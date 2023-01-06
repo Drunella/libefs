@@ -119,15 +119,15 @@ build/ef/directory.data.prg build/ef/files.data.prg: build/ef/files.list build/e
 build/ef/files.list:
 	@mkdir -p ./build/files
 	rm -f ./build/ef/files.list
-	./tools/mkdata.sh build/files/data1.prg 0x2000 1 >> build/ef/files.list
-	./tools/mkdata.sh build/files/data256.prg 0x2000 256 >> build/ef/files.list
-	./tools/mkdata.sh build/files/data1023.prg 0x2000 1023 >> build/ef/files.list
-	./tools/mkdata.sh build/files/data1024.prg 0x2000 1024 >> build/ef/files.list
-	./tools/mkdata.sh build/files/data1025.prg 0x2000 1025 >> build/ef/files.list
-	./tools/mkdata.sh build/files/data24k.prg 0x2000 24575 >> build/ef/files.list
+	./tools/mkdata.sh build/files/data1.prg 0x3000 1 >> build/ef/files.list
+	./tools/mkdata.sh build/files/data256.prg 0x3000 256 >> build/ef/files.list
+	./tools/mkdata.sh build/files/data1023.prg 0x3000 1023 >> build/ef/files.list
+	./tools/mkdata.sh build/files/data1024.prg 0x3000 1024 >> build/ef/files.list
+	./tools/mkdata.sh build/files/data1025.prg 0x3000 1025 >> build/ef/files.list
+	./tools/mkdata.sh build/files/data24k.prg 0x3000 24575 >> build/ef/files.list
 	./tools/mkdata.sh build/files/data4k.prg 0xc000 4096 >> build/ef/files.list
-	./tools/mkdata.sh build/files/data567890123456.prg 0x2000 257 >> build/ef/files.list
-	./tools/mkdata.sh build/files/data56789012345.prg 0x2000 1025 >> build/ef/files.list
+	./tools/mkdata.sh build/files/data567890123456.prg 0x3000 257 >> build/ef/files.list
+	./tools/mkdata.sh build/files/data56789012345.prg 0x3000 1025 >> build/ef/files.list
 
 	
 # easyflash init.bin

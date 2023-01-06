@@ -34,10 +34,14 @@ void menu_option(uint8_t x, uint8_t y, char key, char *desc);
 char* gettextxy(uint8_t x, uint8_t y, uint8_t len);
 
 char* __fastcall__ EFS_get_endadress(void);
-uint8_t __fastcall__ EFS_readst_wrapper();
+uint8_t __fastcall__ EFS_readst_wrapper(void);
 void __fastcall__ EFS_setnam_wrapper(char* name, uint8_t length);
 void __fastcall__ EFS_setlfs_wrapper(uint8_t pseudodevice, uint8_t secondary);
 uint8_t __fastcall__ EFS_load_wrapper(char* address, uint8_t mode);
+uint8_t __fastcall__ EFS_open_wrapper(void);
+uint8_t __fastcall__ EFS_close_wrapper(void);
+uint8_t __fastcall__ EFS_chrin_wrapper(uint8_t* data);
+uint8_t __fastcall__ EFS_chrout_wrapper(uint8_t data);
 
 uint8_t __fastcall__ SYS_get_system();
 uint16_t __fastcall__ TIMER_get_system();

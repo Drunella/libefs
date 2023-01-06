@@ -56,11 +56,16 @@ EAPIGetSlot       = $df9b
 ; EFS lib
 
 EFS_init    = $8000
-EFS_readst  = $DF00
-EFS_setlfs  = $DF06
-EFS_setnam  = $DF0c
-EFS_load    = $DF12
-EFS_save    = $DF18
+EFS_setlfs  = $DF00
+EFS_setnam  = $DF06
+EFS_load    = $DF0C
+EFS_save    = $DF12
+EFS_open    = $DF18
+EFS_close   = $DF1E
+EFS_chrin   = $DF24
+EFS_chrout  = $DF2A
+EFS_readst  = $DF30
+
 
 ; efs struct
 .struct efs_directory

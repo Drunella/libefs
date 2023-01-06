@@ -15,6 +15,18 @@
 ; ----------------------------------------------------------------------------
 
 
+; constants
+
+ERROR_FILE_OPEN         = $02
+ERROR_FILE_NOT_OPEN     = $03
+ERROR_FILE_NOT_FOUND    = $04
+ERROR_NO_INPUT_FILE     = $06
+ERROR_NO_OUTPUT_FILE    = $07
+ERROR_MISSING_FILENAME  = $08
+
+STATUS_EOF       = $40
+STATUS_MISMATCH  = $10
+
 ; io rom
 EFSLIB_ROM_START = $8000
 EFSLIB_ROM_BANK  = 0

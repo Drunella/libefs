@@ -22,9 +22,10 @@
 #include "util.h"
 
 
-#define MENU_START_Y 4
+#define MENU_START_Y 3
 #define OUTPUT_START_Y 10
 #define CONSOLE_START_Y 15
+#define ADDRESS 0x3000
 
 
 static void draw_startmenu(void) {
@@ -58,6 +59,24 @@ void draw_system(uint8_t s)
     cprintf("\n\r");
 }
 
+void fail_tests_3(void)
+{
+    uint8_t data;
+    
+    // close without open
+    uint8_t retval, status;
+    cprintf("close without open: ");
+    retval = EFS_close_wrapper();
+    status = EFS_readst_wrapper();
+    cprintf("r=%d s=$%02x\n\r",retval, status);
+
+    cprintf("chrin without open: ");
+    retval = EFS_chrin_wrapper(&data);
+    status = EFS_readst_wrapper();
+    cprintf("r=%d s=$%02x\n\r",retval, status);
+
+    
+}
 
 void loadverify(char* filename, uint8_t verify, uint8_t secondary)
 {
@@ -71,14 +90,56 @@ void loadverify(char* filename, uint8_t verify, uint8_t secondary)
     EFS_setlfs_wrapper(0, secondary);
     cprintf("start\n\r");
     TIMER_reset();
-    retval = EFS_load_wrapper((char*)(0x2000), verify);
+    retval = EFS_load_wrapper((char*)(ADDRESS), verify);
     timer = UINT32_MAX - TIMER_measure();
     address = EFS_get_endadress();
     if (verify == 0) cprintf("l: "); else cprintf("v: ");
-    cprintf("m=%d, r=%d, s=$%4x, e=$%4x\n\r", secondary, retval, 0x2000, address);
+    cprintf("sc=%d, rt=%d, sa=$%4x, ea=$%4x\n\r", secondary, retval, ADDRESS, address);
     status = EFS_readst_wrapper();
     seconds = timer / 1000000; timer = timer % 1000000;
-    cprintf("status: %x, timer = %lu.%06lu sec\n\r", status, seconds, timer);
+    cprintf("st: $%02x, timer = %lu.%06lu sec\n\r", status, seconds, timer);
+}
+
+void openfile(char* filename, uint8_t secondary)
+{
+    uint8_t retval, status;
+
+    menu_clear(CONSOLE_START_Y, 24);
+    gotoxy(0, CONSOLE_START_Y);
+    EFS_setnam_wrapper(filename, strlen(filename));
+    EFS_setlfs_wrapper(0, secondary);
+    retval = EFS_open_wrapper();
+    status = EFS_readst_wrapper();
+    cprintf("open: sc=%d, rt=%d, st=$%02x\n\r", secondary, retval, status);
+  
+}
+
+void readfile(void)
+{
+    uint8_t retval, status, data;
+    uint16_t checksum = 0;
+    
+    while (true) {
+        retval = EFS_chrin_wrapper(&data);
+        if (retval != 0) break;
+        checksum += data;
+    }
+
+    status = EFS_readst_wrapper();
+    cprintf("chrin: rt=%d, st=$%02x chksum=%d\n\r", retval, status, checksum);
+    
+}
+
+void closefile(void)
+{
+    uint8_t retval, status;
+
+    menu_clear(CONSOLE_START_Y, 24);
+    gotoxy(0, CONSOLE_START_Y);
+    retval = EFS_close_wrapper();
+    status = EFS_readst_wrapper();
+    cprintf("close: rt=%d, st=$%02x\n\r", retval, status);
+
 }
 
 
@@ -97,7 +158,7 @@ void main(void)
     draw_startmenu();
     sprintf(filename, "data256");
     secondary = 0;
-    memset((char*)0x2000, 0, 0x6000);
+    memset((char*)ADDRESS, 0, 0x6000);
     
     //sysident = TIMER_get_system();
     sysident = SYS_get_system();
@@ -116,8 +177,11 @@ void main(void)
             menu_option(0, wherey(), '2', "Verify file");
             menu_option(0, wherey(), 'Q', "Quit to basic");
             gotoxy(0, MENU_START_Y);
-            cprintf("\n\r"); // skip line
             menu_option(20, wherey(), 'S', "Toggle secondary");
+            menu_option(20, wherey(), '0', "Fail tests");
+            menu_option(20, wherey(), '3', "Open file");
+            menu_option(20, wherey(), '4', "Close file");
+            menu_option(20, wherey(), '5', "Read file");
             gotoxy(0, OUTPUT_START_Y);
             //cprintf("%x (4a:60,9 a6:60,1 51:50,9 c0:50,1)\n\r", sysident);
             draw_system(sysident);
@@ -141,7 +205,7 @@ void main(void)
             break;
 
         case 'c':
-            memset((char*)0x2000, 0, 0x6000);
+            memset((char*)ADDRESS, 0, 0x6000);
             repaint = 1;
             break;
 
@@ -150,36 +214,33 @@ void main(void)
             repaint = 1;
             break;
 
+        case '0':
+            fail_tests_3();
+            repaint = true;
+            break;
+
         case '1':
             loadverify(filename, 0, secondary);
-/*            menu_clear(CONSOLE_START_Y, 24);
-            gotoxy(0, CONSOLE_START_Y);
-            EFS_setnam_wrapper(filename, strlen(filename));
-            EFS_setlfs_wrapper(0, secondary);
-            cprintf("start\n\r");
-            TIMER_reset();
-            retval = EFS_load_wrapper((char*)(0x2000), 0);
-            timer = UINT32_MAX - TIMER_measure();
-            address = EFS_get_endadress();
-            cprintf("load: m=%d, r=%d, s=$%4x, e=$%4x\n\r", secondary, retval, 0x2000, address);
-            status = EFS_readst_wrapper();
-            seconds = timer / 1000000; timer = timer % 1000000;
-            cprintf("status: %x, timer = %lu.%06lu sec\n\r", status, seconds, timer);*/
             repaint = true;
             break;
 
         case '2':
             loadverify(filename, 1, secondary);
-/*            menu_clear(CONSOLE_START_Y, 24);
-            gotoxy(0, CONSOLE_START_Y);
-            EFS_setnam_wrapper(filename, strlen(filename));
-            EFS_setlfs_wrapper(0, secondary);
-            cprintf("start\n\r");
-            retval = EFS_load_wrapper((char*)(0x2000), 1); // verify
-            address = EFS_get_endadress();
-            cprintf("verify: m=%d, r=%d, s=$%4x, e=$%4x\n\r", secondary, retval, 0x2000, address);
-            status = EFS_readst_wrapper();
-            cprintf("status: %x\n\r", status);*/
+            repaint = true;
+            break;
+
+        case '3':
+            openfile(filename, secondary);
+            repaint = true;
+            break;
+
+        case '4':
+            closefile();
+            repaint = true;
+            break;
+
+        case '5':
+            readfile();
             repaint = true;
             break;
 

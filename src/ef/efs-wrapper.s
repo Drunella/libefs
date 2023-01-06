@@ -14,7 +14,6 @@
 ; limitations under the License.
 ; ----------------------------------------------------------------------------
 
-
 .feature c_comments
 
 .include "easyflash.i"
@@ -28,6 +27,11 @@
 .export _EFS_setnam_wrapper
 .export _EFS_setlfs_wrapper
 .export _EFS_load_wrapper
+.export _EFS_open_wrapper
+.export _EFS_close_wrapper
+.export _EFS_chrin_wrapper
+.export _EFS_chrout_wrapper
+
 .export _SYS_get_system
 .export _TIMER_get_system
 .export _TIMER_measure
@@ -42,21 +46,21 @@
 
 .segment "CODE"
 
-    ; char* __fastcall__ EFS_get_endadress(void)
+    ; char* __fastcall__ EFS_get_endadress(void);
     _EFS_get_endadress:
         lda end_address
         ldx end_address + 1
         rts
 
 
-    ; uint8_t __fastcall__ EFS_readst_wrapper()
+    ; uint8_t __fastcall__ EFS_readst_wrapper();
     _EFS_readst_wrapper:
         jsr EFS_readst
         ldx #$00
         rts
 
 
-    ; void __fastcall__ EFS_setnam_wrapper(char* name, uint8_t length)
+    ; void __fastcall__ EFS_setnam_wrapper(char* name, uint8_t length);
     _EFS_setnam_wrapper:
         pha        ; length in A
         jsr popax  ; name in A/X
@@ -77,7 +81,7 @@
         rts
 
 
-    ; void __fastcall__ EFS_setlfs_wrapper(uint8_t pseudodevice, uint8_t secondary)
+    ; void __fastcall__ EFS_setlfs_wrapper(uint8_t pseudodevice, uint8_t secondary);
     _EFS_setlfs_wrapper:
         tay
         jsr popa
@@ -91,7 +95,62 @@
 
         rts
 
-    ; uint8_t __fastcall__ EFS_load_wrapper(char* address, uint8_t mode)
+
+    ; uint8_t __fastcall__ EFS_open_wrapper();
+    _EFS_open_wrapper:
+        jsr EFS_open
+
+        bcc :+
+        cmp #$00
+        bne :+
+        lda #$ff
+    :   ldx #$00
+        rts
+
+
+    ; uint8_t __fastcall__ EFS_close_wrapper();
+    _EFS_close_wrapper:
+        jsr EFS_close
+
+        bcc :+
+        cmp #$00
+        bne :+
+        lda #$ff
+    :   ldx #$00
+        rts
+
+
+    ; uint8_t __fastcall__ EFS_chrin_wrapper(uint8_t* data);
+    _EFS_chrin_wrapper:
+        jsr popax
+        sta sreg
+        stx sreg+1
+
+        jsr EFS_chrin
+        bcs :+
+        ldy #$00
+        sta (<sreg), y
+        tya
+        tax
+        rts
+    :   cmp #$00
+        bne :+
+        lda #$ff
+    :   ldx #$00
+        rts
+
+    ; uint8_t __fastcall__ EFS_chrout_wrapper(uint8_t data);
+    _EFS_chrout_wrapper:
+        jsr EFS_chrout
+        bcc :+
+        ;cmp #$00
+        ;bne :+
+        lda #$ff  ; no error value?
+    :   ldx #$00
+        rts
+
+
+    ; uint8_t __fastcall__ EFS_load_wrapper(char* address, uint8_t mode);
     _EFS_load_wrapper:
         pha        ; mode in A
         jsr popax  ; addr in A/X

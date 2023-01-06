@@ -1,0 +1,29 @@
+Zeropage Usage
+==============
+
+$f7
+$f8
+$f9
+$fa
+$fb
+$fc
+$fd
+$fe
+$ff
+
+
+Internal States
+===============
+
+$00: file not open
+$01: file read/verify operation
+§02: directory operation 
+
+
+
+Memory Configuration
+====================
+
+$DF00:  (libefs jumptable and in/out code; variables)
+$DF80:  (eapi)
+
