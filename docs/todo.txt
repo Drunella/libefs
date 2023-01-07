@@ -5,14 +5,15 @@ ToDo
   + read and open only, no write, no verify
     does not need extra space
     average performance
-  + better performance and verify
+  + better performance (?)
     needs appr. 128 (half page) of non-bankable memory
     ($0100-$7fff, $c000-$cfff)
-  + write
-    needs appr. another 128 bytes og non-bankable memory
+  + write and verify
+    needs appr. another 64 bytes of non-bankable memory
   + variant could be set at runtime
 
 - read directory "$"
+
 - open implementation
   + commands: none
   + open does all preparations

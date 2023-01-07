@@ -124,9 +124,8 @@
 
     ; uint8_t __fastcall__ EFS_chrin_wrapper(uint8_t* data);
     _EFS_chrin_wrapper:
-        jsr popax
-        sta sreg
-        stx sreg+1
+        sta <sreg+1
+        stx <sreg
 
         jsr EFS_chrin
         bcs :+

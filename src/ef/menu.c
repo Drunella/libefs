@@ -116,7 +116,8 @@ void openfile(char* filename, uint8_t secondary)
 
 void readfile(void)
 {
-    uint8_t retval, status, data;
+    uint8_t retval, status;
+    uint8_t data;
     uint16_t checksum = 0;
     
     while (true) {
