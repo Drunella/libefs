@@ -59,12 +59,12 @@ EFS_init    = $8000
 EFS_setlfs  = $DF00
 EFS_setnam  = $DF06
 EFS_load    = $DF0C
-EFS_save    = $DF12
-EFS_open    = $DF18
-EFS_close   = $DF1E
-EFS_chrin   = $DF24
-EFS_chrout  = $DF2A
+EFS_open    = $DF12
+EFS_close   = $DF18
+EFS_chrin   = $DF1E
 EFS_readst  = $DF30
+EFS_save    = $DF24
+EFS_chrout  = $DF2A
 
 
 ; efs struct

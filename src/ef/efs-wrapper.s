@@ -83,12 +83,14 @@
 
     ; void __fastcall__ EFS_setlfs_wrapper(uint8_t pseudodevice, uint8_t secondary);
     _EFS_setlfs_wrapper:
-        tay
+        pha
         jsr popa
         tax
+        pla
+        tay
 
         ; parameter:
-        ;    X: number of efs structure;
+        ;    X: number of efs structure; (device)
         ;    Y: secondary address(0=load, ~0=verify)
         ; return: none
         jsr EFS_setlfs

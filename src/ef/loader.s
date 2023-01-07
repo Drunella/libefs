@@ -86,7 +86,11 @@
         sta $de02
         lda #$00        ; EFSLIB_ROM_BANK
         sta $de00
+        lda #$03        ; verify, write
+        ldx #$00        ; load to $0100
+        ldy #$01
         jsr EFS_init
+        ; bcs error
 
         ; load menu
         ldx #$00  ; efs device

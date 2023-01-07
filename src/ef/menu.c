@@ -126,7 +126,7 @@ void readfile(void)
     }
 
     status = EFS_readst_wrapper();
-    cprintf("chrin: rt=%d, st=$%02x chksum=%d\n\r", retval, status, checksum);
+    cprintf("chrin: rt=%d, st=$%02x chksum=%u\n\r", retval, status, checksum);
     
 }
 
@@ -156,7 +156,7 @@ void main(void)
     bgcolor(COLOR_BLACK);
     bordercolor(COLOR_BLACK);
     draw_startmenu();
-    sprintf(filename, "data256");
+    sprintf(filename, "data3k");
     secondary = 0;
     memset((char*)ADDRESS, 0, 0x6000);
     

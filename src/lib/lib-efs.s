@@ -51,6 +51,10 @@ ZEROPAGE_SIZE .set 9
 .import __EFS_RAM_RUN__
 .import __EFS_RAM_SIZE__
 
+.import __EFS_REL_LOAD__
+.import __EFS_REL_RUN__
+.import __EFS_REL_SIZE__
+
 
 .segment "EFS_RAM"
 
@@ -60,7 +64,7 @@ ZEROPAGE_SIZE .set 9
     EFS_setlfs:  ; @ $DF00
         ; parameter:
         ;    X: number of efs structure; 
-        ;    Y: secondary address(0=load, ~0=verify)
+        ;    Y: secondary address (0: relocate)
         ; return: none
         jsr efs_bankin
         jmp rom_setlfs_body
@@ -92,18 +96,7 @@ ZEROPAGE_SIZE .set 9
         jsr efs_bankin
         jmp rom_load_body
 
-    EFS_save:    ; @ $DF12
-        ; parameter:
-        ;    A: z-page to start address
-        ;    X: end address low
-        ;    Y: end address high
-        ; return:
-        ;    A: error code
-        ;    .C: 1 if error
-        jsr efs_bankin
-        jmp rom_save_body
-
-    EFS_open:    ; @ $DF18
+    EFS_open:    ; @ $DF12
         ; parameter: none
         ; return:
         ;    A: error code
@@ -116,7 +109,7 @@ ZEROPAGE_SIZE .set 9
         jsr efs_bankin
         jmp rom_open_body
 
-    EFS_close:   ; @ $DF1E
+    EFS_close:   ; @ $DF18
         ; parameter: none
         ; return:
         ;    A: error code
@@ -126,7 +119,7 @@ ZEROPAGE_SIZE .set 9
         jsr efs_bankin
         jmp rom_close_body
 
-    EFS_chrin:   ; @ $DF24
+    EFS_chrin:   ; @ $DF1E
         ; parameter: none
         ; return:
         ;    A: character or error code
@@ -136,6 +129,17 @@ ZEROPAGE_SIZE .set 9
         ;    $05: device not present (?)
         jsr efs_bankin
         jmp rom_chrin_body
+
+    EFS_save:    ; @ $DF24
+        ; parameter:
+        ;    A: z-page to start address
+        ;    X: end address low
+        ;    Y: end address high
+        ; return:
+        ;    A: error code
+        ;    .C: 1 if error
+        jsr efs_bankin
+        jmp rom_save_body
 
     EFS_chrout: ; @ $DF2A
         ; parameter:
@@ -188,15 +192,15 @@ ZEROPAGE_SIZE .set 9
         jsr EAPISetBank
         jmp efs_enter_pha
 
+    efs_verify_byte:
+        jmp efs_return  ; rel_verify_byte
+
     efs_write_byte:
-        ; write byte in A
-        ; 3 bytes
-        jsr EAPIWriteFlashInc
-        jmp efs_enter_pha
+        jmp efs_return  ; rel_write_byte
 
     efs_read_byte:
         ; load byte in A
-        ; 6 bytes
+        ; 3 bytes
         jsr EAPIReadFlashInc
 
     efs_enter_pha:
@@ -210,6 +214,8 @@ ZEROPAGE_SIZE .set 9
         lda #EFSLIB_ROM_BANK
         sta EASYFLASH_BANK
         pla
+
+    efs_return:
         rts
 
 
@@ -221,6 +227,9 @@ ZEROPAGE_SIZE .set 9
         .byte $00
         .endrepeat
 
+    libefs_configuration:
+        .byte $00  ; $00: read only; bit 0: includes verify; bit 1: includes write
+
     backup_memory_config: ; exclusive usage
         .byte $00
 
@@ -228,6 +237,9 @@ ZEROPAGE_SIZE .set 9
         .byte $00
 
     error_byte:  ; exclusive usage
+        .byte $00
+
+    efs_flags:
         .byte $00
 
     internal_state:  ; exclusive usage
@@ -245,14 +257,53 @@ ZEROPAGE_SIZE .set 9
     io_end_address:
         .word $0000
 
-    efs_secondary:
-        .byte $00
-
     efs_device:
         .byte $00
 
-    efs_verify:
-        .byte $00
+
+
+.segment "EFS_REL"
+
+    rel_verify_byte_offset = rel_verify_byte - __EFS_REL_RUN__
+    rel_verify_byte:
+        ; 25 bytes
+        pha
+        lda backup_memory_config  ; restore memory config
+        sta $01
+        lda #EASYFLASH_KILL
+        sta EASYFLASH_CONTROL
+        pla
+        
+        cmp ($fe), y  ; ### jump to additional verify routine
+
+        php        
+        lda #$37
+        sta $01
+        lda #EASYFLASH_LED | EASYFLASH_16K
+        sta EASYFLASH_CONTROL
+        plp
+
+        rts
+
+
+    rel_write_byte_offset = ~rel_write_byte - __EFS_REL_RUN__
+    rel_write_byte:
+        ; 25 bytes
+        lda backup_memory_config  ; restore memory config
+        sta $01
+        lda #EASYFLASH_KILL
+        sta EASYFLASH_CONTROL
+
+        jsr EAPIWriteFlashInc
+
+        pha
+        lda #$37
+        sta $01
+        lda #EASYFLASH_LED | EASYFLASH_16K
+        sta EASYFLASH_CONTROL
+        pla
+
+        rts
 
 
 
@@ -265,6 +316,14 @@ ZEROPAGE_SIZE .set 9
 ; 3 byte filler
 
     EFS_init:
+        ; parameter:
+        ;    A: configuration
+        ;       $00: read only; 
+        ;       bit0: includes verify
+        ;       bit1: includes write
+        ;    X/Y: relocation address
+        ; return:
+        ;    .C: 1 if error
         jmp efs_init_body
 
     efs_magic:
@@ -302,13 +361,63 @@ ZEROPAGE_SIZE .set 9
 
 
     efs_init_body:
+        pha  ; libefs_configuration
+        tya
+        pha  ; high
+        txa
+        pha  ; low
+
         ; copy code to df00
         ldx #<__EFS_RAM_SIZE__ - 1
     :   lda __EFS_RAM_LOAD__,x
         sta __EFS_RAM_RUN__,x
         dex
         bpl :-
-        rts
+        clc
+
+        pla  ; low
+        sta $fe
+        tax
+        clc
+        adc #<rel_verify_byte_offset
+        sta efs_verify_byte + 1
+        lda #$00
+        adc #>rel_verify_byte_offset
+        sta efs_verify_byte + 2
+
+        txa
+        clc
+        adc #<rel_write_byte_offset
+        sta efs_write_byte + 1
+        lda #$00
+        adc #>rel_write_byte_offset
+        sta efs_write_byte + 2
+
+        pla  ; high
+        sta $ff
+        tax
+        clc
+        adc #>rel_verify_byte_offset
+        sta efs_verify_byte + 2
+
+        txa
+        clc
+        adc #>rel_write_byte_offset
+        sta efs_write_byte + 2
+
+        pla  ; config
+        sta libefs_configuration
+
+        beq :+
+        ; copy code to X/Y
+        ldy #<__EFS_REL_SIZE__ - 1
+      : lda __EFS_REL_LOAD__, y
+        sta ($fe), y
+        dey
+        bpl :-
+        clc
+
+      : rts
 
 
 
@@ -316,14 +425,20 @@ ZEROPAGE_SIZE .set 9
 ; efs body funtions
 ; need to leave with 'jmp efs_bankout'
 
-    rom_readst_body:
-        lda status_byte
-        jmp efs_bankout  ; ends with rts
+;    rom_readst_body:
+;        lda status_byte
+;        jmp efs_bankout  ; ends with rts
 
 
     rom_setlfs_body:
         stx efs_device
-        sty efs_secondary
+        lda #$00
+        cpy #$00
+        bne :+    ; zero => relocate
+        lda #LIBEFS_FLAGS_RELOCATE
+      : sta efs_flags
+;      : lda #LIBEFS_FLAGS_RELOCATE
+;        sty efs_secondary
         jmp efs_bankout  ; ends with rts
 
 
@@ -343,7 +458,7 @@ ZEROPAGE_SIZE .set 9
         ; write character
         ;jsr efs_write_byte
         sec
-        lda #$05
+        lda #ERROR_DEVICE_NOT_PRESENT
         sta error_byte
         ; ### check if writing succeeded or failed
         ; .C set if error
@@ -355,6 +470,7 @@ ZEROPAGE_SIZE .set 9
         ; no zeropage usage
         lda internal_state
         bne @next
+        sec
         lda #ERROR_FILE_NOT_OPEN
         sta error_byte
         bne @done
@@ -365,7 +481,7 @@ ZEROPAGE_SIZE .set 9
         bne @done
 
         lda internal_state
-        and #$01
+        cmp #$01
         bne @dirop       
         jsr efs_read_byte  ; read file
         bcc @done
@@ -376,11 +492,11 @@ ZEROPAGE_SIZE .set 9
 
       @dirop:
         lda internal_state
-        and #$02
+        cmp #$02
         bne @error
         ; read dir ###
         sec             ; ###
-        lda #$05        ; ###
+        lda #ERROR_DEVICE_NOT_PRESENT        ; ###
         sta status_byte ; ###
         jmp @done
 
@@ -412,7 +528,7 @@ ZEROPAGE_SIZE .set 9
       @dircheck:
         jsr rom_directory_list_check
         bcc @dirfind
-        lda #$05
+        lda #ERROR_DEVICE_NOT_PRESENT
         sta error_byte
         sec
         ; process directory preparation ###
@@ -461,10 +577,16 @@ ZEROPAGE_SIZE .set 9
     rom_load_body:
         ; return: X/Y: end address
         ; no internal state will be set
-        sta efs_verify
+        ;sta efs_verify
         stx io_start_address
         sty io_start_address + 1
-        jsr backup_zeropage
+        cmp #$00
+        beq :+    ; zero => no verify
+        lda #LIBEFS_FLAGS_VERIFY
+        ora efs_flags
+        sta efs_flags
+
+      : jsr backup_zeropage
 
         lda #$00
         sta status_byte
@@ -481,7 +603,7 @@ ZEROPAGE_SIZE .set 9
         jsr rom_directory_list_check
         bcc @dirfind
         ; process directory ###
-        lda #$05
+        lda #ERROR_DEVICE_NOT_PRESENT
         sta error_byte
         sec
         jmp @leave
@@ -493,12 +615,23 @@ ZEROPAGE_SIZE .set 9
         jsr rom_fileload_begin
         jsr rom_fileload_address
 
-        lda efs_verify
+        ;lda efs_verify ###
+        lda efs_flags
+        and #LIBEFS_FLAGS_VERIFY  ; set: verify, clear: load
         bne @verify
         
         jsr rom_fileload_transfer
         jmp @leave
       @verify:
+        lda libefs_configuration
+        and #LIBEFS_CONFIG_VERIFY  ;  verify possible
+        bne @verifyok
+        lda #ERROR_DEVICE_NOT_PRESENT
+        sta error_byte
+        sec
+        jmp @leave
+
+      @verifyok:
         jsr rom_fileload_verify
 
       @leave:
@@ -526,7 +659,7 @@ ZEROPAGE_SIZE .set 9
 
 ;        jsr rom_save_execute
         sec  ; ###
-        lda #$05
+        lda #ERROR_DEVICE_NOT_PRESENT
         sta error_byte
 
         php  ; save carry
@@ -573,9 +706,12 @@ ZEROPAGE_SIZE .set 9
         sta $fe
         jsr efs_read_byte
         sta $ff
-        lda efs_secondary  ; 0=load to X/Y, 1=load to prg address
-        bne :+
-        lda io_start_address  ; load to given address
+        ;lda efs_secondary  ; 0=load to X/Y, 1=load to prg address
+        lda #LIBEFS_FLAGS_RELOCATE
+        bit efs_flags
+        bne :+              ; set: load to X/Y, clear: no relocate
+        jmp :++
+      : lda io_start_address  ; load to relocation address (X/Y)
         sta $fe
         lda io_start_address + 1
         sta $ff
@@ -628,7 +764,8 @@ ZEROPAGE_SIZE .set 9
       @loop:
         jsr efs_read_byte
         bcs @eof  ; eof
-        cmp ($fe), y
+        jsr efs_verify_byte
+        ;cmp ($fe), y  ; ### jump to additional verify routine
         bne @mismatch
         iny
         bne @loop
@@ -692,14 +829,18 @@ ZEROPAGE_SIZE .set 9
       : clc
         rts
 
+
     rom_dirload_address:
-        lda $01            ; file gives $0401 as address
+        lda #$01
         sta $fe
-        lda $04
+        lda #$04
         sta $ff
-        lda efs_secondary  ; 0=load to X/Y, 1=load to prg address
-        bne :+
-        lda io_start_address  ; load to given address
+        ;lda efs_secondary  ; 0=load to X/Y, 1=load to prg address
+        lda #LIBEFS_FLAGS_RELOCATE
+        bit efs_flags
+        bne :+              ; set: load to X/Y, clear: no relocate
+        jmp :++
+      : lda io_start_address  ; load to relocation address (X/Y)
         sta $fe
         lda io_start_address + 1
         sta $ff
@@ -710,9 +851,9 @@ ZEROPAGE_SIZE .set 9
         sta io_start_address + 1
 
         rts
-        
-        
-        
+
+
+; ### single directory byte ###
 
 
 ; --------------------------------------------------------------------

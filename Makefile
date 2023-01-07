@@ -125,7 +125,7 @@ build/ef/files.list:
 	./tools/mkdata.sh build/files/data1024.prg 0x3000 1024 >> build/ef/files.list
 	./tools/mkdata.sh build/files/data1025.prg 0x3000 1025 >> build/ef/files.list
 	./tools/mkdata.sh build/files/data24k.prg 0x3000 24575 >> build/ef/files.list
-	./tools/mkdata.sh build/files/data4k.prg 0xc000 4096 >> build/ef/files.list
+	./tools/mkdata.sh build/files/data3k.prg 0xc000 3328 >> build/ef/files.list
 	./tools/mkdata.sh build/files/data567890123456.prg 0x3000 257 >> build/ef/files.list
 	./tools/mkdata.sh build/files/data56789012345.prg 0x3000 1025 >> build/ef/files.list
 
