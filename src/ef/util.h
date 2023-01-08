@@ -48,5 +48,7 @@ uint16_t __fastcall__ TIMER_get_system();
 void __fastcall__ TIMER_reset();
 uint32_t __fastcall__ TIMER_measure(); 
 
+uint8_t __fastcall__ SYS_readdir(uint8_t device);
+
 
 #endif

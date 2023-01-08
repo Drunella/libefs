@@ -37,6 +37,7 @@
 ;.include "../../version.txt"
 ; configuration
 ZEROPAGE_SIZE .set 9
+GENERIC_COMMAND_SIZE .set 12
 
 
 .export EFS_init
@@ -51,9 +52,9 @@ ZEROPAGE_SIZE .set 9
 .import __EFS_RAM_RUN__
 .import __EFS_RAM_SIZE__
 
-.import __EFS_REL_LOAD__
-.import __EFS_REL_RUN__
-.import __EFS_REL_SIZE__
+;.import __EFS_REL_LOAD__
+;.import __EFS_REL_RUN__
+;.import __EFS_REL_SIZE__
 
 
 .segment "EFS_RAM"
@@ -185,27 +186,38 @@ ZEROPAGE_SIZE .set 9
         pla
         rts
 
-    efs_set_startbank:
+        ; variable code area
+        ; 15 bytes
+    efs_generic_command:
+
+        .repeat GENERIC_COMMAND_SIZE
+        .byte $60
+        .endrepeat
+
+;    efs_set_startbank:
         ; safest way to set eapi shadow bank
         ; A: bank
         ; 6 bytes
-        jsr EAPISetBank
-        jmp efs_enter_pha
+;        jsr EAPISetBank
+;        jmp efs_enter_pha
 
-    efs_verify_byte:
-        jmp efs_return  ; rel_verify_byte
+;    efs_verify_byte:
+;        jmp efs_return  ; rel_verify_byte
 
-    efs_write_byte:
-        jmp efs_return  ; rel_write_byte
+;    efs_write_byte:
+;        jmp efs_return  ; rel_write_byte
 
-    efs_read_byte:
+
+    efs_io_byte:
         ; load byte in A
         ; 3 bytes
-        jsr EAPIReadFlashInc
+        ; lda $ffff  ; $ad, $ff, $ff
+        ; jsr EAPIWriteFlashInc  ; $20, <EAPIWriteFlashInc, >EAPIWriteFlashInc
+        jsr EAPIReadFlashInc  ; $20, <EAPIReadFlashInc, >EAPIReadFlashInc
 
     efs_enter_pha:
         ; changes status: N, Z
-        ; 13
+        ; 1 byte
         pha
 
     efs_enter:
@@ -239,7 +251,7 @@ ZEROPAGE_SIZE .set 9
     error_byte:  ; exclusive usage
         .byte $00
 
-    efs_flags:
+    efs_flags:  ; exclusive usage
         .byte $00
 
     internal_state:  ; exclusive usage
@@ -264,6 +276,22 @@ ZEROPAGE_SIZE .set 9
 
 .segment "EFS_REL"
 
+    ; 15 byte: read and verify
+/*
+    rel_verify_byte_offset = rel_verify_byte - __EFS_REL_RUN__
+    rel_verify_byte:
+        ; 15 bytes
+        jsr efs_bankout
+        lda ($fe), y  ; read from memory
+        ldx #$37
+        stx $01
+        jmp efs_enter_pha
+        nop
+        nop
+        nop
+*/       
+
+/*
     rel_verify_byte_offset = rel_verify_byte - __EFS_REL_RUN__
     rel_verify_byte:
         ; 25 bytes
@@ -304,7 +332,7 @@ ZEROPAGE_SIZE .set 9
         pla
 
         rts
-
+*/
 
 
 .segment "EFS_CALL"
@@ -360,6 +388,25 @@ ZEROPAGE_SIZE .set 9
         rts
 
 
+    efs_set_eapiread:
+        lda #$ad  ; lda
+        sta efs_io_byte
+        lda #$00
+        sta efs_io_byte + 1
+        lda #$a0
+        sta efs_io_byte + 2
+        rts
+
+    efs_set_eapireadinc:
+        lda #$20  ; jsr
+        sta efs_io_byte
+        lda #<EAPIReadFlashInc
+        sta efs_io_byte + 1
+        lda #>EAPIReadFlashInc
+        sta efs_io_byte + 2
+        rts
+
+
     efs_init_body:
         pha  ; libefs_configuration
         tya
@@ -375,6 +422,9 @@ ZEROPAGE_SIZE .set 9
         bpl :-
         clc
 
+        pla  ; ###
+        pla  ; ###
+/*
         pla  ; low
         sta $fe
         tax
@@ -404,10 +454,10 @@ ZEROPAGE_SIZE .set 9
         clc
         adc #>rel_write_byte_offset
         sta efs_write_byte + 2
-
+*/
         pla  ; config
         sta libefs_configuration
-
+/*
         beq :+
         ; copy code to X/Y
         ldy #<__EFS_REL_SIZE__ - 1
@@ -415,10 +465,44 @@ ZEROPAGE_SIZE .set 9
         sta ($fe), y
         dey
         bpl :-
+*/
         clc
 
-      : rts
+        rts
 
+
+    efs_init_setstartbank:
+        ldy #<(@codeend - @code - 1)
+      : lda @code, y
+        sta efs_generic_command, y
+        dey
+        bpl :-
+        clc
+        rts
+
+       @code:
+        jsr EAPISetBank
+        jmp efs_enter_pha
+       @codeend:
+
+
+    efs_init_readmem:
+        ldy #<(@codeend - @code - 1)
+      : lda @code, y
+        sta efs_generic_command, y
+        dey
+        bpl :-
+        clc
+        rts
+
+      @code:
+        jsr efs_bankout
+        lda ($fe), y  ; read from memory
+        ldx #$37
+        stx $01
+        jmp efs_enter_pha
+        ; bne #$04
+      @codeend:
 
 
 ; --------------------------------------------------------------------
@@ -476,14 +560,18 @@ ZEROPAGE_SIZE .set 9
         bne @done
 
       @next:
-        sec
         lda status_byte    ; previous eof
-        bne @done
+        beq @fileop
+        lda #$00
+        sta error_byte
+        sec
+        beq @done
 
+      @fileop:
         lda internal_state
         cmp #$01
         bne @dirop       
-        jsr efs_read_byte  ; read file
+        jsr efs_io_byte  ; read file
         bcc @done
         lda #STATUS_EOF
         sta status_byte
@@ -678,6 +766,7 @@ ZEROPAGE_SIZE .set 9
 ;   f9/fa: offset in bank (with $8000 added)
 ;   fb/fc/fd: size
 ; using
+;   f7: temporary
 ;   fe/ff: pointer to data
 ; 
     rom_fileload_begin:
@@ -695,16 +784,17 @@ ZEROPAGE_SIZE .set 9
         lda $fd  ; efs_directory_entry + efs_directory::size_upper
         jsr EAPISetLen
 
+        jsr efs_init_setstartbank
         lda $f8  ; efs_directory_entry + efs_directory::bank
-        jsr efs_set_startbank
+        jsr efs_generic_command
 
         rts
 
 
     rom_fileload_address:
-        jsr efs_read_byte ; load address
+        jsr efs_io_byte ; load address
         sta $fe
-        jsr efs_read_byte
+        jsr efs_io_byte
         sta $ff
         ;lda efs_secondary  ; 0=load to X/Y, 1=load to prg address
         lda #LIBEFS_FLAGS_RELOCATE
@@ -727,7 +817,7 @@ ZEROPAGE_SIZE .set 9
     rom_fileload_transfer:
         ldy #$00
       @loop:
-        jsr efs_read_byte
+        jsr efs_io_byte
         bcs @eof
         sta ($fe), y
         iny
@@ -760,12 +850,14 @@ ZEROPAGE_SIZE .set 9
 
 
     rom_fileload_verify:
+        jsr efs_init_readmem  ; prepare verify command
         ldy #$00
       @loop:
-        jsr efs_read_byte
+        jsr efs_io_byte
         bcs @eof  ; eof
-        jsr efs_verify_byte
-        ;cmp ($fe), y  ; ### jump to additional verify routine
+        sta $f7
+        jsr efs_generic_command
+        cmp $f7
         bne @mismatch
         iny
         bne @loop
@@ -868,9 +960,35 @@ ZEROPAGE_SIZE .set 9
 ;   f9/fa: offset in bank (with $8000 added)
 ;   fb/fc/fd: size
 
+    dir_read_byte_low = efs_io_byte + 1
+    dir_read_byte_high = efs_io_byte + 2
+
     dir_namecheck_result = $f7
     dir_name_pointer = $fe
     dir_directory_entry = $fb
+
+    dir_set_eapiread:
+        lda #$ad
+        sta efs_io_byte
+        rts
+
+    dir_pointer_advance:
+        clc
+        adc dir_read_byte_low
+        sta dir_read_byte_low
+        bcc :+
+        inc dir_read_byte_high
+      : rts
+        
+
+    dir_pointer_reverse:
+        sec
+        sbc dir_read_byte_low
+        sta dir_read_byte_low
+        bcs :+
+        dec dir_read_byte_high
+      : rts
+
 
 ;    rom_directory_entry_advance_to:
 ;        ; advance to position A in directory entry
@@ -879,24 +997,24 @@ ZEROPAGE_SIZE .set 9
     rom_directory_filedata:
         ; position is at flags, bank is the next data to load
         ; all zp variables are free and can be used
-        jsr efs_read_byte  ; bank
+        jsr efs_io_byte  ; bank
         sta $f8
-        jsr efs_read_byte  ; bank high
+        jsr efs_io_byte  ; bank high
 
         ; offset
-        jsr efs_read_byte
+        jsr efs_io_byte
         sta $f9
-        jsr efs_read_byte
+        jsr efs_io_byte
         ;clc
         ;adc #$80
         sta $fa
 
         ; size
-        jsr efs_read_byte
+        jsr efs_io_byte
         sta $fb
-        jsr efs_read_byte
+        jsr efs_io_byte
         sta $fc
-        jsr efs_read_byte
+        jsr efs_io_byte
         sta $fd
 
         rts
@@ -912,8 +1030,9 @@ ZEROPAGE_SIZE .set 9
         ldy #$18  ; ### $1800 bytes, could be $2000
         lda #$00
         jsr EAPISetLen
+        jsr efs_init_setstartbank
         lda #$00  ; ### 0, could be different bank
-        jsr efs_set_startbank
+        jsr efs_generic_command
         rts
 
 
@@ -924,7 +1043,7 @@ ZEROPAGE_SIZE .set 9
         ;sty $fc  ; position of directory entry ?
         ldx #$00
       @loop:
-        jsr efs_read_byte    ; load next char
+        jsr efs_io_byte    ; load next char
         sta dir_directory_entry
         inx
         
@@ -943,7 +1062,7 @@ ZEROPAGE_SIZE .set 9
         bne @loop            ; more characters
         cpy #$10             ; full name length reached
         beq @match           ;   -> match
-        jsr efs_read_byte    ; load next char
+        jsr efs_io_byte    ; load next char
         sta dir_directory_entry
         inx
         lda dir_directory_entry  ; if == \0
@@ -952,7 +1071,7 @@ ZEROPAGE_SIZE .set 9
       @next:
         cpx #$10
         beq :+
-        jsr efs_read_byte    ; load next char
+        jsr efs_io_byte    ; load next char
         inx
         bne @next
       : lda #$00
@@ -962,7 +1081,7 @@ ZEROPAGE_SIZE .set 9
       @match:
         cpx #$10
         beq :+
-        jsr efs_read_byte    ; load next char
+        jsr efs_io_byte    ; load next char
         inx
         bne @match
       : lda #$01
@@ -1004,7 +1123,7 @@ ZEROPAGE_SIZE .set 9
         jsr rom_directory_checkname
 
         ; test if more entries
-        jsr efs_read_byte    ; load next char
+        jsr efs_io_byte    ; load next char
         jsr rom_directory_is_terminator
         bcc @next      ; if not terminator entry (C clear) next check
         lda #$04       ; file not found: status=0, error=4, C
@@ -1018,13 +1137,13 @@ ZEROPAGE_SIZE .set 9
 
         lda dir_namecheck_result
         bne @match
-        jsr efs_read_byte 
-        jsr efs_read_byte
-        jsr efs_read_byte
-        jsr efs_read_byte
-        jsr efs_read_byte
-        jsr efs_read_byte
-        jsr efs_read_byte
+        jsr efs_io_byte 
+        jsr efs_io_byte
+        jsr efs_io_byte
+        jsr efs_io_byte
+        jsr efs_io_byte
+        jsr efs_io_byte
+        jsr efs_io_byte
         jmp @repeat
 
       @match:

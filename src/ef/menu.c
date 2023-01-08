@@ -23,7 +23,7 @@
 
 
 #define MENU_START_Y 3
-#define OUTPUT_START_Y 10
+#define OUTPUT_START_Y 11
 #define CONSOLE_START_Y 15
 #define ADDRESS 0x3000
 
@@ -177,6 +177,7 @@ void main(void)
             menu_option(0, wherey(), '1', "Load file");
             menu_option(0, wherey(), '2', "Verify file");
             menu_option(0, wherey(), 'Q', "Quit to basic");
+            menu_option(0, wherey(), 'D', "Directory #8");
             gotoxy(0, MENU_START_Y);
             menu_option(20, wherey(), 'S', "Toggle secondary");
             menu_option(20, wherey(), '0', "Fail tests");
@@ -204,9 +205,14 @@ void main(void)
             //startup_game(); // does not return
             repaint = 1;
             break;
+        case 'd':
+            gotoxy(0, CONSOLE_START_Y);
+            SYS_readdir(8);
+            break;
 
         case 'c':
             memset((char*)ADDRESS, 0, 0x6000);
+            memset((char*)0xc000, 0, 0x0d00);
             repaint = 1;
             break;
 

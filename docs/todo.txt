@@ -1,6 +1,9 @@
 ToDo
 ====
 
+- fast reading of file w/o eapi
+  small code in $DF80 with an optimized loop
+
 - different library variants
   + read and open only, no write, no verify
     does not need extra space
@@ -11,6 +14,9 @@ ToDo
   + write and verify
     needs appr. another 64 bytes of non-bankable memory
   + variant could be set at runtime
+  + read only without eapi
+  + eapi in permanent location
+  + eapi in temporary location
 
 - read directory "$"
 
@@ -35,3 +41,44 @@ ToDo
   + these start with xx:0:0000 - xx:0:17ff as directory, followed by data
   + these can wrap in LL, HH or LH
   + saving can fail due to fragmentation
+
+
+Directory listing
+=================
+
+01 04 address
+addr   line   headline
+01 01  00 00  12 22 41 53 53 20 50 52 45 53 45 4E 54 53 3A 20 20 20 22 20 20 20 20 20 31 00 
+
+       size space (4)   "name(16)"                                                type $ mod (6 chars)
+01 01  34 00  20 20     22 54 48 45 59 20 53 54 4F 4C 45 20 41 20 4D 2E 2B 22 20  50 52 47 20 20 20 00 
+01 01  43 00  20 20     22 43 4F 44 45 22 20 20 20 20 20 20 20 20 20 20 20 20 20  50 52 47 20 20 20 00 
+01 01  09 00  20 20 20  22 4D 41 50 31 22 20 20 20 20 20 20 20 20 20 20 20 20 20  50 52 47 20 20 00 
+01 01  09 00  20 20 20  22 4D 41 50 32 22 20 20 20 20 20 20 20 20 20 20 20 20 20  50 52 47 20 20 00 
+01 01  09 00  20 20 20  22 4D 41 50 33 22 20 20 20 20 20 20 20 20 20 20 20 20 20  50 52 47 20 20 00 
+01 01  0A 00  20 20     22 4D 41 50 34 22 20 20 20 20 20 20 20 20 20 20 20 20 20  50 52 47 20 20 20 00 
+01 01  0B 00  20 20     22 4D 41 50 35 22 20 20 20 20 20 20 20 20 20 20 20 20 20  50 52 47 20 20 20 00 
+01 01  52 00  20 20     22 4D 45 4E 55 22 20 20 20 20 20 20 20 20 20 20 20 20 20  50 52 47 20 20 20 00 
+
+addr   blocks b  l  o  c  k  s     f  r  e  e  .  13 spaces
+01 01  9F 01  42 4C 4F 43 4B 53 20 46 52 45 45 2E 20 20 20 20 20 20 20 20 20 20 20 20 20 00 
+00 00  00 (end)
+
+state machines needs variables:
+variable for name: 16 bytes)
+counter for name and sizes (1 byte)
+variable for storing size for later filling (1 byte)
+variable for storing the free size in blocks (2 bytes)
+
+state machine (appr 33 states):
+address low, address high, addr dummy, addr dummy, line dummy, line dummy,
+reverse on, quotation mark, disk name (16), quotation mark, disk id(?),
+terminator,
+
+addr dummy, addr dummy, size low(x), size high(x), size filler(x), quotation mark, name(16,x2), quotation mark,
+fill up(-16, x), type, fillup(x), terminator,
+
+addr dummy, addr dumma, size low(x), size high(x), blocksfree(25), terminator
+terminator, terminator, terminator
+
+eof

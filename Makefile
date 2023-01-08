@@ -128,6 +128,8 @@ build/ef/files.list:
 	./tools/mkdata.sh build/files/data3k.prg 0xc000 3328 >> build/ef/files.list
 	./tools/mkdata.sh build/files/data567890123456.prg 0x3000 257 >> build/ef/files.list
 	./tools/mkdata.sh build/files/data56789012345.prg 0x3000 1025 >> build/ef/files.list
+	./tools/mkdata.sh build/files/data8k.prg 0xa000 8192 >> build/ef/files.list
+	./tools/mkdata.sh build/files/data7k.prg 0xe000 7936 >> build/ef/files.list
 
 	
 # easyflash init.bin

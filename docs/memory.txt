@@ -27,3 +27,61 @@ Memory Configuration
 $DF00:  (libefs jumptable and in/out code; variables)
 $DF80:  (eapi)
 
+
+Cartridge Memory Map
+====================
+
+00:0:0000      efs rom
+00:1:0000      efs directory
+     ...       efs directory
+     1700      efs directory
+     1800      EAPI
+     1900      EAPI       
+     1A00      EAPI
+     1B00      easycart name
+     1C00      loader
+     1D00      loader
+     1E00      loader
+     1F00      startup code & reset vector
+01:0:0000      [efs files]
+01:1:0000      [efs files]
+02:0:0000      [efs files]
+02:1:0000      [efs files]
+03:0:0000      [efs files]
+03:1:0000      [efs files]
+04:0:0000      [efs files]
+04:1:0000      [efs files]
+05:0:0000      [efs files]
+05:1:0000      [efs files]
+06:0:0000      [efs files]
+06:1:0000      [efs files]
+07:0:0000      [efs files]
+07:1:0000      [efs files]
+
+08-15:0:0000   [efs files], [low rw dir&files chip]
+
+08-15:1:0000   [efs files], [high rw dir&files chip]
+
+16-23:0:0000   [efs files], [low rw dir&files chip]
+
+16-23:1:0000   [efs files], [high rw dir&files chip]
+
+24-31:0:0000   [efs files], [low rw dir&files chip]
+
+24-31:1:0000   [efs files], [high rw dir&files chip]
+
+32-39:0:0000   [efs files], [low rw dir&files chip]
+
+32-39:1:0000   [efs files], [high rw dir&files chip]
+
+40-47:0:0000   [efs files], [low rw dir&files chip]
+
+40-47:1:0000   [efs files], [high rw dir&files chip]
+
+48-55:0:0000   [efs files], [low rw dir&files chip]
+
+48-55:1:0000   [efs files], [high rw dir&files chip]
+               
+56-63:0:0000   [efs files], [low rw dir&files chip]
+
+56-63:1:0000   [efs files], [high rw dir&files chip]

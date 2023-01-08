@@ -22,6 +22,8 @@
 .import popax
 .import sreg
 
+.import _cputc
+
 .export _EFS_get_endadress
 .export _EFS_readst_wrapper
 .export _EFS_setnam_wrapper
@@ -36,6 +38,7 @@
 .export _TIMER_get_system
 .export _TIMER_measure
 .export _TIMER_reset
+.export _SYS_readdir
 
 
 .segment "DATA"
@@ -273,3 +276,85 @@
     
 
 
+    ; uint8_t __fastcall__ SYS_readdir(uint8_t device);
+    _SYS_readdir:
+        pha
+        LDA #$01
+        LDX #<@dirname
+        LDY #>@dirname
+        JSR $FFBD      ; call SETNAM
+
+        LDA #$02       ; filenumber 2
+        pla 
+        tax
+        LDA #$02       ; filenumber 2
+        LDY #$00       ; secondary address 0 (required for dir reading!)
+        JSR $FFBA      ; call SETLFS
+
+        lda #$c0
+        sta @setbyte + 2
+        lda #$00
+        sta @setbyte + 1 
+
+        JSR $FFC0      ; call OPEN (open the directory)
+        BCS @error     ; quit if OPEN failed
+
+        LDX #$02       ; filenumber 2
+        JSR $FFC6      ; call CHKIN
+
+;        LDY #$04       ; skip 4 bytes on the first dir line
+;        BNE @skip2
+;      @next:
+;        LDY #$02       ; skip 2 bytes on all other lines
+;      @skip2:
+;        JSR @getbyte    ; get a byte from dir and ignore it
+;        DEY
+;        BNE @skip2
+
+;        JSR @getbyte    ; get low byte of basic line number
+;        TAY
+;        JSR @getbyte    ; get high byte of basic line number
+      @char:
+        ;jsr _cputc
+        JSR @getbyte
+        bcs @exit
+        jsr @setbyte
+        jmp @char
+
+;        BNE @char      ; continue until end of line
+
+;        LDA #$0D
+;        jsr _cputc
+;        lda #$0a
+;        jsr _cputc
+;        BNE @next      ; no RUN/STOP -> continue
+      @error:
+        ; Akkumulator contains BASIC error code
+
+        ; most likely error:
+        ; A = $05 (DEVICE NOT PRESENT)
+      @exit:
+        LDA #$02       ; filenumber 2
+        JSR $FFC3      ; call CLOSE
+
+        JSR $FFCC     ; call CLRCHN
+        lda #$00
+        ldy #$00
+        RTS
+
+      @getbyte:
+        JSR $FFB7      ; call READST (read status byte)
+        BNE @end       ; read error or end of file
+        JMP $FFCF      ; call CHRIN (read byte from directory)
+      @end:
+        JMP @exit
+
+      @dirname:
+        .byte "$"      ; filename used to access directory
+
+      @setbyte:
+        sta $c000
+        inc @setbyte + 1
+        bne :+
+        inc @setbyte + 2
+      : rts
