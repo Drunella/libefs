@@ -76,8 +76,8 @@
         bne :-
 
         ; load eapi
-        lda #>__EAPI_START__
-        jsr _load_eapi
+;        lda #>__EAPI_START__
+;        jsr _load_eapi
 
         ; load efs
         lda #$37
@@ -90,7 +90,10 @@
         ldx #$00        ; load to $0100
         ldy #$01
         jsr EFS_init
-        ; bcs error
+        ; bcs error ###
+
+        ; minieapi
+        jsr EFS_init_minieapi
 
         ; load menu
         ldx #$00  ; efs device

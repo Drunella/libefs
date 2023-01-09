@@ -56,6 +56,8 @@ EAPIGetSlot       = $df9b
 ; EFS lib
 
 EFS_init    = $8000
+EFS_init_minieapi = $8003
+
 EFS_setlfs  = $DF00
 EFS_setnam  = $DF06
 EFS_load    = $DF0C

@@ -65,10 +65,11 @@ addr   blocks b  l  o  c  k  s     f  r  e  e  .  13 spaces
 00 00  00 (end)
 
 state machines needs variables:
-variable for name: 16 bytes)
+variable for name: 16 bytes) (not necessary if pointer can move backwards, which it can)
 counter for name and sizes (1 byte)
 variable for storing size for later filling (1 byte)
 variable for storing the free size in blocks (2 bytes)
+
 
 state machine (appr 33 states):
 address low, address high, addr dummy, addr dummy, line dummy, line dummy,

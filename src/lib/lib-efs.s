@@ -37,10 +37,12 @@
 ;.include "../../version.txt"
 ; configuration
 ZEROPAGE_SIZE .set 9
-GENERIC_COMMAND_SIZE .set 12
+GENERIC_COMMAND_SIZE .set 14
 
 
 .export EFS_init
+.export EFS_init_minieapi
+
 .export EFS_setlfs
 .export EFS_setnam
 .export EFS_load
@@ -48,16 +50,20 @@ GENERIC_COMMAND_SIZE .set 12
 .export EFS_readst
 
 
-.import __EFS_RAM_LOAD__
-.import __EFS_RAM_RUN__
-.import __EFS_RAM_SIZE__
+.import __EFS_RAM1_LOAD__
+.import __EFS_RAM1_RUN__
+.import __EFS_RAM1_SIZE__
+
+.import __EFS_RAM2_LOAD__
+.import __EFS_RAM2_RUN__
+.import __EFS_RAM2_SIZE__
 
 ;.import __EFS_REL_LOAD__
 ;.import __EFS_REL_RUN__
 ;.import __EFS_REL_SIZE__
 
 
-.segment "EFS_RAM"
+.segment "EFS_RAM1"
 
 ; --------------------------------------------------------------------
 ; efs jump table
@@ -154,10 +160,9 @@ GENERIC_COMMAND_SIZE .set 12
         ; parameter: none
         ; return:
         ;    A: status code ($10: verify mismatch; $40: EOF; $80: device not present)
-        lda status_byte
+    status_byte = * + 1
+        lda $00
         rts
-        ;jsr efs_bankin
-        ;jmp rom_readst_body
 
 
 ; --------------------------------------------------------------------
@@ -209,9 +214,11 @@ GENERIC_COMMAND_SIZE .set 12
 
 
     efs_io_byte:
+;    efs_io_byte_low = efs_io_byte + 1
+;    efs_io_byte_high = efs_io_byte + 2
         ; load byte in A
         ; 3 bytes
-        ; lda $ffff  ; $ad, $ff, $ff
+        ; lda $ffff  ; $ad, $ff, $ff (no)
         ; jsr EAPIWriteFlashInc  ; $20, <EAPIWriteFlashInc, >EAPIWriteFlashInc
         jsr EAPIReadFlashInc  ; $20, <EAPIReadFlashInc, >EAPIReadFlashInc
 
@@ -245,8 +252,8 @@ GENERIC_COMMAND_SIZE .set 12
     backup_memory_config: ; exclusive usage
         .byte $00
 
-    status_byte:  ; exclusive usage
-        .byte $00
+;    status_byte:  ; exclusive usage
+;        .byte $00
 
     error_byte:  ; exclusive usage
         .byte $00
@@ -274,7 +281,7 @@ GENERIC_COMMAND_SIZE .set 12
 
 
 
-.segment "EFS_REL"
+;.segment "EFS_REL"
 
     ; 15 byte: read and verify
 /*
@@ -354,11 +361,15 @@ GENERIC_COMMAND_SIZE .set 12
         ;    .C: 1 if error
         jmp efs_init_body
 
-    efs_magic:
-      .byte "lib-efs"
-      .byte 0, 1, 0  ; ### read from version.txt
-      .byte $ff, $ff, $ff
+    EFS_init_minieapi:
+        ; parameter: none
+        ; return: none
+        jmp efs_init_minieapi_body
 
+    efs_magic:
+      .byte "libefs"
+      .byte 0, 1, 0  ; ### read from version.txt
+      .byte $ff
 
 
 .segment "EFS_ROM"
@@ -388,23 +399,32 @@ GENERIC_COMMAND_SIZE .set 12
         rts
 
 
-    efs_set_eapiread:
+/*    efs_set_eapiread:
         lda #$ad  ; lda
         sta efs_io_byte
         lda #$00
         sta efs_io_byte + 1
         lda #$a0
         sta efs_io_byte + 2
-        rts
+        rts*/
 
-    efs_set_eapireadinc:
+/*    efs_set_eapireadinc:
         lda #$20  ; jsr
         sta efs_io_byte
         lda #<EAPIReadFlashInc
         sta efs_io_byte + 1
         lda #>EAPIReadFlashInc
         sta efs_io_byte + 2
-        rts
+        rts*/
+
+/*    efs_set_eapirwriteinc:
+        lda #$20  ; jsr
+        sta efs_io_byte
+        lda #<EAPIWriteFlashInc
+        sta efs_io_byte + 1
+        lda #>EAPIWriteFlashInc
+        sta efs_io_byte + 2
+        rts*/
 
 
     efs_init_body:
@@ -415,9 +435,9 @@ GENERIC_COMMAND_SIZE .set 12
         pha  ; low
 
         ; copy code to df00
-        ldx #<__EFS_RAM_SIZE__ - 1
-    :   lda __EFS_RAM_LOAD__,x
-        sta __EFS_RAM_RUN__,x
+        ldx #<__EFS_RAM1_SIZE__ - 1
+    :   lda __EFS_RAM1_LOAD__,x
+        sta __EFS_RAM1_RUN__,x
         dex
         bpl :-
         clc
@@ -471,6 +491,17 @@ GENERIC_COMMAND_SIZE .set 12
         rts
 
 
+    efs_init_minieapi_body:
+        ; copy code to df80
+        ldx #<__EFS_RAM2_SIZE__ - 1
+    :   lda __EFS_RAM2_LOAD__,x
+        sta __EFS_RAM2_RUN__,x
+        dex
+        bpl :-
+        clc
+        rts
+
+
     efs_init_setstartbank:
         ldy #<(@codeend - @code - 1)
       : lda @code, y
@@ -505,14 +536,72 @@ GENERIC_COMMAND_SIZE .set 12
       @codeend:
 
 
+    efs_init_readmem_ext:
+        ldy #<(@codeend - @code - 1)
+      : lda @code, y
+        sta efs_generic_command, y
+        dey
+        bpl :-
+        clc
+        rts
+
+      @code: ;
+        jsr efs_bankout
+        lda $ffff  ; read from memory
+        ldx #$37
+        stx $01
+        bne * + 3
+      @codeend:
+
+    efs_readmem_ext = efs_generic_command
+    efs_readmem_ext_low = efs_generic_command + 4
+    efs_readmem_ext_high = efs_generic_command + 5
+
+
+    efs_init_readef:
+        ldy #<(@codeend - @code - 1)
+      : lda @code, y
+        sta efs_generic_command, y
+        dey
+        bpl :-
+        clc
+        rts
+
+      @code: ; 12 bytes
+        jsr EAPIGetBank
+        sta EASYFLASH_BANK
+        lda $8000  ; read from banked memory
+        jmp efs_enter_pha
+      @codeend:
+
+    efs_readef = efs_generic_command
+    efs_readef_low = efs_generic_command + 7
+    efs_readef_high = efs_generic_command + 8
+
+
+    efs_init_eapireadinc:
+        lda #$20  ; jsr
+        sta efs_io_byte
+        lda #<EAPIReadFlashInc
+        sta efs_io_byte + 1
+        lda #>EAPIReadFlashInc
+        sta efs_io_byte + 2
+        rts
+
+
+    efs_init_eapiwriteinc:
+        lda #$20  ; jsr
+        sta efs_io_byte
+        lda #<EAPIWriteFlashInc
+        sta efs_io_byte + 1
+        lda #>EAPIWriteFlashInc
+        sta efs_io_byte + 2
+        rts
+
+
 ; --------------------------------------------------------------------
-; efs body funtions
+; efs body functions
 ; need to leave with 'jmp efs_bankout'
-
-;    rom_readst_body:
-;        lda status_byte
-;        jmp efs_bankout  ; ends with rts
-
 
     rom_setlfs_body:
         stx efs_device
@@ -770,6 +859,8 @@ GENERIC_COMMAND_SIZE .set 12
 ;   fe/ff: pointer to data
 ; 
     rom_fileload_begin:
+        jsr efs_init_eapireadinc  ; repair dynamic code
+
         ; directory entry
         ldx $f9  ; efs_directory_entry + efs_directory::offset_low
         lda $fa  ; efs_directory_entry + efs_directory::offset_high
@@ -903,6 +994,7 @@ GENERIC_COMMAND_SIZE .set 12
 ; directory list functions
 ; usage:
 ;   fe/ff: pointer to name
+;   io_end_address: ###
 ; return:
 
     rom_directory_list_check:
@@ -960,61 +1052,74 @@ GENERIC_COMMAND_SIZE .set 12
 ;   f9/fa: offset in bank (with $8000 added)
 ;   fb/fc/fd: size
 
-    dir_read_byte_low = efs_io_byte + 1
-    dir_read_byte_high = efs_io_byte + 2
+;    dir_read_byte_low = efs_io_byte + 1
+;    dir_read_byte_high = efs_io_byte + 2
 
     dir_namecheck_result = $f7
     dir_name_pointer = $fe
     dir_directory_entry = $fb
 
-    dir_set_eapiread:
-        lda #$ad
-        sta efs_io_byte
+    dir_read_and_pointer_inc:
+        jsr efs_readef
+        pha
+        jsr dir_pointer_inc
+        pla
         rts
 
+    dir_pointer_inc:
+        ; ### check if pointer leaves directory
+        inc efs_readef_low
+        bne :+
+        inc efs_readef_high
+      : lda efs_readef_high
+        cmp #$b8  ; directory over ### configuration
+        rts
+;        clc
+;        bne :+
+;        sec
+;      : rts
+
     dir_pointer_advance:
+        ; ### check if pointer leaves directory
         clc
-        adc dir_read_byte_low
-        sta dir_read_byte_low
+        adc efs_readef_low
+        sta efs_readef_low
         bcc :+
-        inc dir_read_byte_high
+        inc efs_readef_high
       : rts
         
 
     dir_pointer_reverse:
+        ; ### check if pointer leaves directory
         sec
-        sbc dir_read_byte_low
-        sta dir_read_byte_low
+        sbc efs_readef_low
+        sta efs_readef_low
         bcs :+
-        dec dir_read_byte_high
+        dec efs_readef_high
       : rts
 
-
-;    rom_directory_entry_advance_to:
-;        ; advance to position A in directory entry
-;        cmp $fc
 
     rom_directory_filedata:
         ; position is at flags, bank is the next data to load
         ; all zp variables are free and can be used
-        jsr efs_io_byte  ; bank
+        jsr dir_read_and_pointer_inc  ; efs_io_byte  ; bank
         sta $f8
-        jsr efs_io_byte  ; bank high
+        jsr dir_read_and_pointer_inc  ; efs_io_byte  ; bank high
 
         ; offset
-        jsr efs_io_byte
+        jsr dir_read_and_pointer_inc  ; efs_io_byte
         sta $f9
-        jsr efs_io_byte
+        jsr dir_read_and_pointer_inc  ; efs_io_byte
         ;clc
         ;adc #$80
         sta $fa
 
         ; size
-        jsr efs_io_byte
+        jsr dir_read_and_pointer_inc  ; efs_io_byte
         sta $fb
-        jsr efs_io_byte
+        jsr dir_read_and_pointer_inc  ; efs_io_byte
         sta $fc
-        jsr efs_io_byte
+        jsr dir_read_and_pointer_inc  ; efs_io_byte
         sta $fd
 
         rts
@@ -1033,6 +1138,14 @@ GENERIC_COMMAND_SIZE .set 12
         jsr efs_init_setstartbank
         lda #$00  ; ### 0, could be different bank
         jsr efs_generic_command
+
+        ; set read code
+        jsr efs_init_readef
+        lda #$00
+        sta efs_readef_low
+        lda #$a0
+        sta efs_readef_high
+
         rts
 
 
@@ -1043,7 +1156,7 @@ GENERIC_COMMAND_SIZE .set 12
         ;sty $fc  ; position of directory entry ?
         ldx #$00
       @loop:
-        jsr efs_io_byte    ; load next char
+        jsr dir_read_and_pointer_inc  ; efs_io_byte    ; load next char
         sta dir_directory_entry
         inx
         
@@ -1062,7 +1175,7 @@ GENERIC_COMMAND_SIZE .set 12
         bne @loop            ; more characters
         cpy #$10             ; full name length reached
         beq @match           ;   -> match
-        jsr efs_io_byte    ; load next char
+        jsr dir_read_and_pointer_inc  ; efs_io_byte    ; load next char
         sta dir_directory_entry
         inx
         lda dir_directory_entry  ; if == \0
@@ -1071,7 +1184,7 @@ GENERIC_COMMAND_SIZE .set 12
       @next:
         cpx #$10
         beq :+
-        jsr efs_io_byte    ; load next char
+        jsr dir_read_and_pointer_inc  ; efs_io_byte    ; load next char
         inx
         bne @next
       : lda #$00
@@ -1081,7 +1194,7 @@ GENERIC_COMMAND_SIZE .set 12
       @match:
         cpx #$10
         beq :+
-        jsr efs_io_byte    ; load next char
+        jsr dir_read_and_pointer_inc  ; efs_io_byte    ; load next char
         inx
         bne @match
       : lda #$01
@@ -1123,9 +1236,11 @@ GENERIC_COMMAND_SIZE .set 12
         jsr rom_directory_checkname
 
         ; test if more entries
-        jsr efs_io_byte    ; load next char
+        jsr dir_read_and_pointer_inc  ; efs_io_byte    ; load next char
+        bcs @error4
         jsr rom_directory_is_terminator
         bcc @next      ; if not terminator entry (C clear) next check
+      @error4:
         lda #$04       ; file not found: status=0, error=4, C
       @error:
         sta error_byte
@@ -1137,13 +1252,15 @@ GENERIC_COMMAND_SIZE .set 12
 
         lda dir_namecheck_result
         bne @match
-        jsr efs_io_byte 
-        jsr efs_io_byte
-        jsr efs_io_byte
-        jsr efs_io_byte
-        jsr efs_io_byte
-        jsr efs_io_byte
-        jsr efs_io_byte
+        lda #$07
+        jsr dir_pointer_advance
+        ;jsr efs_io_byte 
+        ;jsr efs_io_byte
+        ;jsr efs_io_byte
+        ;jsr efs_io_byte
+        ;jsr efs_io_byte
+        ;jsr efs_io_byte
+        ;jsr efs_io_byte
         jmp @repeat
 
       @match:
