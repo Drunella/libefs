@@ -82,18 +82,26 @@
         ; load efs
         lda #$37
         sta $01
-        lda #$80 | $07  ; led, 16k mode
+        lda #$87   ; led, 16k mode
         sta $de02
-        lda #$00        ; EFSLIB_ROM_BANK
+        lda #$00   ; EFSLIB_ROM_BANK
         sta $de00
-        lda #$03        ; verify, write
-        ldx #$00        ; load to $0100
-        ldy #$01
+;        lda #$03        ; verify, write
+;        ldx #$00        ; load to $0100
+;        ldy #$01
         jsr EFS_init
+
         ; bcs error ###
 
         ; minieapi
-        jsr EFS_init_minieapi
+;        jsr EFS_init_minieapi
+        lda #$cd
+        jsr EFS_init_eapi
+
+        lda #$36
+        sta $01
+        lda #$04   ; easyflash off
+        sta $de02
 
         ; load menu
         ldx #$00  ; efs device

@@ -1,0 +1,345 @@
+; ----------------------------------------------------------------------------
+; Copyright 2023 Drunella
+;
+; Licensed under the Apache License, Version 2.0 (the "License");
+; you may not use this file except in compliance with the License.
+; You may obtain a copy of the License at
+;
+;     http://www.apache.org/licenses/LICENSE-2.0
+;
+; Unless required by applicable law or agreed to in writing, software
+; distributed under the License is distributed on an "AS IS" BASIS,
+; WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+; See the License for the specific language governing permissions and
+; limitations under the License.
+; ----------------------------------------------------------------------------
+
+; call $8000 (EFS_init) to initialize
+; you need to bank in bank 0 at least in 8k mode
+; init code
+;   lda #$37
+;   sta $01
+;   lda #$80 | $07  ; led, 16k mode
+;   sta $de02
+;   lda #$00        ; EFSLIB_ROM_BANK
+;   sta $de00
+;   jsr $8000       ; _efs_init
+
+; ### implement conditional switches for non rom version
+
+
+.feature c_comments
+.localchar '@'
+
+.include "lib-efs.i"
+
+;.define version
+;.include "../../version.txt"
+; configuration
+
+
+.import rom_chrout_body
+.import rom_save_body
+.import rom_chrin_body
+.import rom_close_body
+.import rom_open_body
+.import rom_load_body
+.import rom_setnam_body
+.import rom_setlfs_body
+
+.export backup_zeropage_data
+.export libefs_configuration
+.export backup_memory_config
+.export status_byte
+.export error_byte
+.export efs_flags
+.export internal_state
+.export filename_address
+.export filename_length
+.export io_start_address
+.export io_end_address
+.export efs_device
+.export efs_io_byte
+.export efs_generic_command
+.export efs_enter_pha
+.export efs_bankout
+.export efs_enter
+
+
+.segment "EFS_RAM1"
+
+; --------------------------------------------------------------------
+; efs jump table
+
+    EFS_setlfs:  ; @ $DF00
+        ; parameter:
+        ;    X: number of efs structure; 
+        ;    Y: secondary address (0: relocate)
+        ; return: none
+        jsr efs_bankin
+        jmp rom_setlfs_body
+
+    EFS_setnam:  ; @ $DF06
+        ; parameter:
+        ;    A: name length 
+        ;    X: name address low
+        ;    Y: name address high
+        ; return: none
+        jsr efs_bankin
+        jmp rom_setnam_body
+
+    EFS_load:    ; @ $DF0C
+        ; parameter:
+        ;    A: 0=load, 1-255=verify
+        ;    X: load address low 
+        ;    Y: load address high
+        ; return: 
+        ;    A: error code
+        ;    X: end address low
+        ;    Y: end address high
+        ;    .C: 1 if error
+        ; error:
+        ;    $02: file open
+        ;    $04: file not found
+        ;    $05: device not present (?)
+        ;    $08: missing filename
+        jsr efs_bankin
+        jmp rom_load_body
+
+    EFS_open:    ; @ $DF12
+        ; parameter: none
+        ; return:
+        ;    A: error code
+        ;    .C: 1 if error
+        ; error:
+        ;    $02: file open
+        ;    $04: file not found
+        ;    $05: device not present (?)
+        ;    $08: missing filename
+        jsr efs_bankin
+        jmp rom_open_body
+
+    EFS_close:   ; @ $DF18
+        ; parameter: none
+        ; return:
+        ;    A: error code
+        ;    .C: 1 if error
+        ; error:
+        ;    $02: file not open
+        jsr efs_bankin
+        jmp rom_close_body
+
+    EFS_chrin:   ; @ $DF1E
+        ; parameter: none
+        ; return:
+        ;    A: character or error code
+        ;    .C: 1 if error
+        ; error:
+        ;    $03: file not open
+        ;    $05: device not present (?)
+        jsr efs_bankin
+        jmp rom_chrin_body
+
+    EFS_save:    ; @ $DF24
+        ; parameter:
+        ;    A: z-page to start address
+        ;    X: end address low
+        ;    Y: end address high
+        ; return:
+        ;    A: error code
+        ;    .C: 1 if error
+        jsr efs_bankin
+        jmp rom_save_body
+
+    EFS_chrout: ; @ $DF2A
+        ; parameter:
+        ;    A: character
+        ; return:
+        ;    .C: 1 if error
+        jsr efs_bankin
+        jmp rom_chrout_body
+
+    EFS_readst:  ; @ $DF30
+        ; parameter: none
+        ; return:
+        ;    A: status code ($10: verify mismatch; $40: EOF; $80: device not present)
+    status_byte = * + 1
+        lda $00
+        rts
+
+
+; --------------------------------------------------------------------
+; efs wrapper function that need to switch banks
+
+    efs_bankin:
+        ; changes status: N, Z
+        ; does not work with disabled io area
+        ; 13 bytes
+        pha
+        lda $01  ; save memory config
+        sta backup_memory_config
+        lda #$37  ; bank to rom area
+        sta $01
+        bne efs_enter
+
+    efs_bankout:
+        ; changes status: N, Z
+        ; does not work with disabled io area
+        ; 13 bytes
+        pha
+        lda backup_memory_config  ; restore memory config
+        sta $01
+        lda #EASYFLASH_KILL
+        sta EASYFLASH_CONTROL
+        pla
+        rts
+
+        ; variable code area
+        ; 15 bytes
+    efs_generic_command:
+
+        .repeat GENERIC_COMMAND_SIZE
+        .byte $60
+        .endrepeat
+
+;    efs_set_startbank:
+        ; safest way to set eapi shadow bank
+        ; A: bank
+        ; 6 bytes
+;        jsr EAPISetBank
+;        jmp efs_enter_pha
+
+;    efs_verify_byte:
+;        jmp efs_return  ; rel_verify_byte
+
+;    efs_write_byte:
+;        jmp efs_return  ; rel_write_byte
+
+
+    efs_io_byte:
+;    efs_io_byte_low = efs_io_byte + 1
+;    efs_io_byte_high = efs_io_byte + 2
+        ; load byte in A
+        ; 3 bytes
+        ; lda $ffff  ; $ad, $ff, $ff (no)
+        ; jsr EAPIWriteFlashInc  ; $20, <EAPIWriteFlashInc, >EAPIWriteFlashInc
+        jsr EAPIReadFlashInc  ; $20, <EAPIReadFlashInc, >EAPIReadFlashInc
+
+    efs_enter_pha:
+        ; changes status: N, Z
+        ; 1 byte
+        pha
+
+    efs_enter:
+        lda #EASYFLASH_LED | EASYFLASH_16K
+        sta EASYFLASH_CONTROL
+        lda #EFSLIB_ROM_BANK
+        sta EASYFLASH_BANK
+        pla
+
+    efs_return:
+        rts
+
+
+; --------------------------------------------------------------------
+; efs data
+
+    backup_zeropage_data:
+        .repeat ZEROPAGE_SIZE
+        .byte $00
+        .endrepeat
+
+    libefs_configuration:
+        .byte $00  ; $00: read only; bit 0: includes verify; bit 1: includes write
+
+    backup_memory_config: ; exclusive usage
+        .byte $00
+
+;    status_byte:  ; exclusive usage
+;        .byte $00
+
+    error_byte:  ; exclusive usage
+        .byte $00
+
+    efs_flags:  ; exclusive usage
+        .byte $00
+
+    internal_state:  ; exclusive usage
+        .byte $00    ; stores, open, closed, open, verify, read directory
+
+    filename_address:
+        .word $0000
+
+    filename_length:
+        .byte $00
+
+    io_start_address:
+        .word $0000
+
+    io_end_address:
+        .word $0000
+
+    efs_device:
+        .byte $00
+
+
+
+;.segment "EFS_REL"
+
+    ; 15 byte: read and verify
+/*
+    rel_verify_byte_offset = rel_verify_byte - __EFS_REL_RUN__
+    rel_verify_byte:
+        ; 15 bytes
+        jsr efs_bankout
+        lda ($fe), y  ; read from memory
+        ldx #$37
+        stx $01
+        jmp efs_enter_pha
+        nop
+        nop
+        nop
+*/       
+
+/*
+    rel_verify_byte_offset = rel_verify_byte - __EFS_REL_RUN__
+    rel_verify_byte:
+        ; 25 bytes
+        pha
+        lda backup_memory_config  ; restore memory config
+        sta $01
+        lda #EASYFLASH_KILL
+        sta EASYFLASH_CONTROL
+        pla
+        
+        cmp ($fe), y  ; ### jump to additional verify routine
+
+        php        
+        lda #$37
+        sta $01
+        lda #EASYFLASH_LED | EASYFLASH_16K
+        sta EASYFLASH_CONTROL
+        plp
+
+        rts
+
+
+    rel_write_byte_offset = ~rel_write_byte - __EFS_REL_RUN__
+    rel_write_byte:
+        ; 25 bytes
+        lda backup_memory_config  ; restore memory config
+        sta $01
+        lda #EASYFLASH_KILL
+        sta EASYFLASH_CONTROL
+
+        jsr EAPIWriteFlashInc
+
+        pha
+        lda #$37
+        sta $01
+        lda #EASYFLASH_LED | EASYFLASH_16K
+        sta EASYFLASH_CONTROL
+        pla
+
+        rts
+*/

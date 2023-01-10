@@ -15,6 +15,10 @@
 ; ----------------------------------------------------------------------------
 
 
+; sizes
+ZEROPAGE_SIZE .set 9
+GENERIC_COMMAND_SIZE .set 14
+
 ; constants
 
 ERROR_FILE_OPEN          = $02

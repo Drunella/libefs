@@ -36,18 +36,18 @@
 ;.define version
 ;.include "../../version.txt"
 ; configuration
-ZEROPAGE_SIZE .set 9
-GENERIC_COMMAND_SIZE .set 14
+;ZEROPAGE_SIZE .set 9
+;GENERIC_COMMAND_SIZE .set 14
 
 
-.export EFS_init
-.export EFS_init_minieapi
+;.export EFS_init
+;.export EFS_init_minieapi
 
-.export EFS_setlfs
-.export EFS_setnam
-.export EFS_load
-.export EFS_save
-.export EFS_readst
+;.export EFS_setlfs
+;.export EFS_setnam
+;.export EFS_load
+;.export EFS_save
+;.export EFS_readst
 
 
 .import __EFS_RAM1_LOAD__
@@ -58,288 +58,35 @@ GENERIC_COMMAND_SIZE .set 14
 .import __EFS_RAM2_RUN__
 .import __EFS_RAM2_SIZE__
 
-;.import __EFS_REL_LOAD__
-;.import __EFS_REL_RUN__
-;.import __EFS_REL_SIZE__
+.import backup_zeropage_data
+.import libefs_configuration
+.import backup_memory_config
+.import status_byte
+.import error_byte
+.import efs_flags
+.import internal_state
+.import filename_address
+.import filename_length
+.import io_start_address
+.import io_end_address
+.import efs_device
 
+.import efs_io_byte
+.import efs_generic_command
+.import efs_bankin
+.import efs_bankout
+.import efs_enter_pha
+.import efs_enter
 
-.segment "EFS_RAM1"
+.export rom_chrout_body
+.export rom_save_body
+.export rom_chrin_body
+.export rom_close_body
+.export rom_open_body
+.export rom_load_body
+.export rom_setnam_body
+.export rom_setlfs_body
 
-; --------------------------------------------------------------------
-; efs jump table
-
-    EFS_setlfs:  ; @ $DF00
-        ; parameter:
-        ;    X: number of efs structure; 
-        ;    Y: secondary address (0: relocate)
-        ; return: none
-        jsr efs_bankin
-        jmp rom_setlfs_body
-
-    EFS_setnam:  ; @ $DF06
-        ; parameter:
-        ;    A: name length 
-        ;    X: name address low
-        ;    Y: name address high
-        ; return: none
-        jsr efs_bankin
-        jmp rom_setnam_body
-
-    EFS_load:    ; @ $DF0C
-        ; parameter:
-        ;    A: 0=load, 1-255=verify
-        ;    X: load address low 
-        ;    Y: load address high
-        ; return: 
-        ;    A: error code
-        ;    X: end address low
-        ;    Y: end address high
-        ;    .C: 1 if error
-        ; error:
-        ;    $02: file open
-        ;    $04: file not found
-        ;    $05: device not present (?)
-        ;    $08: missing filename
-        jsr efs_bankin
-        jmp rom_load_body
-
-    EFS_open:    ; @ $DF12
-        ; parameter: none
-        ; return:
-        ;    A: error code
-        ;    .C: 1 if error
-        ; error:
-        ;    $02: file open
-        ;    $04: file not found
-        ;    $05: device not present (?)
-        ;    $08: missing filename
-        jsr efs_bankin
-        jmp rom_open_body
-
-    EFS_close:   ; @ $DF18
-        ; parameter: none
-        ; return:
-        ;    A: error code
-        ;    .C: 1 if error
-        ; error:
-        ;    $02: file not open
-        jsr efs_bankin
-        jmp rom_close_body
-
-    EFS_chrin:   ; @ $DF1E
-        ; parameter: none
-        ; return:
-        ;    A: character or error code
-        ;    .C: 1 if error
-        ; error:
-        ;    $03: file not open
-        ;    $05: device not present (?)
-        jsr efs_bankin
-        jmp rom_chrin_body
-
-    EFS_save:    ; @ $DF24
-        ; parameter:
-        ;    A: z-page to start address
-        ;    X: end address low
-        ;    Y: end address high
-        ; return:
-        ;    A: error code
-        ;    .C: 1 if error
-        jsr efs_bankin
-        jmp rom_save_body
-
-    EFS_chrout: ; @ $DF2A
-        ; parameter:
-        ;    A: character
-        ; return:
-        ;    .C: 1 if error
-        jsr efs_bankin
-        jmp rom_chrout_body
-
-    EFS_readst:  ; @ $DF30
-        ; parameter: none
-        ; return:
-        ;    A: status code ($10: verify mismatch; $40: EOF; $80: device not present)
-    status_byte = * + 1
-        lda $00
-        rts
-
-
-; --------------------------------------------------------------------
-; efs wrapper function that need to switch banks
-
-    efs_bankin:
-        ; changes status: N, Z
-        ; does not work with disabled io area
-        ; 13 bytes
-        pha
-        lda $01  ; save memory config
-        sta backup_memory_config
-        lda #$37  ; bank to rom area
-        sta $01
-        bne efs_enter
-
-    efs_bankout:
-        ; changes status: N, Z
-        ; does not work with disabled io area
-        ; 13 bytes
-        pha
-        lda backup_memory_config  ; restore memory config
-        sta $01
-        lda #EASYFLASH_KILL
-        sta EASYFLASH_CONTROL
-        pla
-        rts
-
-        ; variable code area
-        ; 15 bytes
-    efs_generic_command:
-
-        .repeat GENERIC_COMMAND_SIZE
-        .byte $60
-        .endrepeat
-
-;    efs_set_startbank:
-        ; safest way to set eapi shadow bank
-        ; A: bank
-        ; 6 bytes
-;        jsr EAPISetBank
-;        jmp efs_enter_pha
-
-;    efs_verify_byte:
-;        jmp efs_return  ; rel_verify_byte
-
-;    efs_write_byte:
-;        jmp efs_return  ; rel_write_byte
-
-
-    efs_io_byte:
-;    efs_io_byte_low = efs_io_byte + 1
-;    efs_io_byte_high = efs_io_byte + 2
-        ; load byte in A
-        ; 3 bytes
-        ; lda $ffff  ; $ad, $ff, $ff (no)
-        ; jsr EAPIWriteFlashInc  ; $20, <EAPIWriteFlashInc, >EAPIWriteFlashInc
-        jsr EAPIReadFlashInc  ; $20, <EAPIReadFlashInc, >EAPIReadFlashInc
-
-    efs_enter_pha:
-        ; changes status: N, Z
-        ; 1 byte
-        pha
-
-    efs_enter:
-        lda #EASYFLASH_LED | EASYFLASH_16K
-        sta EASYFLASH_CONTROL
-        lda #EFSLIB_ROM_BANK
-        sta EASYFLASH_BANK
-        pla
-
-    efs_return:
-        rts
-
-
-; --------------------------------------------------------------------
-; efs data
-
-    backup_zeropage_data:
-        .repeat ZEROPAGE_SIZE
-        .byte $00
-        .endrepeat
-
-    libefs_configuration:
-        .byte $00  ; $00: read only; bit 0: includes verify; bit 1: includes write
-
-    backup_memory_config: ; exclusive usage
-        .byte $00
-
-;    status_byte:  ; exclusive usage
-;        .byte $00
-
-    error_byte:  ; exclusive usage
-        .byte $00
-
-    efs_flags:  ; exclusive usage
-        .byte $00
-
-    internal_state:  ; exclusive usage
-        .byte $00    ; stores, open, closed, open, verify, read directory
-
-    filename_address:
-        .word $0000
-
-    filename_length:
-        .byte $00
-
-    io_start_address:
-        .word $0000
-
-    io_end_address:
-        .word $0000
-
-    efs_device:
-        .byte $00
-
-
-
-;.segment "EFS_REL"
-
-    ; 15 byte: read and verify
-/*
-    rel_verify_byte_offset = rel_verify_byte - __EFS_REL_RUN__
-    rel_verify_byte:
-        ; 15 bytes
-        jsr efs_bankout
-        lda ($fe), y  ; read from memory
-        ldx #$37
-        stx $01
-        jmp efs_enter_pha
-        nop
-        nop
-        nop
-*/       
-
-/*
-    rel_verify_byte_offset = rel_verify_byte - __EFS_REL_RUN__
-    rel_verify_byte:
-        ; 25 bytes
-        pha
-        lda backup_memory_config  ; restore memory config
-        sta $01
-        lda #EASYFLASH_KILL
-        sta EASYFLASH_CONTROL
-        pla
-        
-        cmp ($fe), y  ; ### jump to additional verify routine
-
-        php        
-        lda #$37
-        sta $01
-        lda #EASYFLASH_LED | EASYFLASH_16K
-        sta EASYFLASH_CONTROL
-        plp
-
-        rts
-
-
-    rel_write_byte_offset = ~rel_write_byte - __EFS_REL_RUN__
-    rel_write_byte:
-        ; 25 bytes
-        lda backup_memory_config  ; restore memory config
-        sta $01
-        lda #EASYFLASH_KILL
-        sta EASYFLASH_CONTROL
-
-        jsr EAPIWriteFlashInc
-
-        pha
-        lda #$37
-        sta $01
-        lda #EASYFLASH_LED | EASYFLASH_16K
-        sta EASYFLASH_CONTROL
-        pla
-
-        rts
-*/
 
 
 .segment "EFS_CALL"
@@ -350,7 +97,7 @@ GENERIC_COMMAND_SIZE .set 14
 ; 10 byte magic & version
 ; 3 byte filler
 
-    EFS_init:
+    EFS_init: ; @ $8000
         ; parameter:
         ;    A: configuration
         ;       $00: read only; 
@@ -361,26 +108,36 @@ GENERIC_COMMAND_SIZE .set 14
         ;    .C: 1 if error
         jmp efs_init_body
 
-    EFS_init_minieapi:
+    EFS_init_eapi: ; @ $8003
         ; parameter: none
         ; return: none
         jmp efs_init_minieapi_body
+
+    EFS_init_mini_eapi: ; @ $8006
+        jmp efs_init_eapi_body
+
+    EFS_init_YYY: ; @ $8009
+        jmp $ffff
+
+      .byte $ff, $ff
 
     efs_magic:
       .byte "libefs"
       .byte 0, 1, 0  ; ### read from version.txt
       .byte $ff
 
+    efs_call_size = * - EFS_init
+    .if efs_call_size <> 24
+    .error "EFS_CALL size mismatch"
+    .endif
+
+
 
 .segment "EFS_ROM"
 
 ; --------------------------------------------------------------------
 ; efs: init and utility function bodies
-; $f9: temporary variable
-; $fa/fb: source/destination address
-; $fc
-; $fd
-; $fe/ff: temporary pointer
+; no zp usage
 
     backup_zeropage:
         ldx #ZEROPAGE_SIZE - 1  ; backup zp
@@ -399,40 +156,8 @@ GENERIC_COMMAND_SIZE .set 14
         rts
 
 
-/*    efs_set_eapiread:
-        lda #$ad  ; lda
-        sta efs_io_byte
-        lda #$00
-        sta efs_io_byte + 1
-        lda #$a0
-        sta efs_io_byte + 2
-        rts*/
-
-/*    efs_set_eapireadinc:
-        lda #$20  ; jsr
-        sta efs_io_byte
-        lda #<EAPIReadFlashInc
-        sta efs_io_byte + 1
-        lda #>EAPIReadFlashInc
-        sta efs_io_byte + 2
-        rts*/
-
-/*    efs_set_eapirwriteinc:
-        lda #$20  ; jsr
-        sta efs_io_byte
-        lda #<EAPIWriteFlashInc
-        sta efs_io_byte + 1
-        lda #>EAPIWriteFlashInc
-        sta efs_io_byte + 2
-        rts*/
-
-
     efs_init_body:
         pha  ; libefs_configuration
-        tya
-        pha  ; high
-        txa
-        pha  ; low
 
         ; copy code to df00
         ldx #<__EFS_RAM1_SIZE__ - 1
@@ -442,52 +167,9 @@ GENERIC_COMMAND_SIZE .set 14
         bpl :-
         clc
 
-        pla  ; ###
-        pla  ; ###
-/*
-        pla  ; low
-        sta $fe
-        tax
-        clc
-        adc #<rel_verify_byte_offset
-        sta efs_verify_byte + 1
-        lda #$00
-        adc #>rel_verify_byte_offset
-        sta efs_verify_byte + 2
-
-        txa
-        clc
-        adc #<rel_write_byte_offset
-        sta efs_write_byte + 1
-        lda #$00
-        adc #>rel_write_byte_offset
-        sta efs_write_byte + 2
-
-        pla  ; high
-        sta $ff
-        tax
-        clc
-        adc #>rel_verify_byte_offset
-        sta efs_verify_byte + 2
-
-        txa
-        clc
-        adc #>rel_write_byte_offset
-        sta efs_write_byte + 2
-*/
         pla  ; config
         sta libefs_configuration
-/*
-        beq :+
-        ; copy code to X/Y
-        ldy #<__EFS_REL_SIZE__ - 1
-      : lda __EFS_REL_LOAD__, y
-        sta ($fe), y
-        dey
-        bpl :-
-*/
         clc
-
         rts
 
 
@@ -500,6 +182,62 @@ GENERIC_COMMAND_SIZE .set 14
         bpl :-
         clc
         rts
+
+
+    efs_init_eapi_body:
+        tax
+        lda $01
+        sta backup_memory_config
+
+        ldy #<(@codeend - @code - 1)
+      : lda @code, y
+        sta efs_generic_command, y
+        dey
+        bpl :-
+;        clc
+
+        stx efs_generic_command + @dest  ; store high value
+
+        ; copy blocks
+        ldx #$00
+      : lda EAPI_SOURCE + $0000, x
+        jsr efs_generic_command
+        inx
+        bne :-
+
+        inc efs_generic_command + @dest
+        ldx #$00
+      : lda EAPI_SOURCE + $0100, x
+        jsr efs_generic_command
+        inx
+        bne :-
+
+        inc efs_generic_command + @dest
+        ldx #$00
+      : lda EAPI_SOURCE + $0200, x
+        jsr efs_generic_command
+        inx
+        bne :-
+        dec efs_generic_command + @dest
+        dec efs_generic_command + @dest
+
+        ; init eapi
+        lda #$20  ; jsr
+        sta efs_generic_command + @dest - 2
+        lda #$14  ; low
+        sta efs_generic_command + @dest - 1
+        jmp efs_generic_command  ; init eapi
+        rts
+
+      @code:
+        jsr efs_bankout
+      @dest = * - @code + 2
+        sta $c000, x
+        jmp efs_enter_pha
+      @codeend:
+      .if (@codeend - @code) > GENERIC_COMMAND_SIZE
+      .error "dynamic code initeapi to large"
+      .endif
 
 
     efs_init_setstartbank:
@@ -515,6 +253,9 @@ GENERIC_COMMAND_SIZE .set 14
         jsr EAPISetBank
         jmp efs_enter_pha
        @codeend:
+      .if (@codeend - @code) > GENERIC_COMMAND_SIZE
+      .error "dynamic code setstartbank to large"
+      .endif
 
 
     efs_init_readmem:
@@ -534,6 +275,9 @@ GENERIC_COMMAND_SIZE .set 14
         jmp efs_enter_pha
         ; bne #$04
       @codeend:
+      .if (@codeend - @code) > GENERIC_COMMAND_SIZE
+      .error "dynamic code readmem to large"
+      .endif
 
 
     efs_init_readmem_ext:
@@ -552,6 +296,9 @@ GENERIC_COMMAND_SIZE .set 14
         stx $01
         bne * + 3
       @codeend:
+      .if (@codeend - @code) > GENERIC_COMMAND_SIZE
+      .error "dynamic code readmem_ext to large"
+      .endif
 
     efs_readmem_ext = efs_generic_command
     efs_readmem_ext_low = efs_generic_command + 4
@@ -573,6 +320,9 @@ GENERIC_COMMAND_SIZE .set 14
         lda $8000  ; read from banked memory
         jmp efs_enter_pha
       @codeend:
+      .if (@codeend - @code) > GENERIC_COMMAND_SIZE
+      .error "dynamic code readef to large"
+      .endif
 
     efs_readef = efs_generic_command
     efs_readef_low = efs_generic_command + 7
@@ -602,6 +352,7 @@ GENERIC_COMMAND_SIZE .set 14
 ; --------------------------------------------------------------------
 ; efs body functions
 ; need to leave with 'jmp efs_bankout'
+; zerpage usage only after zeropage backup
 
     rom_setlfs_body:
         stx efs_device
@@ -740,7 +491,7 @@ GENERIC_COMMAND_SIZE .set 14
 
         lda internal_state
         bne :+
-        sec
+        sec 
         lda #ERROR_FILE_NOT_OPEN
         sta error_byte
 
@@ -780,9 +531,12 @@ GENERIC_COMMAND_SIZE .set 14
         jsr rom_directory_list_check
         bcc @dirfind
         ; process directory ###
-        lda #ERROR_DEVICE_NOT_PRESENT
-        sta error_byte
-        sec
+        jsr rom_dirload_begin
+        jsr rom_dirload_address
+        jsr rom_firload_transfer
+;        lda #ERROR_DEVICE_NOT_PRESENT
+;        sta error_byte
+;        sec
         jmp @leave
 
       @dirfind:
@@ -993,9 +747,14 @@ GENERIC_COMMAND_SIZE .set 14
 ; --------------------------------------------------------------------
 ; directory list functions
 ; usage:
-;   fe/ff: pointer to name
-;   io_end_address: ###
-; return:
+;   f8/f9: temporary file size
+;   fa: temporary variable
+;   fc/fd: address to state maching processing function
+;   fe/ff: pointer to destination / pointer to filename
+;   f7: state machine
+;   io_end_address: state machine state
+;   io_end_address + 1: state machine variable
+;   efs_device: current device
 
     rom_directory_list_check:
         lda filename_address
@@ -1011,6 +770,21 @@ GENERIC_COMMAND_SIZE .set 14
         sec
         rts
       : clc
+        rts
+
+
+    rom_dirload_begin:
+        jsr efs_init_setstartbank
+        lda #$00  ; ### 0, could be different bank CONFIG ###
+        jsr efs_generic_command
+
+        ; set read code
+        jsr efs_init_readef
+        lda #$00
+        sta efs_readef_low
+        lda #$a0
+        sta efs_readef_high
+
         rts
 
 
@@ -1037,15 +811,301 @@ GENERIC_COMMAND_SIZE .set 14
         rts
 
 
-; ### single directory byte ###
+    rom_firload_transfer:
+        lda #$01
+        sta $f7 ; init state machine
+
+        ldy #$00
+      @loop:
+        jsr rom_dirload_next_byte
+        ldx $f7
+        stx dirload_state
+        bcs @eof
+        sta ($fe), y
+        iny
+        bne @loop
+        inc $ff
+        jmp @loop
+
+      @eof:
+        clc
+        tya
+        adc $fe
+        sta $fe
+        bcc :+
+        inc $ff
+      : lda $fe
+        bne :+
+        dec $ff
+      : dec $fe
+
+        lda #$40
+        sta status_byte
+
+        lda $fe
+        sta io_end_address
+        lda $ff
+        sta io_end_address + 1
+
+        clc
+        rts
+
+
+
+    dirload_state = io_end_address
+    dirload_state_var = io_end_address + 1
+
+    rom_dirload_next_byte:
+        ; f7: state machine state
+        lda dirload_state
+        sta $f7
+        asl
+        tax
+        lda rom_dirload_statemachine, x
+        sta $fc
+        lda rom_dirload_statemachine + 1, x
+        sta $fd
+        clc
+        jmp ($00fc)
+
+    rom_dirload_statemachine:
+        .addr rom_dirload_sm_finish        ; 0
+        .addr rom_dirload_sm_addresslow    ; 1
+        .addr rom_dirload_sm_addresshigh   ; 2
+        .addr rom_dirload_sm_addrdummy     ; 3
+        .addr rom_dirload_sm_addrdummy     ; 4
+        .addr rom_dirload_sm_zero          ; 5
+        .addr rom_dirload_sm_zero          ; 6
+        .addr rom_dirload_sm_reverseon     ; 7
+        .addr rom_dirload_sm_quotationmark ; 8
+        .addr rom_dirload_sm_diskname      ; 9
+        .addr rom_dirload_sm_quotationmark ; 10
+        .addr rom_dirload_sm_space         ; 11
+        .addr rom_dirload_sm_devhigh       ; 12
+        .addr rom_dirload_sm_devlow        ; 13
+        .addr rom_dirload_sm_linenend      ; 14
+
+        .addr rom_dirload_sm_zero          ; 15
+        .addr rom_dirload_sm_zero          ; 16
+        .addr rom_dirload_sm_zero          ; 17
+        .addr rom_dirload_sm_finish        ; 18
+        .word $0000
+
+        .addr rom_dirload_sm_addrdummy     ; 20
+        .addr rom_dirload_sm_addrdummy     ; 21
+        .addr rom_dirload_sm_sizelow       ; 22
+        .addr rom_dirload_sm_sizehigh      ; 23
+        .addr rom_dirload_sm_space         ; 24
+        .addr rom_dirload_sm_space         ; 25
+        .addr rom_dirload_sm_space         ; 26
+        .addr rom_dirload_sm_quotationmark ; 27
+        .addr rom_dirload_sm_filename      ; 28
+        .addr rom_dirload_sm_quotationmark ; 29
+        .addr rom_dirload_sm_space         ; 30
+        .addr rom_dirload_sm_type          ; 31
+        .addr rom_dirload_sm_linenend      ; 32
+
+
+    rom_dirload_diskname_text:
+        .byte "easyflash fs    "  ; length 16
+
+    rom_dirload_blocksfree_text:
+        .byte "blocks free.             "
+
+    rom_dirload_sm_finish:
+        lda #$00
+        sec
+        rts
+
+    rom_dirload_sm_space:
+        lda #$20
+        inc $f7
+        rts
+
+    rom_dirload_sm_linenend:
+        ; produces $00 and decides if new filename
+        ; if filename -> 20
+        ; if finish -> 15
+        ; ### decide about hidden flag
+        lda #16  ; pointer starts at begin of dir entry
+        jsr dir_pointer_advance
+        bcs :+  ; directory terminates
+        jsr efs_readef
+        and #%00011111  ; mask out hidden and reserved flag fields
+        sta $fa
+        bne :+  ; is file invalid
+        lda #8  ; invalid
+        jsr dir_pointer_advance
+        jmp rom_dirload_sm_linenend
+
+      : lda $fa  ; terminator ?
+        cmp $1f
+        bne :+
+        lda #15  ; finish directory
+        sta $f7
+        lda #$00
+        clc
+        rts
+
+      : lda #20  ; go to file line
+        sta $f7
+        lda #$00
+        clc
+        rts
+
+    rom_dirload_sm_devlow:
+        lda efs_device
+        and #$0f
+        clc
+        adc #$30 
+        cmp #$3a
+        bmi :+    ; if > 9 
+        clc
+        adc #$07  ; add 7 for a-f
+      : inc $f7
+        rts
+
+    rom_dirload_sm_devhigh:
+        lda efs_device
+        lsr
+        lsr
+        lsr
+        lsr
+        clc
+        adc #$30
+        cmp #$3a
+        bmi :+    ; if > 9
+        clc
+        adc #$07  ; add 7 for a-f
+      : inc $f7
+        rts
+
+
+    rom_dirload_sm_addresslow:
+        lda io_start_address
+        inc $f7
+        rts
+
+    rom_dirload_sm_addresshigh:
+        lda io_start_address + 1
+        inc $f7
+        rts
+
+    rom_dirload_sm_addrdummy:
+        lda #$00
+        sta dirload_state_var
+        lda #$01
+        inc $f7
+        rts
+
+    rom_dirload_sm_zero:
+        lda #$00
+        inc $f7
+        rts
+
+    rom_dirload_sm_reverseon:
+        lda #$12
+        inc $f7
+        rts
+
+    rom_dirload_sm_quotationmark:
+        lda #$00
+        sta dirload_state_var
+        lda #$22
+        inc $f7
+        rts
+
+    rom_dirload_sm_diskname:
+        ldx dirload_state_var
+        lda rom_dirload_diskname_text, x
+        inc dirload_state_var
+        cpx #15
+        bne :+
+        inc $f7
+        ldx #$00
+        stx dirload_state_var
+      : clc
+        rts
+
+    rom_dirload_sm_filename:
+        ; pointer is at the name
+        ldx dirload_state_var
+        jsr dir_read_and_pointer_inc
+        bne :+
+        lda #$20  ; space if 0 char
+      : inc dirload_state_var
+        cpx #15
+        bne :+
+        inc $f7
+        ldx #$00
+        stx dirload_state_var
+        
+      : clc
+        rts
+
+    rom_dirload_sm_sizelow:
+        ; pointer is at flags
+        lda #5  ; advance to size low
+        jsr dir_pointer_advance
+        jsr dir_read_and_pointer_inc
+        sta $f8
+        jsr efs_readef
+        clc
+        adc $f8
+        inc $f7
+        rts
+
+    rom_dirload_sm_sizehigh:
+        ; pointer is at size mid
+        jsr dir_pointer_dec
+        jsr dir_read_and_pointer_inc
+        sta $f8
+        jsr dir_read_and_pointer_inc
+        clc
+        adc $f8
+        jsr efs_readef
+        sta $f9
+
+        ; size in blocks is in f8/f9
+        ; calculate how many spaces to skip (0, 1, 2 ,3)
+        ; ###
+        ; 9    -> $0009
+        ; 99   -> $0063
+        ; 999  -> $03e7
+        ; 9999 -> $270f
+        ; https://codebase64.org/doku.php?id=base:16-bit_absolute_comparison
+        
+        inc $f7
+        tax
+        lda #23  ; reverse pointer to name
+        jsr dir_pointer_reverse
+        txa
+      : clc
+        rts
+
+
+    rom_dirload_sm_type:
+        ; pointer is at flags
+        jsr efs_readef
+        inc $f7
+
+        ; ### set type: prg, crt, oce, xba; < for low; > for high
+        ; xxx  : 000: prg; 100: crt; 101: oce; 111: xba
+        ;    yy: 2: low; 3: high (for prg only)
+
+        tax
+        lda #8  ; advance pointer to begin of next name
+        jsr dir_pointer_advance
+        txa
+
+        clc
+        rts
 
 
 ; --------------------------------------------------------------------
 ; directory search functions
 ; usage:
 ;   f7: name check result
-;   fb: current content of directory entry
-;   fc: 
 ;   fe/ff: pointer to name
 ; return:
 ;   f8: bank
@@ -1074,10 +1134,14 @@ GENERIC_COMMAND_SIZE .set 14
       : lda efs_readef_high
         cmp #$b8  ; directory over ### configuration
         rts
-;        clc
-;        bne :+
-;        sec
-;      : rts
+
+    dir_pointer_dec:
+        ; ### check if pointer leaves directory
+        lda efs_readef_low
+        bne :+
+        dec efs_readef_high
+      : dec efs_readef_low
+        rts
 
     dir_pointer_advance:
         ; ### check if pointer leaves directory
@@ -1086,17 +1150,24 @@ GENERIC_COMMAND_SIZE .set 14
         sta efs_readef_low
         bcc :+
         inc efs_readef_high
-      : rts
+      : lda efs_readef_high
+        cmp #$b8  ; directory over ### configuration
+        rts
         
 
     dir_pointer_reverse:
         ; ### check if pointer leaves directory
+        tax
+        lda efs_readef_low
+        stx efs_readef_low
         sec
         sbc efs_readef_low
         sta efs_readef_low
         bcs :+
         dec efs_readef_high
-      : rts
+      : lda efs_readef_high
+        cmp #$b8  ; directory over ### configuration
+        rts
 
 
     rom_directory_filedata:
@@ -1127,14 +1198,14 @@ GENERIC_COMMAND_SIZE .set 14
 
     rom_directory_begin_search:
         ; set pointer and length of directory
-        lda #$d0
-        ldx #$00  ; ### $A000
-        ldy #$a0  ; ### $A000
-        jsr EAPISetPtr
-        ldx #$00
-        ldy #$18  ; ### $1800 bytes, could be $2000
-        lda #$00
-        jsr EAPISetLen
+;        lda #$d0
+;        ldx #$00  ; ### $A000
+;        ldy #$a0  ; ### $A000
+;        jsr EAPISetPtr
+;        ldx #$00
+;        ldy #$18  ; ### $1800 bytes, could be $2000
+;        lda #$00
+;        jsr EAPISetLen
         jsr efs_init_setstartbank
         lda #$00  ; ### 0, could be different bank
         jsr efs_generic_command
@@ -1153,7 +1224,6 @@ GENERIC_COMMAND_SIZE .set 14
         ; compare filename
         ; name is in (fe/ff)
         ldy #$00
-        ;sty $fc  ; position of directory entry ?
         ldx #$00
       @loop:
         jsr dir_read_and_pointer_inc  ; efs_io_byte    ; load next char
@@ -1203,12 +1273,13 @@ GENERIC_COMMAND_SIZE .set 14
 
 
     rom_directory_is_terminator:
+        ; A: value
         ; returns C set if current entry is empty (terminator)
         ; returns C clear if there are more entries
         ; uses A, status
         ; must not use X
         ;lda efs_directory_entry + efs_directory::flags
-        lda $f9
+;        lda $f9
         and #$1f
         cmp #$1f
         beq :+
@@ -1270,6 +1341,49 @@ GENERIC_COMMAND_SIZE .set 14
         rts
 
 
+
+; ------------------------------------------------------------------------
+; attic
+
+/*
+        pla  ; low
+        sta $fe
+        tax
+        clc
+        adc #<rel_verify_byte_offset
+        sta efs_verify_byte + 1
+        lda #$00
+        adc #>rel_verify_byte_offset
+        sta efs_verify_byte + 2
+
+        txa
+        clc
+        adc #<rel_write_byte_offset
+        sta efs_write_byte + 1
+        lda #$00
+        adc #>rel_write_byte_offset
+        sta efs_write_byte + 2
+
+        pla  ; high
+        sta $ff
+        tax
+        clc
+        adc #>rel_verify_byte_offset
+        sta efs_verify_byte + 2
+
+        txa
+        clc
+        adc #>rel_write_byte_offset
+        sta efs_write_byte + 2
+
+        beq :+
+        ; copy code to X/Y
+        ldy #<__EFS_REL_SIZE__ - 1
+      : lda __EFS_REL_LOAD__, y
+        sta ($fe), y
+        dey
+        bpl :-
+*/
 
 /*
       morefiles:

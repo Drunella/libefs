@@ -79,8 +79,8 @@ mrproper:
 # lib-efs.prg
 
 # lib-efs.prg
-build/lib-efs.prg: src/lib/lib-efs.cfg build/lib/lib-efs.o build/lib/lib-efs-ram2.o
-	$(LD65) $(LD65FLAGS) -vm -m ./build/lib/lib-efs.map -Ln ./build/lib/lib-efs.lst -o $@ -C src/lib/lib-efs.cfg c64.lib build/lib/lib-efs.o build/lib/lib-efs-ram2.o
+build/lib-efs.prg: src/lib/lib-efs.cfg build/lib/lib-efs.o build/lib/lib-efs-ram1.o build/lib/lib-efs-ram2.o
+	$(LD65) $(LD65FLAGS) -vm -m ./build/lib/lib-efs.map -Ln ./build/lib/lib-efs.lst -o $@ -C src/lib/lib-efs.cfg c64.lib build/lib/lib-efs.o build/lib/lib-efs-ram1.o build/lib/lib-efs-ram2.o
 
 
 
