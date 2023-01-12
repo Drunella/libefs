@@ -812,15 +812,21 @@
 
 
     rom_firload_transfer:
-        lda #$01
-        sta $f7 ; init state machine
+        jsr rom_dirload_statemachine_reset
+        jsr rom_dirload_next_byte  ; skip load address
+        ldx $f7
+        stx dirload_state
+        jsr rom_dirload_next_byte
+        ldx $f7
+        stx dirload_state
 
         ldy #$00
       @loop:
         jsr rom_dirload_next_byte
         ldx $f7
         stx dirload_state
-        bcs @eof
+        beq @eof   ; state 0 means end
+        bcs @loop  ; C set, skip writing and repeat
         sta ($fe), y
         iny
         bne @loop
@@ -855,6 +861,13 @@
     dirload_state = io_end_address
     dirload_state_var = io_end_address + 1
 
+    rom_dirload_statemachine_reset:
+        lda #$01
+        sta dirload_state
+        lda #$00
+        sta dirload_state_var
+        rts
+
     rom_dirload_next_byte:
         ; f7: state machine state
         lda dirload_state
@@ -883,27 +896,38 @@
         .addr rom_dirload_sm_space         ; 11
         .addr rom_dirload_sm_devhigh       ; 12
         .addr rom_dirload_sm_devlow        ; 13
-        .addr rom_dirload_sm_linenend      ; 14
-
-        .addr rom_dirload_sm_zero          ; 15
-        .addr rom_dirload_sm_zero          ; 16
-        .addr rom_dirload_sm_zero          ; 17
-        .addr rom_dirload_sm_finish        ; 18
+        .addr rom_dirload_sm_space         ; 14
+        .addr rom_dirload_sm_space         ; 15
+        .addr rom_dirload_sm_space         ; 16
+        .addr rom_dirload_sm_space         ; 17
+        .addr rom_dirload_sm_linenend      ; 18
         .word $0000
 
-        .addr rom_dirload_sm_addrdummy     ; 20
-        .addr rom_dirload_sm_addrdummy     ; 21
-        .addr rom_dirload_sm_sizelow       ; 22
-        .addr rom_dirload_sm_sizehigh      ; 23
-        .addr rom_dirload_sm_space         ; 24
-        .addr rom_dirload_sm_space         ; 25
-        .addr rom_dirload_sm_space         ; 26
-        .addr rom_dirload_sm_quotationmark ; 27
-        .addr rom_dirload_sm_filename      ; 28
-        .addr rom_dirload_sm_quotationmark ; 29
-        .addr rom_dirload_sm_space         ; 30
-        .addr rom_dirload_sm_type          ; 31
-        .addr rom_dirload_sm_linenend      ; 32
+        sm_finish = 20
+        ; ### x blocks free
+        .addr rom_dirload_sm_zero          ; 20
+        .addr rom_dirload_sm_zero          ; 21
+        .addr rom_dirload_sm_finish        ; 22
+        .word $0000
+        .word $0000
+
+        sm_nextfile = 25
+        .addr rom_dirload_sm_addrdummy     ; 25
+        .addr rom_dirload_sm_addrdummy     ; 26
+        .addr rom_dirload_sm_sizelow       ; 27
+        .addr rom_dirload_sm_sizehigh      ; 28
+        .addr rom_dirload_sm_skip_withspace  ; 29
+        .addr rom_dirload_sm_quotationmark ; 30
+        .addr rom_dirload_sm_filename      ; 31
+        .addr rom_dirload_sm_quotationmark ; 32
+        .addr rom_dirload_sm_space         ; 33
+        .addr rom_dirload_sm_type_begin    ; 34
+        .addr rom_dirload_sm_type_next     ; 35
+        .addr rom_dirload_sm_type_next     ; 36
+        .addr rom_dirload_sm_type_next     ; 37
+        .addr rom_dirload_sm_space         ; 38
+        .addr rom_dirload_sm_space         ; 39
+        .addr rom_dirload_sm_linenend      ; 40
 
 
     rom_dirload_diskname_text:
@@ -912,9 +936,25 @@
     rom_dirload_blocksfree_text:
         .byte "blocks free.             "
 
+    rom_dirload_types_text:
+        ; set type: prg, crt, oce, xba; < for low; > for high, +/* for ultimax
+        .byte "prg "
+        .byte "prg<"
+        .byte "prg>"
+        .byte "crt<"
+        .byte "crt>"
+        .byte "crt*"
+        .byte "crt+"
+        .byte "ocn>"
+        .byte "ocn<"
+        .byte "xba<"
+        .byte "prg>"
+        .byte "prg*"
+
     rom_dirload_sm_finish:
         lda #$00
-        sec
+        sta $f7
+        clc
         rts
 
     rom_dirload_sm_space:
@@ -926,11 +966,11 @@
         ; produces $00 and decides if new filename
         ; if filename -> 20
         ; if finish -> 15
-        ; ### decide about hidden flag
         lda #16  ; pointer starts at begin of dir entry
         jsr dir_pointer_advance
         bcs :+  ; directory terminates
         jsr efs_readef
+        ; ### test hidden
         and #%00011111  ; mask out hidden and reserved flag fields
         sta $fa
         bne :+  ; is file invalid
@@ -939,15 +979,15 @@
         jmp rom_dirload_sm_linenend
 
       : lda $fa  ; terminator ?
-        cmp $1f
+        cmp #$1f
         bne :+
-        lda #15  ; finish directory
+        lda #sm_finish  ; finish directory
         sta $f7
         lda #$00
         clc
         rts
 
-      : lda #20  ; go to file line
+      : lda #sm_nextfile  ; go to file line
         sta $f7
         lda #$00
         clc
@@ -1055,6 +1095,27 @@
         inc $f7
         rts
 
+
+    rom_compare16:
+        ; A: high value
+        ; X: low value
+        ; val1(X/A) >= Val2(f8/f9) => C set
+        ; https://codebase64.org/doku.php?id=base:16-bit_comparison
+        ; a            ; Val1 high
+        cmp $f9        ; Val2 high
+        bcc @LsThan    ; hiVal1 < hiVal2 --> Val1 < Val2
+        bne @GrtEqu    ; hiVal1 != hiVal2 --> Val1 > Val2
+        txa            ; Val1 low
+        cmp $f8        ; Val2 low
+        ;beq Equal     ; Val1 = Val2
+        bcs @GrtEqu    ; loVal1 >= loVal2 --> Val1 >= Val2
+      @LsThan:
+        sec
+        rts
+      @GrtEqu:
+        clc
+        rts
+
     rom_dirload_sm_sizehigh:
         ; pointer is at size mid
         jsr dir_pointer_dec
@@ -1063,9 +1124,62 @@
         jsr dir_read_and_pointer_inc
         clc
         adc $f8
+        sta $f8
         jsr efs_readef
         sta $f9
 
+        inc $f7
+        lda #23  ; reverse pointer to name
+        jsr dir_pointer_reverse
+
+        lda #$00
+        ldx #$09
+        jsr rom_compare16
+        bcs :+     ; 10 >= f8/f9 ($000a)
+        lda #$03   ; print 3 spaces
+        sta dirload_state_var
+        jmp @done
+
+      : lda #$00
+        ldx #$63
+        jsr rom_compare16
+        bcs :+     ; 100 >= f8/f9 ($0064)
+        lda #$02   ; print 2 spaces
+        sta dirload_state_var
+        jmp @done
+
+      : lda #$03
+        ldx #$e7
+        jsr rom_compare16
+        bcs :+     ; 1000 >= f8/f9 ($03e8)
+        lda #$01   ; print 1 spaces
+        sta dirload_state_var
+        jmp @done
+
+      : lda #$01
+        sta dirload_state_var
+        sec        ; skip next state -> print 0 spaces
+
+/*      : lda #$03
+        ldx #$e8
+        jsr rom_compare16
+        bcc :+     ; 1000 >= f8/f0 ($03e8)
+        lda #$01   ; print 1 spaces
+        sta dirload_state_var
+        jmp @done
+
+      : lda #$27
+        ldx #$10
+        jsr rom_compare16
+        bcc :+     ; 10000 >= f8/f0 ($2710)
+        lda #$03   ; print 1 spaces
+        sta dirload_state_var
+
+        inc $f7    ; skip 
+        inc $f7
+        inc $f7
+        jmp @done*/
+        
         ; size in blocks is in f8/f9
         ; calculate how many spaces to skip (0, 1, 2 ,3)
         ; ###
@@ -1074,33 +1188,51 @@
         ; 999  -> $03e7
         ; 9999 -> $270f
         ; https://codebase64.org/doku.php?id=base:16-bit_absolute_comparison
-        
-        inc $f7
-        tax
-        lda #23  ; reverse pointer to name
-        jsr dir_pointer_reverse
-        txa
-      : clc
+
+      @done:
+        ;inc $f7
+        ;lda #23  ; reverse pointer to name
+        ;jsr dir_pointer_reverse
+        lda $f9
+        ;clc
         rts
 
 
-    rom_dirload_sm_type:
-        ; pointer is at flags
-        jsr efs_readef
+    rom_dirload_sm_skip_withspace:
+        dec dirload_state_var
+        bne :+
         inc $f7
-
-        ; ### set type: prg, crt, oce, xba; < for low; > for high
-        ; xxx  : 000: prg; 100: crt; 101: oce; 111: xba
-        ;    yy: 2: low; 3: high (for prg only)
-
-        tax
-        lda #8  ; advance pointer to begin of next name
-        jsr dir_pointer_advance
-        txa
-
+      : lda #$20
         clc
         rts
 
+
+    rom_dirload_sm_type_begin:
+        ; pointer is at flags
+        jsr efs_readef
+        and #$1f
+        cmp #$09
+        bcc :+
+        sbc #$09 - $03  ; reduce by reserved values ($04 - $0f)
+      : sec
+        sbc #$01
+        asl a
+        asl a
+        sta dirload_state_var
+
+        lda #8  ; advance pointer to begin of next name
+        jsr dir_pointer_advance
+        ; no return here
+
+    rom_dirload_sm_type_next:
+        lda dirload_state_var
+        inc dirload_state_var
+        tax
+        lda rom_dirload_types_text, x
+        inc $f7
+        clc
+        rts
+        
 
 ; --------------------------------------------------------------------
 ; directory search functions

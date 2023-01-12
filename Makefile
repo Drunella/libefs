@@ -31,6 +31,7 @@ CC65FLAGS=-t $(TARGET) -O
 
 EF_LOADER_FILES=build/ef/loader.o build/ef/loadeapi.o
 EF_MENU_FILES=build/ef/menu.o build/ef/util.o build/ef/efs-wrapper.o
+EF_DIREFS_FILES=build/prg/direfs.o build/lib/lib-efs.o build/lib/lib-efs-ram1.o build/lib/lib-efs-ram2.o
 #EF_IOROM_FILES=build/ef/io-wrapper.o
 #EF_MENU_FILES=build/ef/loadeapi.o build/ef/io-loader.o build/ef/game-loader.o build/ef/io-sector.o build/ef/io-loadfile.o build/ef/io-caller.o 
 #STARTMENU_FILES=build/ef/menu.o build/ef/util.o build/ef/util_s.o build/ef/savegame.o build/ef/savegame_map.o build/ef/io-1541.o build/ef/io-sectortable-da.o
@@ -46,12 +47,12 @@ libefs: build/lib-efs.prg
 testef: build/test-libefs.crt
 
 # test porogram
-testprg: build/test-libefs.prg
+testprg: build/test-efs.d64
 
 
 # assemble
 build/%.o: src/%.s
-	@mkdir -p ./build/lib ./build/ef
+	@mkdir -p ./build/lib ./build/ef ./build/prg
 	$(CA65) $(CA65FLAGS) -g -o $@ $<
 
 # compile
@@ -83,6 +84,15 @@ build/lib-efs.prg: src/lib/lib-efs.cfg build/lib/lib-efs.o build/lib/lib-efs-ram
 	$(LD65) $(LD65FLAGS) -vm -m ./build/lib/lib-efs.map -Ln ./build/lib/lib-efs.lst -o $@ -C src/lib/lib-efs.cfg c64.lib build/lib/lib-efs.o build/lib/lib-efs-ram1.o build/lib/lib-efs-ram2.o
 
 
+# ------------------------------------------------------------------------
+# test-efs.d64
+
+build/test-efs.d64: build/prg/direfs.prg
+	SDL_VIDEODRIVER=dummy c1541 -format efs-tools,0 d64 ./build/test-efs.d64
+	SDL_VIDEODRIVER=dummy c1541 -attach ./build/test-efs.d64 -write ./build/prg/direfs.prg direfs
+
+build/prg/direfs.prg: $(EF_DIREFS_FILES)
+	$(LD65) $(LD65FLAGS) -vm -m ./build/prg/direfs.map -Ln ./build/prg/direfs.lst -o $@ -C src/prg/direfs.cfg c64.lib $(EF_DIREFS_FILES)
 
 # ------------------------------------------------------------------------
 # easyflash
@@ -113,7 +123,7 @@ build/ef/menu.prg: $(EF_MENU_FILES)
 
 # build efs
 build/ef/directory.data.prg build/ef/files.data.prg: build/ef/files.list build/ef/menu.prg
-	tools/mkefs.py -v -u -s 360448 -l ./build/ef/files.list -f . -d ./build/ef
+	tools/mkefs.py -v -u -s 507904 -l ./build/ef/files.list -f . -d ./build/ef
 
 # test files
 build/ef/files.list:
@@ -130,6 +140,11 @@ build/ef/files.list:
 	./tools/mkdata.sh build/files/data56789012345.prg 0x3000 1025 >> build/ef/files.list
 	./tools/mkdata.sh build/files/data8k.prg 0xa000 8192 >> build/ef/files.list
 	./tools/mkdata.sh build/files/data7k.prg 0xe000 7936 >> build/ef/files.list
+	./tools/mkdata.sh build/files/data9b.prg 0x3000 2302 >> build/ef/files.list
+	./tools/mkdata.sh build/files/data10b.prg 0x3000 2303 >> build/ef/files.list
+	./tools/mkdata.sh build/files/data99b.prg 0x3000 25342 >> build/ef/files.list
+	./tools/mkdata.sh build/files/data100b.prg 0x3000 25343 >> build/ef/files.list
+	./tools/mkdata.sh build/files/data1000b.prg 0x3000 255998 >> build/ef/files.list
 
 	
 # easyflash init.bin

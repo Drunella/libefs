@@ -94,9 +94,9 @@
         ; bcs error ###
 
         ; minieapi
-;        jsr EFS_init_minieapi
-        lda #$cd
-        jsr EFS_init_eapi
+        jsr EFS_init_minieapi
+;        lda #$cd
+;        jsr EFS_init_eapi
 
         lda #$36
         sta $01
