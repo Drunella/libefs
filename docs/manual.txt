@@ -1,0 +1,188 @@
+libefs
+======
+
+A library to access the EasyFlash Filesystem (efs) in the manner of the c64
+kernal routines.
+
+The library uses the low rom space of the EasyFlash cartridge on bank
+(0:l:0000 - 0:l:1fff) and the 128 bytes in the io2 area (df00 - df7f). 
+No further ram is needed. All banking code and variables reside in the 
+io2 space.
+
+If you only need read access to the efs you can use minieapi which contains
+a subset of functions of eapi for reading. Of course there is no erase and
+write. The minieapi sits in the upper io2 area (df80 - dfff) and replaces
+the eapi jump table, code and variables there. No further ram space is
+needed.
+
+The efs library can be iedentified by the text LIBEFS (in PETSCII) at
+00:l:000f, followed by the version number in major.minor.patch.
+
+
+Initialize
+==========
+
+To initialize libefs, eapi or minieapi youi need to call the following
+functions while bank 0 must be banked in as 16k cartridge.
+
+EFS_init ($8000):
+Parameter: none
+Returns: none
+Initializes the efs library, copies code and variables to the io2 area ($df00
+- $df7f). EFS_init can be called before or after EFS_init_eapi or
+EFS_initminieapi.
+
+EFS_init_eapi ($8003):
+Parameter:
+  A: the high byte of the address where eapi will reside in c64 memory
+Return:
+  .C: set if eapi is not on the cartridge
+Copies the epi code (768 bytes) to the memory location given as high byte 
+in the eaccumulator. A low address is not necessary as the eapi must be page
+aligned. C flag will be set if eapi is not on the cartrdidge. You can
+overwrite a previous initialized minieapi.
+
+EFS_init_minieapi ($8006):
+Parameter: none
+Returns: none
+Initalizes minieapi in te io2 area ($df80 - $dfff). You can overwrite a
+previously initialized eapi. With minieapi calls to the write and erase
+functions will lead to a crash.
+
+
+You can use the following code to bank in before calling an init function:
+   lda #$37
+   sta $01
+   lda #$87     ; led, 16k mode
+   sta $de02
+   lda #$00     ; rom bank of efslib
+   sta $de00
+
+
+
+Minieapi
+========
+
+Minieapi provides the eapi functions EAPIGetBank, EAPISetBank, EAPISetPtr,
+EAPISetLen and EAPIReadFlashInc. EAPISetSlot and EAPIGetSlot is not available. 
+See the EasyFlash Programmer Reference for more information.
+
+Calling EAPIWriteFlash in minieapi will do nothing harmful.
+Calling EAPIEraseSector, EAPIWriteFlashInc or EAPISetSlot has undefined 
+behaviour ranging from jamming the cpu, crashing the computer or having no
+effact at all.
+
+
+libefs
+======
+
+EFS_setlfs ($df00)
+Parameter:
+  X: number of efs structure;
+  Y: secondary address (0: relocate)
+Return: 
+  none
+
+
+EFS_setnam ($df06)
+Parameter:
+  A: name length
+  X: name address low
+  Y: name address high
+Peturn:
+  none
+
+
+EFS_load ($df0c)
+Parameter:
+  A: 0=load, 1-255=verify
+  X: load address low
+  Y: load address high
+Return:
+  A: error code
+  X: end address low
+  Y: end address high
+  .C: 1 if error
+Errors:
+  $02: file open
+  $04: file not found
+  $05: device not present (?)
+  $08: missing filename
+
+
+EFS_open ($df12)
+Parameter:
+  none
+Return:
+  A: error code
+  .C: set if error
+Error:
+  $02: file open
+  $04: file not found
+  $05: device not present (?)
+  $08: missing filename
+
+
+EFS_close ($df18)
+Parameter: 
+  none
+Return:
+  A: error code
+  .C: set if error
+Error:
+  $02: file not open
+
+
+EFS_chrin ($df1e)
+Parameter: 
+  none
+Return:
+  A: character or error code
+  .C: set if error
+Error:
+  $03: file not open
+  $05: device not present (?)
+
+
+EFS_save ($df24)
+Parameter:
+  A: z-page to start address
+  X: end address low
+  Y: end address high
+Peturn:
+  A: error code
+  .C: set if error
+
+
+EFS_chrout ($df2a)
+Parameter:
+  A: character to output
+Return:
+  .C: set if error
+
+
+EFS_readst ($df30)
+Parameter: 
+  none
+Return:
+  A: status code 
+Status codes:
+  $10: verify mismatch
+  $40: EOF
+  $80: device not present (?)
+
+
+Usage
+=====
+
+Interrupts:
+-----------
+
+libefs does not use sei. You have to take care of your interrupts
+beforehand. EAPI uses sei and cli abd therefore you cannot use sei to block
+interupts as cli will be called in the libefs resp. eapi code.
+
+libefs uses $37 (BASIC and KERNAL banked in) as memory configuration. If
+this collides with your interrupt usage you need to turn interrupts off
+before calling libefs functions.
+

@@ -110,21 +110,21 @@
 
     EFS_init_eapi: ; @ $8003
         ; parameter: none
-        ; return: none
+        ; return: .C set if eapi not present
         jmp efs_init_minieapi_body
 
     EFS_init_mini_eapi: ; @ $8006
         jmp efs_init_eapi_body
 
-    EFS_init_YYY: ; @ $8009
+    EFS_init_XXX: ; @ $8009
         jmp $ffff
 
-      .byte $ff, $ff
+    EFS_init_YYY: ; @ $800c
+        jmp $ffff
 
-    efs_magic:
+    efs_magic: ; @ $800f
       .byte "libefs"
       .byte 0, 1, 0  ; ### read from version.txt
-      .byte $ff
 
     efs_call_size = * - EFS_init
     .if efs_call_size <> 24
@@ -186,6 +186,20 @@
 
     efs_init_eapi_body:
         tax
+
+        lda $65
+        cmp $b800
+        bne @error
+        lda $61
+        cmp $b801
+        bne @error
+        lda $70
+        cmp $b802
+        bne @error
+        lda $69
+        cmp $b803
+        bne @error
+
         lda $01
         sta backup_memory_config
 
@@ -227,6 +241,11 @@
         lda #$14  ; low
         sta efs_generic_command + @dest - 1
         jmp efs_generic_command  ; init eapi
+        clc
+        rts
+
+      @error:
+        sec
         rts
 
       @code:
@@ -377,7 +396,7 @@
 
     rom_chrout_body:
         ; character in a
-        ; ### try not to use zeropage
+        ; ### no zeropage usage
         ; check if character may be written (file not open: $03, not output file: $07)
         ; write character
         ;jsr efs_write_byte
@@ -422,11 +441,12 @@
         lda internal_state
         cmp #$02
         bne @error
-        ; read dir ###
-        sec             ; ###
-        lda #ERROR_DEVICE_NOT_PRESENT        ; ###
-        sta status_byte ; ###
-        jmp @done
+        jsr rom_dirload_chrin  ; read dir
+        bcc @done
+        lda #STATUS_EOF
+        sta status_byte
+        lda #$00
+        beq @done
 
       @error:
         sec
@@ -456,19 +476,18 @@
       @dircheck:
         jsr rom_directory_list_check
         bcc @dirfind
-        lda #ERROR_DEVICE_NOT_PRESENT
-        sta error_byte
-        sec
-        ; process directory preparation ###
+        jsr rom_dirload_begin
+;        jsr rom_dirload_address
+        lda #$02  ; directory processing
+        sta internal_state
+        clc
         jmp @leave
 
       @dirfind:
         jsr rom_directory_find
-        bcs @leave ; not found
-
+        bcs @leave  ; not found
         jsr rom_fileload_begin
-        jsr rom_fileload_address
-
+;        jsr rom_fileload_address
         lda #$01
         sta internal_state
         clc
@@ -478,7 +497,7 @@
         jsr restore_zeropage
         lda error_byte
         plp
-        jsr restore_zeropage
+        ;jsr restore_zeropage
         jmp efs_bankout  ; ends with rts
 
 
@@ -530,13 +549,9 @@
       @dircheck:
         jsr rom_directory_list_check
         bcc @dirfind
-        ; process directory ###
         jsr rom_dirload_begin
         jsr rom_dirload_address
-        jsr rom_firload_transfer
-;        lda #ERROR_DEVICE_NOT_PRESENT
-;        sta error_byte
-;        sec
+        jsr rom_dirload_transfer
         jmp @leave
 
       @dirfind:
@@ -546,7 +561,6 @@
         jsr rom_fileload_begin
         jsr rom_fileload_address
 
-        ;lda efs_verify ###
         lda efs_flags
         and #LIBEFS_FLAGS_VERIFY  ; set: verify, clear: load
         bne @verify
@@ -747,14 +761,17 @@
 ; --------------------------------------------------------------------
 ; directory list functions
 ; usage:
+;   f7: temporary state machine state
 ;   f8/f9: temporary file size
 ;   fa: temporary variable
 ;   fc/fd: address to state maching processing function
 ;   fe/ff: pointer to destination / pointer to filename
-;   f7: state machine
 ;   io_end_address: state machine state
 ;   io_end_address + 1: state machine variable
-;   efs_device: current device
+;   
+
+    dirload_state = io_end_address
+    dirload_state_var = io_end_address + 1
 
     rom_directory_list_check:
         lda filename_address
@@ -785,6 +802,13 @@
         lda #$a0
         sta efs_readef_high
 
+        lda #$01
+        sta dirload_state
+        sta $f7
+        lda #$00
+        sta dirload_state_var
+        rts
+
         rts
 
 
@@ -811,20 +835,42 @@
         rts
 
 
-    rom_firload_transfer:
-        jsr rom_dirload_statemachine_reset
-        jsr rom_dirload_next_byte  ; skip load address
-        ldx $f7
-        stx dirload_state
+    rom_dirload_chrin:
+        jsr backup_zeropage
+        lda dirload_state
+        sta $f7
+      @again:
         jsr rom_dirload_next_byte
-        ldx $f7
-        stx dirload_state
+        tay
+        lda $f7
+        sta dirload_state
+        beq @eof   ; state 0 means end
+        bcs @again  ; C set, skip writing and repeat
+        jsr restore_zeropage
+        tya
+        clc
+        rts
+      @eof:
+        jsr restore_zeropage
+        tya
+        sec
+        rts
+
+
+    rom_dirload_transfer:
+        ;jsr rom_dirload_statemachine_reset
+        jsr rom_dirload_next_byte  ; skip load address
+        ;ldx $f7
+        ;stx dirload_state
+        jsr rom_dirload_next_byte
+        ;ldx $f7
+        ;stx dirload_state
 
         ldy #$00
       @loop:
         jsr rom_dirload_next_byte
         ldx $f7
-        stx dirload_state
+        ;stx dirload_state
         beq @eof   ; state 0 means end
         bcs @loop  ; C set, skip writing and repeat
         sta ($fe), y
@@ -856,22 +902,13 @@
         clc
         rts
 
-
-
-    dirload_state = io_end_address
-    dirload_state_var = io_end_address + 1
-
-    rom_dirload_statemachine_reset:
-        lda #$01
-        sta dirload_state
-        lda #$00
-        sta dirload_state_var
-        rts
+    ; ### direload verify -> device not present error
 
     rom_dirload_next_byte:
         ; f7: state machine state
-        lda dirload_state
-        sta $f7
+        ;lda dirload_state
+        ;sta $f7
+        lda $f7
         asl
         tax
         lda rom_dirload_statemachine, x
@@ -901,60 +938,81 @@
         .addr rom_dirload_sm_space         ; 16
         .addr rom_dirload_sm_space         ; 17
         .addr rom_dirload_sm_linenend      ; 18
-        .word $0000
 
-        sm_finish = 20
-        ; ### x blocks free
-        .addr rom_dirload_sm_zero          ; 20
-        .addr rom_dirload_sm_zero          ; 21
-        .addr rom_dirload_sm_finish        ; 22
-        .word $0000
-        .word $0000
+        sm_finish = 19
+        .addr rom_dirload_sm_addrdummy     ; 19
+        .addr rom_dirload_sm_addrdummy     ; 20
+        .addr rom_dirload_sm_freelow       ; 21
+        .addr rom_dirload_sm_freehigh      ; 22
+        .addr rom_dirload_sm_blocksfree    ; 23
+        .addr rom_dirload_sm_zero          ; 24
+        .addr rom_dirload_sm_zero          ; 25
+        .addr rom_dirload_sm_zero          ; 26
+        .addr rom_dirload_sm_finish        ; 27
 
-        sm_nextfile = 25
-        .addr rom_dirload_sm_addrdummy     ; 25
-        .addr rom_dirload_sm_addrdummy     ; 26
-        .addr rom_dirload_sm_sizelow       ; 27
-        .addr rom_dirload_sm_sizehigh      ; 28
-        .addr rom_dirload_sm_skip_withspace  ; 29
-        .addr rom_dirload_sm_quotationmark ; 30
-        .addr rom_dirload_sm_filename      ; 31
-        .addr rom_dirload_sm_quotationmark ; 32
-        .addr rom_dirload_sm_space         ; 33
-        .addr rom_dirload_sm_type_begin    ; 34
-        .addr rom_dirload_sm_type_next     ; 35
-        .addr rom_dirload_sm_type_next     ; 36
+        sm_nextfile = 28
+        .addr rom_dirload_sm_addrdummy     ; 28
+        .addr rom_dirload_sm_addrdummy     ; 29
+        .addr rom_dirload_sm_sizelow       ; 30
+        .addr rom_dirload_sm_sizehigh      ; 31
+        .addr rom_dirload_sm_skip_withspace  ; 32
+        .addr rom_dirload_sm_quotationmark ; 33
+        .addr rom_dirload_sm_filename      ; 34
+        .addr rom_dirload_sm_quotationmark ; 35
+        .addr rom_dirload_sm_type_begin    ; 36
         .addr rom_dirload_sm_type_next     ; 37
-        .addr rom_dirload_sm_space         ; 38
-        .addr rom_dirload_sm_space         ; 39
-        .addr rom_dirload_sm_linenend      ; 40
+        .addr rom_dirload_sm_type_next     ; 38
+        .addr rom_dirload_sm_type_next     ; 39
+        .addr rom_dirload_sm_writeprot     ; 40
+        .addr rom_dirload_sm_space         ; 41
+        .addr rom_dirload_sm_space         ; 42
+        .addr rom_dirload_sm_linenend      ; 43
 
 
     rom_dirload_diskname_text:
         .byte "easyflash fs    "  ; length 16
+        rom_dirload_diskname_textlen = * - rom_dirload_diskname_text - 1
 
     rom_dirload_blocksfree_text:
         .byte "blocks free.             "
+        rom_dirload_blocksfree_textlen = * - rom_dirload_blocksfree_text - 1
 
     rom_dirload_types_text:
         ; set type: prg, crt, oce, xba; < for low; > for high, +/* for ultimax
-        .byte "prg "
-        .byte "prg<"
-        .byte "prg>"
-        .byte "crt<"
-        .byte "crt>"
-        .byte "crt*"
-        .byte "crt+"
-        .byte "ocn>"
-        .byte "ocn<"
-        .byte "xba<"
-        .byte "prg>"
-        .byte "prg*"
+        .byte " prg"
+        .byte "-prg"
+        .byte "+prg"
+        .byte "-crt"
+        .byte " crt"
+        .byte "+crt"
+        .byte "*crt"
+        .byte "+ocn"
+        .byte "-ocn"
+        .byte " xba"
+        .byte " xba"
+        .byte " xba"
+
+
+    rom_dirload_sm_writeprot:
+        ; if in device 0 area, always write protected
+        ; ### other areas
+        lda #$3c  ; '<'
+        inc $f7
+        clc
+        rts
 
     rom_dirload_sm_finish:
+        ; finish does not produce a byte
         lda #$00
         sta $f7
         clc
+        rts
+
+    rom_dirload_sm_skip:
+        lda #$00
+        sta dirload_state_var
+        inc $f7
+        sec
         rts
 
     rom_dirload_sm_space:
@@ -1059,7 +1117,19 @@
         ldx dirload_state_var
         lda rom_dirload_diskname_text, x
         inc dirload_state_var
-        cpx #15
+        cpx #rom_dirload_diskname_textlen
+        bne :+
+        inc $f7
+        ldx #$00
+        stx dirload_state_var
+      : clc
+        rts
+
+    rom_dirload_sm_blocksfree:
+        ldx dirload_state_var
+        lda rom_dirload_blocksfree_text, x
+        inc dirload_state_var
+        cpx #rom_dirload_blocksfree_textlen
         bne :+
         inc $f7
         ldx #$00
@@ -1087,9 +1157,11 @@
         ; pointer is at flags
         lda #5  ; advance to size low
         jsr dir_pointer_advance
-        jsr dir_read_and_pointer_inc
-        sta $f8
-        jsr efs_readef
+        jsr dir_read_and_pointer_inc  ; size low
+        beq :+
+        lda #$01
+      : sta $f8  ; a is 0 after branch
+        jsr efs_readef  ; read mid
         clc
         adc $f8
         inc $f7
@@ -1119,13 +1191,18 @@
     rom_dirload_sm_sizehigh:
         ; pointer is at size mid
         jsr dir_pointer_dec
-        jsr dir_read_and_pointer_inc
-        sta $f8
-        jsr dir_read_and_pointer_inc
+        jsr dir_read_and_pointer_inc  ;low
+        beq :+
+        lda #$01
+      : sta $f8  ; a is zero iafter branch
+        jsr dir_read_and_pointer_inc  ;mid
         clc
         adc $f8
         sta $f8
-        jsr efs_readef
+        lda #$00
+        sta $f9
+        jsr efs_readef ; high
+        adc $f9
         sta $f9
 
         inc $f7
@@ -1156,9 +1233,8 @@
         sta dirload_state_var
         jmp @done
 
-      : lda #$01
+      : lda #$00   ; print 0 spaces
         sta dirload_state_var
-        sec        ; skip next state -> print 0 spaces
 
 /*      : lda #$03
         ldx #$e8
@@ -1182,7 +1258,6 @@
         
         ; size in blocks is in f8/f9
         ; calculate how many spaces to skip (0, 1, 2 ,3)
-        ; ###
         ; 9    -> $0009
         ; 99   -> $0063
         ; 999  -> $03e7
@@ -1194,15 +1269,18 @@
         ;lda #23  ; reverse pointer to name
         ;jsr dir_pointer_reverse
         lda $f9
-        ;clc
+        clc
         rts
 
 
     rom_dirload_sm_skip_withspace:
-        dec dirload_state_var
+        lda dirload_state_var
         bne :+
         inc $f7
+        sec
+        rts
       : lda #$20
+        dec dirload_state_var
         clc
         rts
 
@@ -1232,7 +1310,24 @@
         inc $f7
         clc
         rts
-        
+
+
+    rom_dirload_sm_freelow:
+        ; calculate the free blocks
+        ; ### other area  
+        ; in area 0 nothing free
+        lda #$00
+        sta dirload_state_var
+        inc $f7
+        clc
+        rts
+
+    rom_dirload_sm_freehigh:
+        lda dirload_state_var
+        inc $f7
+        clc
+        rts
+
 
 ; --------------------------------------------------------------------
 ; directory search functions
@@ -1331,11 +1426,11 @@
     rom_directory_begin_search:
         ; set pointer and length of directory
 ;        lda #$d0
-;        ldx #$00  ; ### $A000
-;        ldy #$a0  ; ### $A000
+;        ldx #$00  ; $A000
+;        ldy #$a0  ; $A000
 ;        jsr EAPISetPtr
 ;        ldx #$00
-;        ldy #$18  ; ### $1800 bytes, could be $2000
+;        ldy #$18  ; $1800 bytes, could be $2000
 ;        lda #$00
 ;        jsr EAPISetLen
         jsr efs_init_setstartbank
@@ -1344,9 +1439,9 @@
 
         ; set read code
         jsr efs_init_readef
-        lda #$00
+        lda #$00  ; ### efs dir
         sta efs_readef_low
-        lda #$a0
+        lda #$a0  ; ### efs dir (usually $a0 or $80)
         sta efs_readef_high
 
         rts
@@ -1457,13 +1552,6 @@
         bne @match
         lda #$07
         jsr dir_pointer_advance
-        ;jsr efs_io_byte 
-        ;jsr efs_io_byte
-        ;jsr efs_io_byte
-        ;jsr efs_io_byte
-        ;jsr efs_io_byte
-        ;jsr efs_io_byte
-        ;jsr efs_io_byte
         jmp @repeat
 
       @match:
@@ -1520,8 +1608,8 @@
 /*
       morefiles:
         ; check if deleted
-        ; check if hidden or other wrong type ###
-        ; we only allow prg ($01, $02, $03) ###
+        ; check if hidden or other wrong type
+        ; we only allow prg ($01, $02, $03)
         jsr efs_read_byte    ; load next char
 ;        lda efs_directory_entry + efs_directory::flags
         beq nextname    ; if deleted go directly to next name

@@ -164,7 +164,7 @@
         ; return:
         ;    A: status code ($10: verify mismatch; $40: EOF; $80: device not present)
     status_byte = * + 1
-        lda $00
+        lda #$00
         rts
 
 

@@ -120,10 +120,17 @@ void readfile(void)
     uint8_t retval, status;
     uint8_t data;
     uint16_t checksum = 0;
+    char* address = ADDRESS;
+    uint8_t header = 2;
     
     while (true) {
         retval = EFS_chrin_wrapper(&data);
         if (retval != 0) break;
+        if (header > 0) { 
+            header--;
+            continue;
+        }
+        address[0] = data; address++;
         checksum += data;
     }
 

@@ -68,15 +68,19 @@ EASYFLASH_IO_BANK = $de00
 ;       Z,N <- bank
 ;
 ; =============================================================================
-EAPIGetBank:
-        lda EAPI_SHADOW_BANK
+EAPIGetBank: ; 3 bytes
+    EAPI_SHADOW_BANK = * + 1
+        lda #$00  ; storage of EAPI_SHADOW_BANK
         rts
 
 
-    EAPI_INC_TYPE:
+    EAPI_LENGTH_LO:
         .byte $00
 
-    EAPI_LENGTH_LO:
+    EAPI_LENGTH_MED:
+        .byte $00
+
+    EAPI_LENGTH_HI:
         .byte $00
 
 
@@ -87,11 +91,9 @@ EAPIGetBank:
         jmp EAPIReadFlashInc ;  $df92
 
 
-    EAPI_LENGTH_MED:
+    EAPI_INC_TYPE:
         .byte $00
 
-    EAPI_LENGTH_HI:
-        .byte $00
 
 
 ; =============================================================================
@@ -201,8 +203,7 @@ EAPISetLen:
 ; =============================================================================
 EAPIReadFlashInc:
         ; now we have to activate the right bank
-    EAPI_SHADOW_BANK = * + 1
-        lda #$00  ; storage of EAPI_SHADOW_BANK
+        lda EAPI_SHADOW_BANK
         sta EASYFLASH_IO_BANK
 
         ; read-routine
@@ -216,7 +217,6 @@ EAPIReadFlashInc:
         tya
         pha
 
-;    rwInc_inc:
         ; inc to next position
         inc EAPI_INC_ADDR_LO
         bne rwInc_noInc

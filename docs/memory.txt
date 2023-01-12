@@ -38,7 +38,7 @@ Cartridge Memory Map
      1800      EAPI
      1900      EAPI       
      1A00      EAPI
-     1B00      easycart name
+     1B00      easycart name & efs configuration
      1C00      loader
      1D00      loader
      1E00      loader
