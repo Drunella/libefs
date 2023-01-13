@@ -49,7 +49,7 @@
 .import filename_length
 .import io_start_address
 .import io_end_address
-.import efs_device
+;.import efs_device
 
 .import efs_io_byte
 .import efs_generic_command
@@ -100,11 +100,26 @@
         jmp $ffff
 
     efs_magic: ; @ $800f
-      .byte "libefs"
-      .byte major_version, minor_version, patch_version
+    efs_default_config:
+        .byte "libefs"
+        .byte major_version, minor_version, patch_version
+
+        .byte $01
+        .byte $00, $00, $a0, $d0, $00  ; area 0: bank 0, $a000, mode lhlh, unlimited
+        .byte $00, $00, $00, $00, $00  ; area 1: none
+        .byte $00, $00, $00, $00, $00  ; area 2: none
+        .byte $00, $00, $00            ; defragment: no
+        .byte $00, $00, $00, $00  ; dummy
+
+    efs_config_size = * - efs_default_config
+    .if efs_call_size <> 32
+    .error "efs config size mismatch"
+    .endif
+
+        .byte $00
 
     efs_call_size = * - EFS_init
-    .if efs_call_size <> 24
+    .if efs_call_size <> 48
     .error "EFS_CALL size mismatch"
     .endif
 
@@ -346,8 +361,8 @@
 ; zerpage usage only after zeropage backup
 
     rom_setlfs_body:
-        stx efs_device
-        lda #$00
+        ;stx efs_device
+        ;lda #$00
         cpy #$00
         bne :+    ; zero => relocate
         lda #LIBEFS_FLAGS_RELOCATE
@@ -930,8 +945,8 @@
         .addr rom_dirload_sm_diskname      ; 9
         .addr rom_dirload_sm_quotationmark ; 10
         .addr rom_dirload_sm_space         ; 11
-        .addr rom_dirload_sm_devhigh       ; 12
-        .addr rom_dirload_sm_devlow        ; 13
+        .addr rom_dirload_sm_space         ; 12
+        .addr rom_dirload_sm_space         ; 13
         .addr rom_dirload_sm_space         ; 14
         .addr rom_dirload_sm_space         ; 15
         .addr rom_dirload_sm_space         ; 16
@@ -954,7 +969,7 @@
         .addr rom_dirload_sm_addrdummy     ; 29
         .addr rom_dirload_sm_sizelow       ; 30
         .addr rom_dirload_sm_sizehigh      ; 31
-        .addr rom_dirload_sm_skip_withspace  ; 32
+        .addr rom_dirload_sm_sizeskip      ; 32
         .addr rom_dirload_sm_quotationmark ; 33
         .addr rom_dirload_sm_filename      ; 34
         .addr rom_dirload_sm_quotationmark ; 35
@@ -1050,7 +1065,7 @@
         clc
         rts
 
-    rom_dirload_sm_devlow:
+/*    rom_dirload_sm_devlow:
         lda efs_device
         and #$0f
         clc
@@ -1075,7 +1090,7 @@
         clc
         adc #$07  ; add 7 for a-f
       : inc $f7
-        rts
+        rts*/
 
 
     rom_dirload_sm_addresslow:
@@ -1249,7 +1264,7 @@
         rts
 
 
-    rom_dirload_sm_skip_withspace:
+    rom_dirload_sm_sizeskip:
         lda dirload_state_var
         bne :+
         inc $f7

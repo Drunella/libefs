@@ -103,9 +103,8 @@ build/test-libefs.crt: build/ef/test-libefs.bin
 	cartconv -b -t easy -o build/test-libefs.crt -i build/ef/test-libefs.bin -n "libefs test" -p
 
 # cartridge binary
-build/ef/test-libefs.bin: build/ef/init.bin src/ef/eapi-am29f040.prg build/lib-efs.prg build/ef/loader.prg build/ef/directory.data.prg build/ef/files.data.prg
+build/ef/test-libefs.bin: build/ef/init.bin src/ef/eapi-am29f040.prg build/lib-efs.prg build/ef/loader.prg build/ef/directory.data.prg build/ef/files.data.prg build/ef/config.bin
 	cp ./src/ef/eapi-am29f040.prg ./build/ef/eapi-am29f040.prg
-	cp ./src/ef/ef-name.bin ./build/ef/ef-name.bin
 	cp ./build/lib-efs.prg ./build/ef/lib-efs.prg
 	tools/mkbin.py -v -b ./build/ef -m ./src/ef/crt.map -o ./build/ef/test-libefs.bin
 
@@ -121,6 +120,11 @@ build/ef/loader.prg: $(EF_LOADER_FILES)
 build/ef/menu.prg: $(EF_MENU_FILES)
 	$(LD65) $(LD65FLAGS) -vm -m ./build/ef/menu.map -Ln ./build/ef/menu.lst -o $@ -C src/ef/menu.cfg c64.lib $(EF_MENU_FILES)
 	echo "./build/ef/menu.prg, 1" >> ./build/ef/files.list
+
+# easyflash config.bin
+build/ef/efs-config.bin: build/ef/efs-config.o src/ef/efs-config.cfg
+	$(LD65) $(LD65FLAGS) -vm -m ./build/ef/efs-config.map -Ln ./build/ef/efs-config.lst -o $@ -C src/ef/efs-config.cfg c64.lib build/ef/efs-config.o
+
 
 # build efs
 build/ef/directory.data.prg build/ef/files.data.prg: build/ef/files.list build/ef/menu.prg

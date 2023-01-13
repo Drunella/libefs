@@ -33,10 +33,6 @@
 
 .include "lib-efs.i"
 
-;.define version
-;.include "../../version.txt"
-; configuration
-
 
 .import rom_chrout_body
 .import rom_save_body
@@ -48,7 +44,6 @@
 .import rom_setlfs_body
 
 .export backup_zeropage_data
-;.export libefs_unused
 .export backup_memory_config
 .export status_byte
 .export error_byte
@@ -58,7 +53,6 @@
 .export filename_length
 .export io_start_address
 .export io_end_address
-.export efs_device
 .export efs_io_byte
 .export efs_generic_command
 .export efs_enter_pha
@@ -73,7 +67,6 @@
 
     EFS_setlfs:  ; @ $DF00
         ; parameter:
-        ;    X: number of efs structure; 
         ;    Y: secondary address (0: relocate)
         ; return: none
         jsr efs_bankin
@@ -277,11 +270,11 @@
     io_end_address:
         .word $0000
 
-    efs_device:
-        .byte $00
+;    efs_unused1:
+;        .byte $00
 
-    libefs_unused:
-        .byte $00
+;    efs_unused2:
+;        .byte $00
 
 
 ;.segment "EFS_REL"

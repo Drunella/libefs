@@ -16,7 +16,7 @@
 
 
 ; sizes
-ZEROPAGE_SIZE .set 9
+ZEROPAGE_SIZE .set 11
 GENERIC_COMMAND_SIZE .set 14
 
 ; constants
@@ -95,3 +95,24 @@ EAPIGetSlot       = $df9b
     size_high .byte
     size_upper .byte
 .endstruct
+
+
+; lib efs config struct
+.struct libefs_area
+    bank .byte
+    addr .byte
+    mode .byte
+    size .byte
+.endstruct
+
+.struct libefs_config
+    .byte 6
+    .byte 2
+    areas .byte
+    area_0 .tag libefs_area
+    area_1 .tag libefs_area
+    area_2 .tag libefs_area
+    dfcall .byte
+    dfaddr .addr 
+.endstruct
+
