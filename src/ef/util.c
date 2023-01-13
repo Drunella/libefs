@@ -24,8 +24,9 @@
 #include "util.h"
 
 
+/*
 uint8_t version[3] = {
-#include "../../version.txt"
+// #include "../../version.txt"
 };
 
 
@@ -43,6 +44,7 @@ uint8_t get_version_patch()
 {
     return version[2];
 }
+*/
 
 
 void cart_kill(void)

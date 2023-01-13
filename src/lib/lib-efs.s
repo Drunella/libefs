@@ -14,16 +14,6 @@
 ; limitations under the License.
 ; ----------------------------------------------------------------------------
 
-; call $8000 (EFS_init) to initialize
-; you need to bank in bank 0 at least in 8k mode
-; init code
-;   lda #$37
-;   sta $01
-;   lda #$80 | $07  ; led, 16k mode
-;   sta $de02
-;   lda #$00        ; EFSLIB_ROM_BANK
-;   sta $de00
-;   jsr $8000       ; _efs_init
 
 ; ### implement conditional switches for non rom version
 
@@ -32,22 +22,13 @@
 .localchar '@'
 
 .include "lib-efs.i"
+.include "../../version.txt"
 
 ;.define version
 ;.include "../../version.txt"
 ; configuration
 ;ZEROPAGE_SIZE .set 9
 ;GENERIC_COMMAND_SIZE .set 14
-
-
-;.export EFS_init
-;.export EFS_init_minieapi
-
-;.export EFS_setlfs
-;.export EFS_setnam
-;.export EFS_load
-;.export EFS_save
-;.export EFS_readst
 
 
 .import __EFS_RAM1_LOAD__
@@ -59,7 +40,6 @@
 .import __EFS_RAM2_SIZE__
 
 .import backup_zeropage_data
-.import libefs_configuration
 .import backup_memory_config
 .import status_byte
 .import error_byte
@@ -100,9 +80,6 @@
     EFS_init: ; @ $8000
         ; parameter:
         ;    A: configuration
-        ;       $00: read only; 
-        ;       bit0: includes verify
-        ;       bit1: includes write
         ;    X/Y: relocation address
         ; return:
         ;    .C: 1 if error
@@ -124,7 +101,7 @@
 
     efs_magic: ; @ $800f
       .byte "libefs"
-      .byte 0, 1, 0  ; ### read from version.txt
+      .byte major_version, minor_version, patch_version
 
     efs_call_size = * - EFS_init
     .if efs_call_size <> 24
@@ -157,8 +134,6 @@
 
 
     efs_init_body:
-        pha  ; libefs_configuration
-
         ; copy code to df00
         ldx #<__EFS_RAM1_SIZE__ - 1
     :   lda __EFS_RAM1_LOAD__,x
@@ -167,8 +142,6 @@
         bpl :-
         clc
 
-        pla  ; config
-        sta libefs_configuration
         clc
         rts
 
@@ -208,7 +181,6 @@
         sta efs_generic_command, y
         dey
         bpl :-
-;        clc
 
         stx efs_generic_command + @dest  ; store high value
 
@@ -380,8 +352,6 @@
         bne :+    ; zero => relocate
         lda #LIBEFS_FLAGS_RELOCATE
       : sta efs_flags
-;      : lda #LIBEFS_FLAGS_RELOCATE
-;        sty efs_secondary
         jmp efs_bankout  ; ends with rts
 
 
@@ -427,9 +397,9 @@
         beq @done
 
       @fileop:
-        lda internal_state
-        cmp #$01
-        bne @dirop       
+        bit internal_state  ; we check for bit 7/6 == 1/0
+        bpl @dirop  ; branch if bit 7 is clear
+        bvs @dirop  ; branch if bit 6 is set
         jsr efs_io_byte  ; read file
         bcc @done
         lda #STATUS_EOF
@@ -438,9 +408,10 @@
         beq @done
 
       @dirop:
-        lda internal_state
-        cmp #$02
-        bne @error
+        bit internal_state  ; we check for bit 7/6 == 1/0
+        bmi @error  ; branch if bit 7 is set
+        bvc @error  ; branch if bit 6 is clear
+
         jsr rom_dirload_chrin  ; read dir
         bcc @done
         lda #STATUS_EOF
@@ -476,20 +447,18 @@
       @dircheck:
         jsr rom_directory_list_check
         bcc @dirfind
-        jsr rom_dirload_begin
-;        jsr rom_dirload_address
-        lda #$02  ; directory processing
+        lda #%01000000  ; directory processing
         sta internal_state
+        jsr rom_dirload_begin
         clc
         jmp @leave
 
       @dirfind:
         jsr rom_directory_find
         bcs @leave  ; not found
-        jsr rom_fileload_begin
-;        jsr rom_fileload_address
-        lda #$01
+        lda #%10000000  ; file load processing
         sta internal_state
+        jsr rom_fileload_begin
         clc
 
       @leave:
@@ -497,7 +466,6 @@
         jsr restore_zeropage
         lda error_byte
         plp
-        ;jsr restore_zeropage
         jmp efs_bankout  ; ends with rts
 
 
@@ -548,13 +516,23 @@
 
       @dircheck:
         jsr rom_directory_list_check
-        bcc @dirfind
+        bcc @fileload
+
+      @dirload:
+        lda efs_flags
+        and #LIBEFS_FLAGS_VERIFY  ; set: verify, clear: load
+        bne @dirloadverify
+
         jsr rom_dirload_begin
         jsr rom_dirload_address
         jsr rom_dirload_transfer
         jmp @leave
 
-      @dirfind:
+      @dirloadverify:
+        jsr rom_dirload_verify
+        jmp @leave
+
+      @fileload:
         jsr rom_directory_find
         bcs @leave ; not found
 
@@ -563,31 +541,31 @@
 
         lda efs_flags
         and #LIBEFS_FLAGS_VERIFY  ; set: verify, clear: load
-        bne @verify
+        bne @fileloadverify
         
         jsr rom_fileload_transfer
         jmp @leave
-      @verify:
-        lda libefs_configuration
-        and #LIBEFS_CONFIG_VERIFY  ;  verify possible
-        bne @verifyok
-        lda #ERROR_DEVICE_NOT_PRESENT
-        sta error_byte
-        sec
-        jmp @leave
 
-      @verifyok:
+      @fileloadverify:
+;        lda libefs_configuration
+;        and #LIBEFS_CONFIG_VERIFY  ;  verify possible
+;        bne @verifyok
+;        lda #ERROR_DEVICE_NOT_PRESENT
+;        sta error_byte
+;        sec
+;        jmp @leave
+;      @verifyok:
         jsr rom_fileload_verify
 
       @leave:
         php  ; save carry
         jsr restore_zeropage
+        plp
 
         ldx io_end_address
         ldy io_end_address + 1
         lda error_byte
 
-        plp
         jmp efs_bankout  ; ends with rts
 
 
@@ -602,11 +580,23 @@
         sta io_start_address + 1
         jsr backup_zeropage
 
-;        jsr rom_save_execute
+        bit internal_state  ; we check for bit 7/6 == 1/1
+        bpl @fileopen  ; branch if bit 7 is clear
+        bvs @fileopen  ; branch if bit 6 is clear
+
         sec  ; ###
         lda #ERROR_DEVICE_NOT_PRESENT
         sta error_byte
+        jmp @done
 
+;        jsr rom_save_execute ###
+;        jmp @done
+
+      @fileopen:
+        lda #ERROR_FILE_OPEN
+        sta error_byte
+
+      @done:
         php  ; save carry
 
         jsr restore_zeropage
@@ -614,6 +604,7 @@
 
         plp
         jmp efs_bankout  ; ends with rts
+
 
 
 ; --------------------------------------------------------------------
@@ -758,6 +749,7 @@
         rts
 
 
+
 ; --------------------------------------------------------------------
 ; directory list functions
 ; usage:
@@ -768,9 +760,7 @@
 ;   fe/ff: pointer to destination / pointer to filename
 ;   io_end_address: state machine state
 ;   io_end_address + 1: state machine variable
-;   
 
-    dirload_state = io_end_address
     dirload_state_var = io_end_address + 1
 
     rom_directory_list_check:
@@ -802,13 +792,15 @@
         lda #$a0
         sta efs_readef_high
 
+        lda internal_state
+        and #$c0
+        ora #$01
+        sta internal_state
         lda #$01
-        sta dirload_state
+        ;sta dirload_state
         sta $f7
         lda #$00
         sta dirload_state_var
-        rts
-
         rts
 
 
@@ -837,14 +829,18 @@
 
     rom_dirload_chrin:
         jsr backup_zeropage
-        lda dirload_state
+        lda internal_state
+        and #$3f  ; remove the upper bits
         sta $f7
       @again:
         jsr rom_dirload_next_byte
         tay
-        lda $f7
-        sta dirload_state
-        beq @eof   ; state 0 means end
+        lda internal_state
+        and #$c0    ; only take the upper bits
+        ora $f7     ; or the state
+        sta internal_state
+        lda $f7     ; check if state is zero
+        beq @eof    ; state 0 means end
         bcs @again  ; C set, skip writing and repeat
         jsr restore_zeropage
         tya
@@ -858,19 +854,13 @@
 
 
     rom_dirload_transfer:
-        ;jsr rom_dirload_statemachine_reset
         jsr rom_dirload_next_byte  ; skip load address
-        ;ldx $f7
-        ;stx dirload_state
         jsr rom_dirload_next_byte
-        ;ldx $f7
-        ;stx dirload_state
 
         ldy #$00
       @loop:
         jsr rom_dirload_next_byte
         ldx $f7
-        ;stx dirload_state
         beq @eof   ; state 0 means end
         bcs @loop  ; C set, skip writing and repeat
         sta ($fe), y
@@ -893,6 +883,8 @@
 
         lda #$40
         sta status_byte
+        lda #$00
+        sta internal_state  ; must be reset here
 
         lda $fe
         sta io_end_address
@@ -902,12 +894,19 @@
         clc
         rts
 
-    ; ### direload verify -> device not present error
+
+    rom_dirload_verify:
+        ; dirload verify not supported -> device not present error
+        lda #ERROR_DEVICE_NOT_PRESENT
+        sta error_byte
+        lda #$00
+        sta io_end_address
+        sta io_end_address + 1
+        sec
+        rts
+
 
     rom_dirload_next_byte:
-        ; f7: state machine state
-        ;lda dirload_state
-        ;sta $f7
         lda $f7
         asl
         tax
@@ -1212,7 +1211,7 @@
         lda #$00
         ldx #$09
         jsr rom_compare16
-        bcs :+     ; 10 >= f8/f9 ($000a)
+        bcs :+     ; 10 >= f8/f9 ($0009)
         lda #$03   ; print 3 spaces
         sta dirload_state_var
         jmp @done
@@ -1220,7 +1219,7 @@
       : lda #$00
         ldx #$63
         jsr rom_compare16
-        bcs :+     ; 100 >= f8/f9 ($0064)
+        bcs :+     ; 100 >= f8/f9 ($0063)
         lda #$02   ; print 2 spaces
         sta dirload_state_var
         jmp @done
@@ -1228,7 +1227,7 @@
       : lda #$03
         ldx #$e7
         jsr rom_compare16
-        bcs :+     ; 1000 >= f8/f9 ($03e8)
+        bcs :+     ; 1000 >= f8/f9 ($03e7)
         lda #$01   ; print 1 spaces
         sta dirload_state_var
         jmp @done
@@ -1236,26 +1235,6 @@
       : lda #$00   ; print 0 spaces
         sta dirload_state_var
 
-/*      : lda #$03
-        ldx #$e8
-        jsr rom_compare16
-        bcc :+     ; 1000 >= f8/f0 ($03e8)
-        lda #$01   ; print 1 spaces
-        sta dirload_state_var
-        jmp @done
-
-      : lda #$27
-        ldx #$10
-        jsr rom_compare16
-        bcc :+     ; 10000 >= f8/f0 ($2710)
-        lda #$03   ; print 1 spaces
-        sta dirload_state_var
-
-        inc $f7    ; skip 
-        inc $f7
-        inc $f7
-        jmp @done*/
-        
         ; size in blocks is in f8/f9
         ; calculate how many spaces to skip (0, 1, 2 ,3)
         ; 9    -> $0009
@@ -1265,9 +1244,6 @@
         ; https://codebase64.org/doku.php?id=base:16-bit_absolute_comparison
 
       @done:
-        ;inc $f7
-        ;lda #23  ; reverse pointer to name
-        ;jsr dir_pointer_reverse
         lda $f9
         clc
         rts
@@ -1408,8 +1384,7 @@
         jsr dir_read_and_pointer_inc  ; efs_io_byte
         sta $f9
         jsr dir_read_and_pointer_inc  ; efs_io_byte
-        ;clc
-        ;adc #$80
+        ; memory offset will be added later
         sta $fa
 
         ; size
@@ -1505,8 +1480,6 @@
         ; returns C clear if there are more entries
         ; uses A, status
         ; must not use X
-        ;lda efs_directory_entry + efs_directory::flags
-;        lda $f9
         and #$1f
         cmp #$1f
         beq :+

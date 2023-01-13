@@ -30,7 +30,7 @@ CC65FLAGS=-t $(TARGET) -O
 .PHONY: clean all testef testprg libefs mrproper
 
 EF_LOADER_FILES=build/ef/loader.o build/ef/loadeapi.o
-EF_MENU_FILES=build/ef/menu.o build/ef/util.o build/ef/efs-wrapper.o
+EF_MENU_FILES=build/ef/menu.o build/ef/util.o build/ef/efs-wrapper.o build/ef/version.o
 EF_DIREFS_FILES=build/prg/direfs.o build/lib/lib-efs.o build/lib/lib-efs-ram1.o build/lib/lib-efs-ram2.o
 #EF_IOROM_FILES=build/ef/io-wrapper.o
 #EF_MENU_FILES=build/ef/loadeapi.o build/ef/io-loader.o build/ef/game-loader.o build/ef/io-sector.o build/ef/io-loadfile.o build/ef/io-caller.o 
@@ -71,6 +71,7 @@ clean:
 	rm -rf build/files
 	rm -f build/lib-efs.prg
 	rm -f build/test-libefs.crt
+	rm -f build/test-efs.d64
 
 mrproper:
 	rm -rf build

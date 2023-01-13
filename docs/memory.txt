@@ -28,6 +28,26 @@ $DF00:  (libefs jumptable and in/out code; variables)
 $DF80:  (eapi)
 
 
+Configuration
+=============
+
+Configuration starts at:
+
+00:1:1bxx: 
+18:       1:only one area (default read only); 3:two additional read/write areas
+19,1a,1b: start of area 0 directory: bank, low/high (usually 00:2000)
+1c:       banking mode according to eapi ($d0=lhlh, $b0=llll, $d4=hhhh
+1d:       number of banks (every bank, low and high must count) (can be empty)
+1e,1f,20: start of area 1 directory: bank, low/high; this must start at an erase area
+21:       banking mode
+22:       number of banks used (must be divisible by 8)
+23,24,25: start of area 2 directory
+26:       banking mode
+27:       number of banks used (must be divisible by 8)
+28:       call rom function on defragmentation
+29,2a:    low/high address of rom function in memory ($8000 - $bffff), must be in bank 0
+
+
 Cartridge Memory Map
 ====================
 

@@ -48,7 +48,7 @@
 .import rom_setlfs_body
 
 .export backup_zeropage_data
-.export libefs_configuration
+;.export libefs_unused
 .export backup_memory_config
 .export status_byte
 .export error_byte
@@ -107,7 +107,8 @@
         jmp rom_load_body
 
     EFS_open:    ; @ $DF12
-        ; parameter: none
+        ; parameter:
+        ;    A: 0: read; 1: write
         ; return:
         ;    A: error code
         ;    .C: 1 if error
@@ -249,14 +250,8 @@
         .byte $00
         .endrepeat
 
-    libefs_configuration:
-        .byte $00  ; $00: read only; bit 0: includes verify; bit 1: includes write
-
     backup_memory_config: ; exclusive usage
         .byte $00
-
-;    status_byte:  ; exclusive usage
-;        .byte $00
 
     error_byte:  ; exclusive usage
         .byte $00
@@ -265,7 +260,10 @@
         .byte $00
 
     internal_state:  ; exclusive usage
-        .byte $00    ; stores, open, closed, open, verify, read directory
+        .byte $00
+        ; bits 76543210
+        ;      xx: 10: load; 01: dir; 11: save
+        ;        xxxxxx : state machine value
 
     filename_address:
         .word $0000
@@ -282,6 +280,8 @@
     efs_device:
         .byte $00
 
+    libefs_unused:
+        .byte $00
 
 
 ;.segment "EFS_REL"
