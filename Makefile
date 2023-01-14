@@ -134,22 +134,22 @@ build/ef/efs.dir.prg build/ef/efs.files.prg: build/ef/files.list build/ef/menu.p
 build/ef/files.list:
 	@mkdir -p ./build/files
 	rm -f ./build/ef/files.list
-	./tools/mkdata.sh build/files/data1.prg 0x3000 1 >> build/ef/files.list
-	./tools/mkdata.sh build/files/data256.prg 0x3000 256 >> build/ef/files.list
-	./tools/mkdata.sh build/files/data1023.prg 0x3000 1023 >> build/ef/files.list
-	./tools/mkdata.sh build/files/data1024.prg 0x3000 1024 >> build/ef/files.list
-	./tools/mkdata.sh build/files/data1025.prg 0x3000 1025 >> build/ef/files.list
-	./tools/mkdata.sh build/files/data24k.prg 0x3000 24575 >> build/ef/files.list
-	./tools/mkdata.sh build/files/data3k.prg 0xc000 3328 >> build/ef/files.list
-	./tools/mkdata.sh build/files/data567890123456.prg 0x3000 257 >> build/ef/files.list
-	./tools/mkdata.sh build/files/data56789012345.prg 0x3000 1025 >> build/ef/files.list
-	./tools/mkdata.sh build/files/data8k.prg 0xa000 8192 >> build/ef/files.list
-	./tools/mkdata.sh build/files/data7k.prg 0xe000 7936 >> build/ef/files.list
-	./tools/mkdata.sh build/files/data9b.prg 0x3000 2302 >> build/ef/files.list
-	./tools/mkdata.sh build/files/data10b.prg 0x3000 2303 >> build/ef/files.list
-	./tools/mkdata.sh build/files/data99b.prg 0x3000 25342 >> build/ef/files.list
-	./tools/mkdata.sh build/files/data100b.prg 0x3000 25343 >> build/ef/files.list
-	./tools/mkdata.sh build/files/data1000b.prg 0x3000 255998 >> build/ef/files.list
+	./tools/mkdata.py -f build/files/data1.prg -a 0x3000 -s 1 >> build/ef/files.list
+	./tools/mkdata.py -f build/files/data256.prg -a 0x3000 -s 256 >> build/ef/files.list
+	./tools/mkdata.py -f build/files/data1023.prg -a 0x3000 -s 1023 >> build/ef/files.list
+	./tools/mkdata.py -f build/files/data1024.prg -a 0x3000 -s 1024 >> build/ef/files.list
+	./tools/mkdata.py -f build/files/data1025.prg -a 0x3000 -s 1025 >> build/ef/files.list
+	./tools/mkdata.py -f build/files/data24k.prg -a 0x3000 -s 24575 >> build/ef/files.list
+	./tools/mkdata.py -f build/files/data3k.prg -a 0xc000 -s 3328 >> build/ef/files.list
+	./tools/mkdata.py -f build/files/data567890123456.prg -a 0x3000 -s 257 >> build/ef/files.list
+	./tools/mkdata.py -f build/files/data56789012345.prg -a 0x3000 -s 1025 >> build/ef/files.list
+	./tools/mkdata.py -f build/files/data8k.prg -a 0xa000 -s 8192 >> build/ef/files.list
+	./tools/mkdata.py -f build/files/data7k.prg -a 0xe000 -s 7936 >> build/ef/files.list
+	./tools/mkdata.py -f build/files/data9b.prg -a 0x3000 -s 2302 >> build/ef/files.list
+	./tools/mkdata.py -f build/files/data10b.prg -a 0x3000 -s 2303 >> build/ef/files.list
+	./tools/mkdata.py -f build/files/data99b.prg -a 0x3000 -s 25342 >> build/ef/files.list
+	./tools/mkdata.py -f build/files/data100b.prg -a 0x3000 -s 25343 >> build/ef/files.list
+	./tools/mkdata.py -f build/files/data1000b.prg -a 0x3000 -s 255998 >> build/ef/files.list
 
 
 # build efs rw
@@ -160,12 +160,12 @@ build/ef/efs-rw.dir.prg build/ef/efs-rw.files.prg: build/ef/files-rw.list
 build/ef/files-rw.list:
 	@mkdir -p ./build/files
 	rm -f ./build/ef/files-rw.list
-	./tools/mkdata.sh build/files/delme15.prg 0x3000 15 >> build/ef/files-rw.list
-	./tools/mkdata.sh build/files/delme384.prg 0x3000 384 >> build/ef/files-rw.list
-	./tools/mkdata.sh build/files/delme640.prg 0x3000 640 >> build/ef/files-rw.list
-	./tools/mkdata.sh build/files/delme641.prg 0x3000 641 >> build/ef/files-rw.list
-	./tools/mkdata.sh build/files/delme642.prg 0x3000 642 >> build/ef/files-rw.list
-	./tools/mkdata.sh build/files/delme50k.prg 0x3000 50000 >> build/ef/files-rw.list
+	./tools/mkdata.py -f build/files/delme15.prg -a 0x3000 -s 15 >> build/ef/files-rw.list
+	./tools/mkdata.py -f build/files/delme384.prg -a 0x3000 -s 384 >> build/ef/files-rw.list
+	./tools/mkdata.py -f build/files/delme640.prg -a 0x3000 -s 640 >> build/ef/files-rw.list
+	./tools/mkdata.py -f build/files/delme641.prg -a 0x3000 -s 641 >> build/ef/files-rw.list
+	./tools/mkdata.py -f build/files/delme642.prg -a 0x3000 -s 642 >> build/ef/files-rw.list
+	./tools/mkdata.py -f build/files/delme50k.prg -a 0x3000 -s 50000 >> build/ef/files-rw.list
 	
 # easyflash init.bin
 #build/ef/init.bin: build/ef/init.o
