@@ -34,9 +34,10 @@
         .byte 0, 0, 0
 
         .byte $03
-        .byte $00, $00, $a0, $d0, 110  ; area 0: bank 0, $a000, mode lhlh, unlimited
-        .byte  32, $00, $80, $b0,  63  ; area 1: low side
-        .byte  32, $00, $a0, $d4,  63  ; area 2: none
+        ;    bank lo/hi addr mode size
+        .byte $00, $00, $a0, $d0,   0  ; area 0: bank 0, $a000, mode lhlh, ignore size
+        .byte  32, $00, $80, $b0,  32  ; area 1: low side
+        .byte  32, $00, $a0, $d4,  32  ; area 2: high side
         .byte $01                      ; defragment: yes
         .addr __EFS_CONFIG_RUN__ + efs_defragment_warning_offset
         .byte $00, $00, $00, $00       ; empty

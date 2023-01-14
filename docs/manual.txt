@@ -179,8 +179,9 @@ Interrupts:
 -----------
 
 libefs does not use sei. You have to take care of your interrupts
-beforehand. EAPI uses sei and cli abd therefore you cannot use sei to block
-interupts as cli will be called in the libefs resp. eapi code.
+beforehand. EAPI uses sei but restores the interrupt flag with plp.
+You can block interrupts by calling sei and cli before resp. after calling
+efs functions.
 
 libefs uses $37 (BASIC and KERNAL banked in) as memory configuration. If
 this collides with your interrupt usage you need to turn interrupts off

@@ -37,8 +37,7 @@ EFSLIB_ROM_START = $8000
 EFSLIB_ROM_BANK  = 0
 
 ; configuration
-LIBEFS_CONFIG_VERIFY = $01
-LIBEFS_CONFIG_SAVE   = $02
+LIBEFS_CONFIG_START = $bb18
 
 ; flags
 LIBEFS_FLAGS_RELOCATE = $01
@@ -100,15 +99,15 @@ EAPIGetSlot       = $df9b
 ; lib efs config struct
 .struct libefs_area
     bank .byte
-    addr .byte
+    addr .word
     mode .byte
     size .byte
 .endstruct
 
 .struct libefs_config
-    .byte 6
-    .byte 2
-    areas .byte
+    .byte 6      ; LIBEFS
+    .byte 3      ; 0,0,0 (version in default config)
+    areas .byte  ; 1 or 3
     area_0 .tag libefs_area
     area_1 .tag libefs_area
     area_2 .tag libefs_area

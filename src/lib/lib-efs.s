@@ -94,29 +94,33 @@
         jmp efs_init_eapi_body
 
     EFS_init_XXX: ; @ $8009
-        jmp $ffff
+        rts
+        nop
+        nop
 
     EFS_init_YYY: ; @ $800c
-        jmp $ffff
+        rts
+        nop
+        nop
 
-    efs_magic: ; @ $800f
+        .byte $00
+
+    efs_magic: ; @ $8010
     efs_default_config:
         .byte "libefs"
         .byte major_version, minor_version, patch_version
 
         .byte $01
-        .byte $00, $00, $a0, $d0, $00  ; area 0: bank 0, $a000, mode lhlh, unlimited
+        .byte $00, $00, $a0, $d0, $ff  ; area 0: bank 0, $a000, mode lhlh, unlimited
         .byte $00, $00, $00, $00, $00  ; area 1: none
         .byte $00, $00, $00, $00, $00  ; area 2: none
         .byte $00, $00, $00            ; defragment: no
         .byte $00, $00, $00, $00  ; dummy
 
     efs_config_size = * - efs_default_config
-    .if efs_call_size <> 32
+    .if efs_config_size <> 32
     .error "efs config size mismatch"
     .endif
-
-        .byte $00
 
     efs_call_size = * - EFS_init
     .if efs_call_size <> 48
@@ -311,7 +315,7 @@
     efs_readmem_ext_high = efs_generic_command + 5
 
 
-    efs_init_readef:
+/*    efs_init_readef:
         ldy #<(@codeend - @code - 1)
       : lda @code, y
         sta efs_generic_command, y
@@ -323,7 +327,7 @@
       @code: ; 12 bytes
         jsr EAPIGetBank
         sta EASYFLASH_BANK
-        lda $8000  ; read from banked memory
+        lda $8000  ; read from banked memory; byte 7, 8
         jmp efs_enter_pha
       @codeend:
       .if (@codeend - @code) > GENERIC_COMMAND_SIZE
@@ -332,7 +336,7 @@
 
     efs_readef = efs_generic_command
     efs_readef_low = efs_generic_command + 7
-    efs_readef_high = efs_generic_command + 8
+    efs_readef_high = efs_generic_command + 8*/
 
 
     efs_init_eapireadinc:
@@ -469,7 +473,7 @@
         jmp @leave
 
       @dirfind:
-        jsr rom_directory_find
+        jsr efs_directory_search
         bcs @leave  ; not found
         lda #%10000000  ; file load processing
         sta internal_state
@@ -548,7 +552,7 @@
         jmp @leave
 
       @fileload:
-        jsr rom_directory_find
+        jsr efs_directory_search
         bcs @leave ; not found
 
         jsr rom_fileload_begin
@@ -619,6 +623,137 @@
 
         plp
         jmp efs_bankout  ; ends with rts
+
+
+; --------------------------------------------------------------------
+; ef read functions with manipulatable pointer
+
+/*.scope efs_readef
+
+    .export efs_init_readef
+    .export efs_readef
+    .export efs_readef_low
+    .export efs_readef_high
+    .export efs_readef_read_and_inc
+    .export efs_readef_pointer_inc
+    .export efs_readef_pointer_dec
+    .export efs_readef_pointer_advance
+    .export efs_readef_pointer_reverse*/
+
+    efs_init_readef:
+        ldy #<(@codeend - @code - 1)
+      : lda @code, y
+        sta efs_generic_command, y
+        dey
+        bpl :-
+        clc
+        rts
+
+      @code: ; 12 bytes
+        jsr EAPIGetBank
+        sta EASYFLASH_BANK
+        lda $8000  ; read from banked memory; byte 7, 8
+        jmp efs_enter_pha
+      @codeend:
+      .if (@codeend - @code) > GENERIC_COMMAND_SIZE
+      .error "dynamic code readef to large"
+      .endif
+
+    efs_readef = efs_generic_command
+    efs_readef_low = efs_generic_command + 7
+    efs_readef_high = efs_generic_command + 8
+
+    efs_readef_read_and_inc:
+        jsr efs_readef
+        pha
+        jsr efs_readef_pointer_inc
+        pla  ; to have the correct cpu states
+        rts
+
+    efs_readef_pointer_inc:
+        inc efs_readef_low
+        bne :+
+        inc efs_readef_high
+      : ;lda efs_readef_high
+        rts
+
+    efs_readef_pointer_dec:
+        lda efs_readef_low
+        bne :+
+        dec efs_readef_high
+      : dec efs_readef_low
+        rts
+
+    efs_readef_pointer_advance:
+        clc
+        adc efs_readef_low
+        sta efs_readef_low
+        bcc :+
+        inc efs_readef_high
+      : ;lda efs_readef_high
+        rts
+
+    efs_readef_pointer_reverse:
+        tax
+        lda efs_readef_low
+        stx efs_readef_low
+        sec
+        sbc efs_readef_low
+        sta efs_readef_low
+        bcs :+
+        dec efs_readef_high
+      : ;lda efs_readef_high
+        rts
+
+;.endscope
+
+
+
+; --------------------------------------------------------------------
+; efs config functions
+; f5/f6 temporary variable
+
+
+    rom_conf_get_config:
+        ; config is stored in f5/f6
+        ; config address parameter in a
+        tay
+        lda ($f5), y
+        rts
+
+
+    rom_config_prepare_config:
+        lda LIBEFS_CONFIG_START + 0
+        cmp #$4c
+        bne @default
+        lda LIBEFS_CONFIG_START + 1
+        cmp #$49
+        bne @default
+        lda LIBEFS_CONFIG_START + 2
+        cmp #$42
+        bne @default
+        lda LIBEFS_CONFIG_START + 3
+        cmp #$45
+        bne @default
+        lda LIBEFS_CONFIG_START + 4
+        cmp #$46
+        bne @default
+        lda LIBEFS_CONFIG_START + 5
+        cmp #$53
+        bne @default
+
+        lda #<LIBEFS_CONFIG_START
+        sta $f5
+        lda #>LIBEFS_CONFIG_START
+        sta $f6
+        rts
+
+      @default:
+        lda #<efs_default_config
+        sta $f5
+        lda #>efs_default_config
+        sta $f6
+        rts
 
 
 
@@ -812,7 +947,6 @@
         ora #$01
         sta internal_state
         lda #$01
-        ;sta dirload_state
         sta $f7
         lda #$00
         sta dirload_state_var
@@ -824,7 +958,6 @@
         sta $fe
         lda #$04
         sta $ff
-        ;lda efs_secondary  ; 0=load to X/Y, 1=load to prg address
         lda #LIBEFS_FLAGS_RELOCATE
         bit efs_flags
         bne :+              ; set: load to X/Y, clear: no relocate
@@ -1034,12 +1167,20 @@
         inc $f7
         rts
 
+    rom_dirload_checkboundary:
+        ; check if directory cursor is out of bounds
+        ; .C set if out of bounds
+        lda efs_readef_high
+        cmp #$b8
+        rts
+
     rom_dirload_sm_linenend:
         ; produces $00 and decides if new filename
         ; if filename -> 20
         ; if finish -> 15
         lda #16  ; pointer starts at begin of dir entry
-        jsr dir_pointer_advance
+        jsr efs_readef_pointer_advance
+        jsr rom_dirload_checkboundary
         bcs :+  ; directory terminates
         jsr efs_readef
         ; ### test hidden
@@ -1047,7 +1188,7 @@
         sta $fa
         bne :+  ; is file invalid
         lda #8  ; invalid
-        jsr dir_pointer_advance
+        jsr efs_readef_pointer_advance
         jmp rom_dirload_sm_linenend
 
       : lda $fa  ; terminator ?
@@ -1154,7 +1295,7 @@
     rom_dirload_sm_filename:
         ; pointer is at the name
         ldx dirload_state_var
-        jsr dir_read_and_pointer_inc
+        jsr efs_readef_read_and_inc
         bne :+
         lda #$20  ; space if 0 char
       : inc dirload_state_var
@@ -1170,8 +1311,8 @@
     rom_dirload_sm_sizelow:
         ; pointer is at flags
         lda #5  ; advance to size low
-        jsr dir_pointer_advance
-        jsr dir_read_and_pointer_inc  ; size low
+        jsr efs_readef_pointer_advance
+        jsr efs_readef_read_and_inc  ; size low
         beq :+
         lda #$01
       : sta $f8  ; a is 0 after branch
@@ -1204,12 +1345,12 @@
 
     rom_dirload_sm_sizehigh:
         ; pointer is at size mid
-        jsr dir_pointer_dec
-        jsr dir_read_and_pointer_inc  ;low
+        jsr efs_readef_pointer_dec
+        jsr efs_readef_read_and_inc  ;low
         beq :+
         lda #$01
       : sta $f8  ; a is zero iafter branch
-        jsr dir_read_and_pointer_inc  ;mid
+        jsr efs_readef_read_and_inc  ;mid
         clc
         adc $f8
         sta $f8
@@ -1221,7 +1362,7 @@
 
         inc $f7
         lda #23  ; reverse pointer to name
-        jsr dir_pointer_reverse
+        jsr efs_readef_pointer_reverse
 
         lda #$00
         ldx #$09
@@ -1290,7 +1431,7 @@
         sta dirload_state_var
 
         lda #8  ; advance pointer to begin of next name
-        jsr dir_pointer_advance
+        jsr efs_readef_pointer_advance
         ; no return here
 
     rom_dirload_sm_type_next:
@@ -1323,6 +1464,7 @@
 ; --------------------------------------------------------------------
 ; directory search functions
 ; usage:
+;   f5/f6: pointer to configuration
 ;   f7: name check result
 ;   fe/ff: pointer to name
 ; return:
@@ -1333,18 +1475,52 @@
 ;    dir_read_byte_low = efs_io_byte + 1
 ;    dir_read_byte_high = efs_io_byte + 2
 
-    dir_namecheck_result = $f7
+    dir_temp_var = $f7
     dir_name_pointer = $fe
     dir_directory_entry = $fb
 
-    dir_read_and_pointer_inc:
+    efs_directory_search:
+        lda filename_address
+        sta dir_name_pointer
+        lda filename_address + 1
+        sta dir_name_pointer + 1
+
+        jsr rom_config_prepare_config
+        lda #libefs_config::areas
+        jsr rom_conf_get_config
+        cmp #$03
+        beq :+
+
+        ; read only efs
+        lda #$00  ; area 0
+        jsr rom_directory_begin
+        jsr rom_directory_find
+        rts
+        
+      : ; rw efs
+        lda #libefs_config::area_0
+        jsr rom_directory_begin
+        jsr rom_directory_find
+        bcc @found
+        lda #libefs_config::area_1
+        jsr rom_directory_begin
+        jsr rom_directory_find
+        bcc @found
+        lda #libefs_config::area_2
+        jsr rom_directory_begin
+        jsr rom_directory_find
+       @found:
+        rts
+
+
+/*    xdir_read_and_pointer_inc:
         jsr efs_readef
         pha
-        jsr dir_pointer_inc
+        jsr efs_readef_pointer_inc
         pla
         rts
 
-    dir_pointer_inc:
+    xdir_pointer_inc:
         ; ### check if pointer leaves directory
         inc efs_readef_low
         bne :+
@@ -1353,7 +1529,7 @@
         cmp #$b8  ; directory over ### configuration
         rts
 
-    dir_pointer_dec:
+    xdir_pointer_dec:
         ; ### check if pointer leaves directory
         lda efs_readef_low
         bne :+
@@ -1361,7 +1537,7 @@
       : dec efs_readef_low
         rts
 
-    dir_pointer_advance:
+    xdir_pointer_advance:
         ; ### check if pointer leaves directory
         clc
         adc efs_readef_low
@@ -1373,7 +1549,7 @@
         rts
         
 
-    dir_pointer_reverse:
+    xdir_pointer_reverse:
         ; ### check if pointer leaves directory
         tax
         lda efs_readef_low
@@ -1385,55 +1561,61 @@
         dec efs_readef_high
       : lda efs_readef_high
         cmp #$b8  ; directory over ### configuration
-        rts
+        rts*/
 
 
     rom_directory_filedata:
         ; position is at flags, bank is the next data to load
         ; all zp variables are free and can be used
-        jsr dir_read_and_pointer_inc  ; efs_io_byte  ; bank
+        jsr efs_readef_read_and_inc  ; efs_io_byte  ; bank
         sta $f8
-        jsr dir_read_and_pointer_inc  ; efs_io_byte  ; bank high
+        jsr efs_readef_read_and_inc  ; efs_io_byte  ; bank high
 
         ; offset
-        jsr dir_read_and_pointer_inc  ; efs_io_byte
+        jsr efs_readef_read_and_inc  ; efs_io_byte
         sta $f9
-        jsr dir_read_and_pointer_inc  ; efs_io_byte
+        jsr efs_readef_read_and_inc  ; efs_io_byte
         ; memory offset will be added later
         sta $fa
 
         ; size
-        jsr dir_read_and_pointer_inc  ; efs_io_byte
+        jsr efs_readef_read_and_inc  ; efs_io_byte
         sta $fb
-        jsr dir_read_and_pointer_inc  ; efs_io_byte
+        jsr efs_readef_read_and_inc  ; efs_io_byte
         sta $fc
-        jsr dir_read_and_pointer_inc  ; efs_io_byte
+        jsr efs_readef_read_and_inc  ; efs_io_byte
         sta $fd
 
         rts
 
 
-    rom_directory_begin_search:
+    rom_directory_begin:
         ; set pointer and length of directory
-;        lda #$d0
-;        ldx #$00  ; $A000
-;        ldy #$a0  ; $A000
-;        jsr EAPISetPtr
-;        ldx #$00
-;        ldy #$18  ; $1800 bytes, could be $2000
-;        lda #$00
-;        jsr EAPISetLen
+        ; a offset in configuration
+        sta dir_temp_var
+
+        jsr rom_config_prepare_config
+
         jsr efs_init_setstartbank
-        lda #$00  ; ### 0, could be different bank
+        ;lda #$00  ; ### 0, could be different bank
+        ldy dir_temp_var
+        lda ($f5), y  ; at libefs_config::libefs_area::bank
         jsr efs_generic_command
 
-        ; set read code
+        ; set read ef code
         jsr efs_init_readef
-        lda #$00  ; ### efs dir
+
+        inc dir_temp_var
+        ldy dir_temp_var
+        lda ($f5), y  ; at libefs_config::libefs_area::addr low
         sta efs_readef_low
-        lda #$a0  ; ### efs dir (usually $a0 or $80)
+
+        inc dir_temp_var
+        ldy dir_temp_var
+        lda ($f5), y  ; at libefs_config::libefs_area::addr high
         sta efs_readef_high
 
+        ; banking mode and area size is irrelevant in dirsearch
         rts
 
 
@@ -1443,7 +1625,7 @@
         ldy #$00
         ldx #$00
       @loop:
-        jsr dir_read_and_pointer_inc  ; efs_io_byte    ; load next char
+        jsr efs_readef_read_and_inc  ; load next char
         sta dir_directory_entry
         inx
         
@@ -1462,7 +1644,7 @@
         bne @loop            ; more characters
         cpy #$10             ; full name length reached
         beq @match           ;   -> match
-        jsr dir_read_and_pointer_inc  ; efs_io_byte    ; load next char
+        jsr efs_readef_read_and_inc  ; load next char
         sta dir_directory_entry
         inx
         lda dir_directory_entry  ; if == \0
@@ -1471,23 +1653,30 @@
       @next:
         cpx #$10
         beq :+
-        jsr dir_read_and_pointer_inc  ; efs_io_byte    ; load next char
+        jsr efs_readef_read_and_inc  ; load next char
         inx
         bne @next
       : lda #$00
-        sta dir_namecheck_result
+        sta dir_temp_var
         rts
 
       @match:
         cpx #$10
         beq :+
-        jsr dir_read_and_pointer_inc  ; efs_io_byte    ; load next char
+        jsr efs_readef_read_and_inc  ; load next char
         inx
         bne @match
       : lda #$01
-        sta dir_namecheck_result
+        sta dir_temp_var
         rts
 
+
+    rom_directory_checkboundary:
+        ; check if directory cursor is out of bounds
+        ; .C set if out of bounds
+        lda efs_readef_high
+        cmp #$b8        
+        rts
 
     rom_directory_is_terminator:
         ; A: value
@@ -1504,13 +1693,12 @@
         rts
 
 
-
     rom_directory_find:
-        lda filename_address
-        sta dir_name_pointer
-        lda filename_address + 1
-        sta dir_name_pointer + 1
-        jsr rom_directory_begin_search
+;        lda filename_address
+;        sta dir_name_pointer
+;        lda filename_address + 1
+;        sta dir_name_pointer + 1
+;        jsr rom_directory_begin_search
 
         lda filename_length
         bne @repeat
@@ -1522,10 +1710,12 @@
         jsr rom_directory_checkname
 
         ; test if more entries
-        jsr dir_read_and_pointer_inc  ; efs_io_byte    ; load next char
-        bcs @error4
+        jsr efs_readef_read_and_inc  ; efs_io_byte    ; load next char
         jsr rom_directory_is_terminator
-        bcc @next      ; if not terminator entry (C clear) next check
+        bcs @error4    ; terminator, file not found
+        jsr rom_directory_checkboundary
+        bcs @error4    ; over bounds, file not found
+        jmp @next
       @error4:
         lda #$04       ; file not found: status=0, error=4, C
       @error:
@@ -1534,17 +1724,18 @@
         rts
 
       @next:
-        ; test if hidden ###
-
-        lda dir_namecheck_result
+        ; no test if hidden
+        lda dir_temp_var
         bne @match
         lda #$07
-        jsr dir_pointer_advance
+        jsr efs_readef_pointer_advance
         jmp @repeat
 
       @match:
         ; found, read file info
         jsr rom_directory_filedata
+        lda #$00
+        sta error_byte
         clc
         rts
 

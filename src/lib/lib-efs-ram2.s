@@ -47,6 +47,31 @@ EASYFLASH_IO_BANK = $de00
 
 .segment "EFS_RAM2"
 
+    EAPIWriteFlash:          ;  $df80
+        rts
+
+
+    EAPI_INC_TYPE:
+        .byte $00
+
+    EAPI_LENGTH_LO:
+        .byte $00
+
+
+    EAPIEraseSector:         ;  $df83
+        rts
+
+
+    EAPI_LENGTH_MED:
+        .byte $00
+
+    EAPI_LENGTH_HI:
+        .byte $00
+
+
+        jmp EAPISetBank      ;  $df86
+
+
 
 ; =============================================================================
 ;
@@ -68,26 +93,11 @@ EASYFLASH_IO_BANK = $de00
 ;       Z,N <- bank
 ;
 ; =============================================================================
-EAPIGetBank: ; 3 bytes
-    ; EAPIWriteFlash goes here, no immediate bad effect
+    EAPIGetBank:             ;  $df89
     EAPI_SHADOW_BANK = * + 1
         lda #$00  ; storage of EAPI_SHADOW_BANK
         rts
 
-
-    ; EAPIEraseSector  goes here, may jam or crash
-    EAPI_LENGTH_LO:
-        .byte $00
-
-    EAPI_LENGTH_MED:
-        .byte $00
-
-    EAPI_LENGTH_HI:
-        .byte $00
-
-
-        jmp EAPISetBank      ;  $df86
-        jmp EAPIGetBank      ;  $df89
         jmp EAPISetPtr       ;  $df8c
         jmp EAPISetLen       ;  $df8f
         jmp EAPIReadFlashInc ;  $df92
@@ -117,11 +127,6 @@ EAPISetBank:
         sta EAPI_SHADOW_BANK    ; EAPIWriteFlashInc will go here, no immediate negative effect
         sta EASYFLASH_IO_BANK   ; EAPISetSlot will go here, no immediate negative effect
         rts                     ; EAPIGetSlot will go herer, no negative effect
-
-
-
-    EAPI_INC_TYPE:
-        .byte $00
 
 
 

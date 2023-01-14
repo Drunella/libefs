@@ -103,7 +103,7 @@ build/test-libefs.crt: build/ef/test-libefs.bin
 	cartconv -b -t easy -o build/test-libefs.crt -i build/ef/test-libefs.bin -n "libefs test" -p
 
 # cartridge binary
-build/ef/test-libefs.bin: build/ef/init.bin src/ef/eapi-am29f040.prg build/lib-efs.prg build/ef/loader.prg build/ef/directory.data.prg build/ef/files.data.prg build/ef/config.bin
+build/ef/test-libefs.bin: build/ef/init.bin src/ef/eapi-am29f040.prg build/lib-efs.prg build/ef/loader.prg build/ef/efs.dir.prg build/ef/efs.files.prg build/ef/efs-config.bin build/ef/efs-rw.dir.prg build/ef/efs-rw.files.prg
 	cp ./src/ef/eapi-am29f040.prg ./build/ef/eapi-am29f040.prg
 	cp ./build/lib-efs.prg ./build/ef/lib-efs.prg
 	tools/mkbin.py -v -b ./build/ef -m ./src/ef/crt.map -o ./build/ef/test-libefs.bin
@@ -127,7 +127,7 @@ build/ef/efs-config.bin: build/ef/efs-config.o src/ef/efs-config.cfg
 
 
 # build efs
-build/ef/directory.data.prg build/ef/files.data.prg: build/ef/files.list build/ef/menu.prg
+build/ef/efs.dir.prg build/ef/efs.files.prg: build/ef/files.list build/ef/menu.prg
 	tools/mkefs.py -v -u -s 507904 -l ./build/ef/files.list -f . -d ./build/ef
 
 # test files
@@ -151,6 +151,21 @@ build/ef/files.list:
 	./tools/mkdata.sh build/files/data100b.prg 0x3000 25343 >> build/ef/files.list
 	./tools/mkdata.sh build/files/data1000b.prg 0x3000 255998 >> build/ef/files.list
 
+
+# build efs rw
+build/ef/efs-rw.dir.prg build/ef/efs-rw.files.prg: build/ef/files-rw.list
+	tools/mkefs.py -v -u -s 256000 -o 6144 -m ll -b 32 -n efs-rw -l ./build/ef/files-rw.list -f . -d ./build/ef
+
+# test files rw
+build/ef/files-rw.list:
+	@mkdir -p ./build/files
+	rm -f ./build/ef/files-rw.list
+	./tools/mkdata.sh build/files/delme15.prg 0x3000 15 >> build/ef/files-rw.list
+	./tools/mkdata.sh build/files/delme384.prg 0x3000 384 >> build/ef/files-rw.list
+	./tools/mkdata.sh build/files/delme640.prg 0x3000 640 >> build/ef/files-rw.list
+	./tools/mkdata.sh build/files/delme641.prg 0x3000 641 >> build/ef/files-rw.list
+	./tools/mkdata.sh build/files/delme642.prg 0x3000 642 >> build/ef/files-rw.list
+	./tools/mkdata.sh build/files/delme50k.prg 0x3000 50000 >> build/ef/files-rw.list
 	
 # easyflash init.bin
 #build/ef/init.bin: build/ef/init.o

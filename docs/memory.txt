@@ -36,9 +36,9 @@ Configuration
 Configuration starts at:
 
 00:1:1bxx: 
-00-17:    [efsname]
-18,19,1a  LIB
-1b,1c,1d  EFS
+00-17:    [ef name]
+18,19,1a  LIB ($4c, $49, $42)
+1b,1c,1d  EFS ($45, $46, $53)
 1e,1f     $00, $00, $00
 21:       1:only one area (default read only); 3:two additional read/write areas
 22,23,24: start of area 0 directory: bank, low/high (usually 00:2000)
@@ -92,11 +92,11 @@ Cartridge Memory Map
 24-31:1:0000   [efs files]
 
 32-39:0:0000   [low rw dir&files chip]
-40-47:0:0000   [low rw dir&files chip]
-48-55:0:0000   [low rw dir&files chip]
-56-63:0:0000   [low rw dir&files chip]
+40-47:0:0000   [low rw files chip]
+48-55:0:0000   [low rw files chip]
+56-63:0:0000   [low rw files chip]
 
 32-39:1:0000   [high rw dir&files chip]
-40-47:1:0000   [high rw dir&files chip]
-48-55:1:0000   [high rw dir&files chip]               
-56-63:1:0000   [high rw dir&files chip]
+40-47:1:0000   [high rw files chip]
+48-55:1:0000   [high rw files chip]               
+56-63:1:0000   [high rw files chip]

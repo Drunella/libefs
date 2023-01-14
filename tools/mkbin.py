@@ -55,18 +55,33 @@ def bin_initialize():
     binary_file = bytearray([0xff] * 64 * 16384) # all 64 banks
 
 
-def bin_placedata(data, bank, address, size, start):
+def bin_placedata(data, bank, address, size, start, mode):
     global binary_file
     if address < 0x8000 or address >= 0xC000:
         raise Exception("address outside allowed range: 0x{0:04x}".format(address))
-    address -= 0x8000
+    #address -= 0x8000
     address += bank * 16384
+    
+    if (size > 0) and (start+size > len(data)):
+        raise Exception("given data size is more than actual data size")
+    
     if size == 0:
-        binary_file[address:address+len(data)] = data[start:]
-    else:
-        if start+size > len(data):
-            raise Exception("given data size is more than actual data size")
-        binary_file[address:address+size] = data[start:start+size]
+        size = len(data)
+        
+    for i in range(0, size):
+        if (i > 0 and mode == 'll'):
+            if (address+i) % 0x2000 == 0:
+                address += 0x2000
+        if (i > 0 and mode == 'hh'):
+            if (address+i) % 0x2000 == 0:
+                address += 0x2000
+                
+        binary_file[address+i - 0x8000] = data[start+i]
+    
+#     if size == 0:
+#        binary_file[address:address+len(data)] = data[start:]
+#    else:
+#        binary_file[address:address+size] = data[start:start+size]
 
 
 def bin_write(filename):
@@ -103,12 +118,14 @@ def process(e):
         #address = int(e[3], 0)
         size = int(e[4], 0)
         start = int(e[5], 0)
+        mode = e[6]
         #if flag != "addr":
         #    raise Exception("unknown flag " + flag)
     else:
         #address = 0
         start = 0
         size = 0
+        mode = 'lh'
 
     if type == "f":
         # set prg file with load address
@@ -122,7 +139,7 @@ def process(e):
         else:
             if address == 0:
                 raise Exception("must give address for non prg file")
-        bin_placedata(data, bank, address, size, start)
+        bin_placedata(data, bank, address, size, start, mode)
         return address
     elif type == "a":
         # set data in low/high
@@ -134,7 +151,7 @@ def process(e):
         data = bytearray(2);
         data[0] = value % 256
         data[1] = value // 256
-        bin_placedata(data, bank, address, 0, 0)
+        bin_placedata(data, bank, address, 0, 0, mode)
         return address
     else:
         raise Exception("unknown type " + type)
