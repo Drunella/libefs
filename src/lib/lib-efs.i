@@ -20,6 +20,20 @@ ZEROPAGE_SIZE .set 11
 ZEROPAGE_BACKUP_END = $3f
 GENERIC_COMMAND_SIZE .set 14
 
+zp_var_xf := ZEROPAGE_BACKUP_END
+zp_var_xe := ZEROPAGE_BACKUP_END - 1
+zp_var_xd := ZEROPAGE_BACKUP_END - 2
+zp_var_xc := ZEROPAGE_BACKUP_END - 3
+zp_var_xb := ZEROPAGE_BACKUP_END - 4
+zp_var_xa := ZEROPAGE_BACKUP_END - 5
+zp_var_x9 := ZEROPAGE_BACKUP_END - 6
+zp_var_x8 := ZEROPAGE_BACKUP_END - 7
+zp_var_x7 := ZEROPAGE_BACKUP_END - 8
+zp_var_x6 := ZEROPAGE_BACKUP_END - 9
+zp_var_x5 := ZEROPAGE_BACKUP_END - 10
+
+;.globalzp zp_var_x5, zp_var_x6, zp_var_x7, zp_var_x8, zp_var_x9, zp_var_xa,
+;.globalzp zp_var_xb, zp_var_xc, zp_var_xd, zp_var_xe, zp_var_xf
 
 ; constants
 
