@@ -1,17 +1,17 @@
 Zeropage Usage
 ==============
 
-$f5
-$f6
-$f7
-$f8
-$f9
-$fa
-$fb
-$fc
-$fd
-$fe
-$ff
+$35
+$36
+$37
+$38
+$39
+$3a
+$3b
+$3c
+$3d
+$3e
+$3f
 
 
 Internal States

@@ -137,7 +137,7 @@
 
     backup_zeropage:
         ldx #ZEROPAGE_SIZE - 1  ; backup zp
-    :   lda $ff - ZEROPAGE_SIZE + 1, x
+    :   lda ZEROPAGE_BACKUP_END - ZEROPAGE_SIZE + 1, x
         sta backup_zeropage_data, x
         dex
         bpl :-
@@ -146,7 +146,7 @@
     restore_zeropage:
         ldx #ZEROPAGE_SIZE - 1  ; restore zp
     :   lda backup_zeropage_data, x
-        sta $ff - ZEROPAGE_SIZE + 1, x
+        sta ZEROPAGE_BACKUP_END - ZEROPAGE_SIZE + 1, x
         dex
         bpl :-
         rts
@@ -279,7 +279,7 @@
 
       @code:
         jsr efs_bankout
-        lda ($fe), y  ; read from memory
+        lda ($3e), y  ; read from memory
         ldx #$37
         stx $01
         jmp efs_enter_pha
@@ -713,12 +713,13 @@
 ; efs config functions
 ; f5/f6 temporary variable
 
+    zp_pointer_configuration = $35
 
     rom_conf_get_config:
         ; config is stored in f5/f6
         ; config address parameter in a
         tay
-        lda ($f5), y
+        lda (zp_pointer_configuration), y
         rts
 
 
@@ -743,16 +744,16 @@
         bne @default
 
         lda #<LIBEFS_CONFIG_START
-        sta $f5
+        sta zp_pointer_configuration
         lda #>LIBEFS_CONFIG_START
-        sta $f6
+        sta zp_pointer_configuration + 1
         rts
 
       @default:
         lda #<efs_default_config
-        sta $f5
+        sta zp_pointer_configuration
         lda #>efs_default_config
-        sta $f6
+        sta zp_pointer_configuration + 1
         rts
 
 
@@ -760,32 +761,32 @@
 ; --------------------------------------------------------------------
 ; efs load and verify functions
 ; parameter:
-;   f8: bank
-;   f9/fa: offset in bank (with $8000 added)
-;   fb/fc/fd: size
+;   38: bank
+;   39/3a: offset in bank (with $8000 added)
+;   3b/3c/fd: size
 ; using
-;   f7: temporary
-;   fe/ff: pointer to data
+;   37: temporary
+;   3e/3f: pointer to data
 ; 
     rom_fileload_begin:
         jsr efs_init_eapireadinc  ; repair dynamic code
 
         ; directory entry
-        ldx $f9  ; efs_directory_entry + efs_directory::offset_low
-        lda $fa  ; efs_directory_entry + efs_directory::offset_high
+        ldx $39  ; efs_directory_entry + efs_directory::offset_low
+        lda $3a  ; efs_directory_entry + efs_directory::offset_high
         clc
         adc #$80
         tay
         lda #$d0  ; eapi bank mode
         jsr EAPISetPtr
 
-        ldx $fb  ; efs_directory_entry + efs_directory::size_low
-        ldy $fc  ; efs_directory_entry + efs_directory::size_high
-        lda $fd  ; efs_directory_entry + efs_directory::size_upper
+        ldx $3b  ; efs_directory_entry + efs_directory::size_low
+        ldy $3c  ; efs_directory_entry + efs_directory::size_high
+        lda $3d  ; efs_directory_entry + efs_directory::size_upper
         jsr EAPISetLen
 
         jsr efs_init_setstartbank
-        lda $f8  ; efs_directory_entry + efs_directory::bank
+        lda $38  ; efs_directory_entry + efs_directory::bank
         jsr efs_generic_command
 
         rts
@@ -793,22 +794,22 @@
 
     rom_fileload_address:
         jsr efs_io_byte ; load address
-        sta $fe
+        sta $3e
         jsr efs_io_byte
-        sta $ff
+        sta $3f
         ;lda efs_secondary  ; 0=load to X/Y, 1=load to prg address
         lda #LIBEFS_FLAGS_RELOCATE
         bit efs_flags
         bne :+              ; set: load to X/Y, clear: no relocate
         jmp :++
       : lda io_start_address  ; load to relocation address (X/Y)
-        sta $fe
+        sta $3e
         lda io_start_address + 1
-        sta $ff
+        sta $3f
 
-      : lda $fe
+      : lda $3e
         sta io_start_address
-        lda $ff
+        lda $3f
         sta io_start_address + 1
 
         rts
@@ -819,30 +820,30 @@
       @loop:
         jsr efs_io_byte
         bcs @eof
-        sta ($fe), y
+        sta ($3e), y
         iny
         bne @loop
-        inc $ff
+        inc $3f
         jmp @loop
 
       @eof:
         clc
         tya
-        adc $fe
-        sta $fe
+        adc $3e
+        sta $3e
         bcc :+
-        inc $ff
-      : lda $fe
+        inc $3f
+      : lda $3e
         bne :+
-        dec $ff
-      : dec $fe
+        dec $3f
+      : dec $3e
      
         lda #$40
         sta status_byte
 
-        lda $fe
+        lda $3e
         sta io_end_address
-        lda $ff
+        lda $3f
         sta io_end_address + 1
 
         clc
@@ -855,22 +856,22 @@
       @loop:
         jsr efs_io_byte
         bcs @eof  ; eof
-        sta $f7
+        sta $37
         jsr efs_generic_command
-        cmp $f7
+        cmp $37
         bne @mismatch
         iny
         bne @loop
-        inc $ff
+        inc $3f
         jmp @loop
 
       @eof:
         lda #$40
         sta status_byte
-        lda $fe  ; verify successful, reduce address by one
+        lda $3e  ; verify successful, reduce address by one
         bne :+
-        dec $ff
-      : dec $fe
+        dec $3f
+      : dec $3e
         jmp @leave
 
       @mismatch:
@@ -880,14 +881,14 @@
       @leave:
         clc
         tya
-        adc $fe
-        sta $fe
+        adc $3e
+        sta $3e
         bcc :+
-        inc $ff
+        inc $3f
 
-      : lda $fe
+      : lda $3e
         sta io_end_address
-        lda $ff
+        lda $3f
         sta io_end_address + 1
 
         lda status_byte
@@ -915,13 +916,13 @@
 
     rom_directory_list_check:
         lda filename_address
-        sta $fe
+        sta $3e
         lda filename_address + 1
-        sta $ff
+        sta $3f
 
         ldy #$00
         lda #$24        ; '$'
-        cmp ($fe), y     ; no fit
+        cmp ($3e), y     ; no fit
         bne :+
 
         sec
@@ -947,7 +948,7 @@
         ora #$01
         sta internal_state
         lda #$01
-        sta $f7
+        sta $37
         lda #$00
         sta dirload_state_var
         rts
@@ -955,21 +956,21 @@
 
     rom_dirload_address:
         lda #$01
-        sta $fe
+        sta $3e
         lda #$04
-        sta $ff
+        sta $3f
         lda #LIBEFS_FLAGS_RELOCATE
         bit efs_flags
         bne :+              ; set: load to X/Y, clear: no relocate
         jmp :++
       : lda io_start_address  ; load to relocation address (X/Y)
-        sta $fe
+        sta $3e
         lda io_start_address + 1
-        sta $ff
+        sta $3f
 
-      : lda $fe
+      : lda $3e
         sta io_start_address
-        lda $ff
+        lda $3f
         sta io_start_address + 1
 
         rts
@@ -979,15 +980,15 @@
         jsr backup_zeropage
         lda internal_state
         and #$3f  ; remove the upper bits
-        sta $f7
+        sta $37
       @again:
         jsr rom_dirload_next_byte
         tay
         lda internal_state
         and #$c0    ; only take the upper bits
-        ora $f7     ; or the state
+        ora $37     ; or the state
         sta internal_state
-        lda $f7     ; check if state is zero
+        lda $37     ; check if state is zero
         beq @eof    ; state 0 means end
         bcs @again  ; C set, skip writing and repeat
         jsr restore_zeropage
@@ -1008,35 +1009,35 @@
         ldy #$00
       @loop:
         jsr rom_dirload_next_byte
-        ldx $f7
+        ldx $37
         beq @eof   ; state 0 means end
         bcs @loop  ; C set, skip writing and repeat
-        sta ($fe), y
+        sta ($3e), y
         iny
         bne @loop
-        inc $ff
+        inc $3f
         jmp @loop
 
       @eof:
         clc
         tya
-        adc $fe
-        sta $fe
+        adc $3e
+        sta $3e
         bcc :+
-        inc $ff
-      : lda $fe
+        inc $3f
+      : lda $3e
         bne :+
-        dec $ff
-      : dec $fe
+        dec $3f
+      : dec $3e
 
         lda #$40
         sta status_byte
         lda #$00
         sta internal_state  ; must be reset here
 
-        lda $fe
+        lda $3e
         sta io_end_address
-        lda $ff
+        lda $3f
         sta io_end_address + 1
 
         clc
@@ -1055,15 +1056,15 @@
 
 
     rom_dirload_next_byte:
-        lda $f7
+        lda $37
         asl
         tax
         lda rom_dirload_statemachine, x
-        sta $fc
+        sta $3c
         lda rom_dirload_statemachine + 1, x
-        sta $fd
+        sta $3d
         clc
-        jmp ($00fc)
+        jmp ($003c)
 
     rom_dirload_statemachine:
         .addr rom_dirload_sm_finish        ; 0
@@ -1144,27 +1145,27 @@
         ; if in device 0 area, always write protected
         ; ### other areas
         lda #$3c  ; '<'
-        inc $f7
+        inc $37
         clc
         rts
 
     rom_dirload_sm_finish:
         ; finish does not produce a byte
         lda #$00
-        sta $f7
+        sta $37
         clc
         rts
 
     rom_dirload_sm_skip:
         lda #$00
         sta dirload_state_var
-        inc $f7
+        inc $37
         sec
         rts
 
     rom_dirload_sm_space:
         lda #$20
-        inc $f7
+        inc $37
         rts
 
     rom_dirload_checkboundary:
@@ -1185,23 +1186,23 @@
         jsr efs_readef
         ; ### test hidden
         and #%00011111  ; mask out hidden and reserved flag fields
-        sta $fa
+        sta $3a
         bne :+  ; is file invalid
         lda #8  ; invalid
         jsr efs_readef_pointer_advance
         jmp rom_dirload_sm_linenend
 
-      : lda $fa  ; terminator ?
+      : lda $3a  ; terminator ?
         cmp #$1f
         bne :+
         lda #sm_finish  ; finish directory
-        sta $f7
+        sta $37
         lda #$00
         clc
         rts
 
       : lda #sm_nextfile  ; go to file line
-        sta $f7
+        sta $37
         lda #$00
         clc
         rts
@@ -1215,7 +1216,7 @@
         bmi :+    ; if > 9 
         clc
         adc #$07  ; add 7 for a-f
-      : inc $f7
+      : inc $37
         rts
 
     rom_dirload_sm_devhigh:
@@ -1230,42 +1231,42 @@
         bmi :+    ; if > 9
         clc
         adc #$07  ; add 7 for a-f
-      : inc $f7
+      : inc $37
         rts*/
 
 
     rom_dirload_sm_addresslow:
         lda io_start_address
-        inc $f7
+        inc $37
         rts
 
     rom_dirload_sm_addresshigh:
         lda io_start_address + 1
-        inc $f7
+        inc $37
         rts
 
     rom_dirload_sm_addrdummy:
         lda #$00
         sta dirload_state_var
         lda #$01
-        inc $f7
+        inc $37
         rts
 
     rom_dirload_sm_zero:
         lda #$00
-        inc $f7
+        inc $37
         rts
 
     rom_dirload_sm_reverseon:
         lda #$12
-        inc $f7
+        inc $37
         rts
 
     rom_dirload_sm_quotationmark:
         lda #$00
         sta dirload_state_var
         lda #$22
-        inc $f7
+        inc $37
         rts
 
     rom_dirload_sm_diskname:
@@ -1274,7 +1275,7 @@
         inc dirload_state_var
         cpx #rom_dirload_diskname_textlen
         bne :+
-        inc $f7
+        inc $37
         ldx #$00
         stx dirload_state_var
       : clc
@@ -1286,7 +1287,7 @@
         inc dirload_state_var
         cpx #rom_dirload_blocksfree_textlen
         bne :+
-        inc $f7
+        inc $37
         ldx #$00
         stx dirload_state_var
       : clc
@@ -1301,7 +1302,7 @@
       : inc dirload_state_var
         cpx #15
         bne :+
-        inc $f7
+        inc $37
         ldx #$00
         stx dirload_state_var
         
@@ -1315,11 +1316,11 @@
         jsr efs_readef_read_and_inc  ; size low
         beq :+
         lda #$01
-      : sta $f8  ; a is 0 after branch
+      : sta $38  ; a is 0 after branch
         jsr efs_readef  ; read mid
         clc
-        adc $f8
-        inc $f7
+        adc $38
+        inc $37
         rts
 
 
@@ -1329,11 +1330,11 @@
         ; val1(X/A) >= Val2(f8/f9) => C set
         ; https://codebase64.org/doku.php?id=base:16-bit_comparison
         ; a            ; Val1 high
-        cmp $f9        ; Val2 high
+        cmp $39        ; Val2 high
         bcc @LsThan    ; hiVal1 < hiVal2 --> Val1 < Val2
         bne @GrtEqu    ; hiVal1 != hiVal2 --> Val1 > Val2
         txa            ; Val1 low
-        cmp $f8        ; Val2 low
+        cmp $38        ; Val2 low
         ;beq Equal     ; Val1 = Val2
         bcs @GrtEqu    ; loVal1 >= loVal2 --> Val1 >= Val2
       @LsThan:
@@ -1349,18 +1350,18 @@
         jsr efs_readef_read_and_inc  ;low
         beq :+
         lda #$01
-      : sta $f8  ; a is zero iafter branch
+      : sta $38  ; a is zero iafter branch
         jsr efs_readef_read_and_inc  ;mid
         clc
-        adc $f8
-        sta $f8
+        adc $38
+        sta $38
         lda #$00
-        sta $f9
+        sta $39
         jsr efs_readef ; high
-        adc $f9
-        sta $f9
+        adc $39
+        sta $39
 
-        inc $f7
+        inc $37
         lda #23  ; reverse pointer to name
         jsr efs_readef_pointer_reverse
 
@@ -1400,7 +1401,7 @@
         ; https://codebase64.org/doku.php?id=base:16-bit_absolute_comparison
 
       @done:
-        lda $f9
+        lda $39
         clc
         rts
 
@@ -1408,7 +1409,7 @@
     rom_dirload_sm_sizeskip:
         lda dirload_state_var
         bne :+
-        inc $f7
+        inc $37
         sec
         rts
       : lda #$20
@@ -1439,7 +1440,7 @@
         inc dirload_state_var
         tax
         lda rom_dirload_types_text, x
-        inc $f7
+        inc $37
         clc
         rts
 
@@ -1450,13 +1451,13 @@
         ; in area 0 nothing free
         lda #$00
         sta dirload_state_var
-        inc $f7
+        inc $37
         clc
         rts
 
     rom_dirload_sm_freehigh:
         lda dirload_state_var
-        inc $f7
+        inc $37
         clc
         rts
 
@@ -1475,9 +1476,9 @@
 ;    dir_read_byte_low = efs_io_byte + 1
 ;    dir_read_byte_high = efs_io_byte + 2
 
-    dir_temp_var = $f7
-    dir_name_pointer = $fe
-    dir_directory_entry = $fb
+    dir_temp_var = $37
+    dir_name_pointer = $3e
+    dir_directory_entry = $3b
 
     efs_directory_search:
         lda filename_address
@@ -1568,23 +1569,23 @@
         ; position is at flags, bank is the next data to load
         ; all zp variables are free and can be used
         jsr efs_readef_read_and_inc  ; efs_io_byte  ; bank
-        sta $f8
+        sta $38
         jsr efs_readef_read_and_inc  ; efs_io_byte  ; bank high
 
         ; offset
         jsr efs_readef_read_and_inc  ; efs_io_byte
-        sta $f9
+        sta $39
         jsr efs_readef_read_and_inc  ; efs_io_byte
         ; memory offset will be added later
-        sta $fa
+        sta $3a
 
         ; size
         jsr efs_readef_read_and_inc  ; efs_io_byte
-        sta $fb
+        sta $3b
         jsr efs_readef_read_and_inc  ; efs_io_byte
-        sta $fc
+        sta $3c
         jsr efs_readef_read_and_inc  ; efs_io_byte
-        sta $fd
+        sta $3d
 
         rts
 
@@ -1599,7 +1600,7 @@
         jsr efs_init_setstartbank
         ;lda #$00  ; ### 0, could be different bank
         ldy dir_temp_var
-        lda ($f5), y  ; at libefs_config::libefs_area::bank
+        lda ($35), y  ; at libefs_config::libefs_area::bank
         jsr efs_generic_command
 
         ; set read ef code
@@ -1607,12 +1608,12 @@
 
         inc dir_temp_var
         ldy dir_temp_var
-        lda ($f5), y  ; at libefs_config::libefs_area::addr low
+        lda ($35), y  ; at libefs_config::libefs_area::addr low
         sta efs_readef_low
 
         inc dir_temp_var
         ldy dir_temp_var
-        lda ($f5), y  ; at libefs_config::libefs_area::addr high
+        lda ($35), y  ; at libefs_config::libefs_area::addr high
         sta efs_readef_high
 
         ; banking mode and area size is irrelevant in dirsearch

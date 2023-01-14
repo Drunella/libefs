@@ -15,9 +15,11 @@
 ; ----------------------------------------------------------------------------
 
 
-; sizes
+; sizes and zeropage
 ZEROPAGE_SIZE .set 11
+ZEROPAGE_BACKUP_END = $3f
 GENERIC_COMMAND_SIZE .set 14
+
 
 ; constants
 
