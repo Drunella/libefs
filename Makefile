@@ -31,7 +31,7 @@ CC65FLAGS=-t $(TARGET) -O
 
 EF_LOADER_FILES=build/ef/loader.o build/ef/loadeapi.o
 EF_MENU_FILES=build/ef/menu.o build/ef/util.o build/ef/efs-wrapper.o build/ef/version.o
-EF_DIREFS_FILES=build/prg/direfs.o build/lib/lib-efs.o build/lib/lib-efs-ram1.o build/lib/lib-efs-ram2.o
+EF_DIREFS_FILES=build/prg/direfs.o build/lib/lib-efs.o build/lib/lib-efs-ram1.o build/lib/lib-efs-ram2.o build/lib/lib-efs-dirlist.o
 #EF_IOROM_FILES=build/ef/io-wrapper.o
 #EF_MENU_FILES=build/ef/loadeapi.o build/ef/io-loader.o build/ef/game-loader.o build/ef/io-sector.o build/ef/io-loadfile.o build/ef/io-caller.o 
 #STARTMENU_FILES=build/ef/menu.o build/ef/util.o build/ef/util_s.o build/ef/savegame.o build/ef/savegame_map.o build/ef/io-1541.o build/ef/io-sectortable-da.o
@@ -79,10 +79,11 @@ mrproper:
 
 # ------------------------------------------------------------------------
 # lib-efs.prg
+LIB_EFS_FILES=build/lib/lib-efs.o build/lib/lib-efs-ram1.o build/lib/lib-efs-ram2.o build/lib/lib-efs-dirlist.o
 
 # lib-efs.prg
-build/lib-efs.prg: src/lib/lib-efs.cfg build/lib/lib-efs.o build/lib/lib-efs-ram1.o build/lib/lib-efs-ram2.o
-	$(LD65) $(LD65FLAGS) -vm -m ./build/lib/lib-efs.map -Ln ./build/lib/lib-efs.lst -o $@ -C src/lib/lib-efs.cfg c64.lib build/lib/lib-efs.o build/lib/lib-efs-ram1.o build/lib/lib-efs-ram2.o
+build/lib-efs.prg: src/lib/lib-efs.cfg $(LIB_EFS_FILES)
+	$(LD65) $(LD65FLAGS) -vm -m ./build/lib/lib-efs.map -Ln ./build/lib/lib-efs.lst -o $@ -C src/lib/lib-efs.cfg c64.lib $(LIB_EFS_FILES)
 
 
 # ------------------------------------------------------------------------
@@ -119,7 +120,7 @@ build/ef/loader.prg: $(EF_LOADER_FILES)
 # easyflash menu.prg
 build/ef/menu.prg: $(EF_MENU_FILES)
 	$(LD65) $(LD65FLAGS) -vm -m ./build/ef/menu.map -Ln ./build/ef/menu.lst -o $@ -C src/ef/menu.cfg c64.lib $(EF_MENU_FILES)
-	echo "./build/ef/menu.prg, 1" >> ./build/ef/files.list
+	echo "./build/ef/menu.prg, 1, 1" >> ./build/ef/files.list
 
 # easyflash config.bin
 build/ef/efs-config.bin: build/ef/efs-config.o src/ef/efs-config.cfg

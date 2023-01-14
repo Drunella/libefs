@@ -43,7 +43,6 @@
 .import filename_length
 .import io_start_address
 .import io_end_address
-;.import efs_device
 
 .import efs_io_byte
 .import efs_generic_command
@@ -51,6 +50,13 @@
 .import efs_bankout
 .import efs_enter_pha
 .import efs_enter
+
+.import rom_dirload_isrequested
+.import rom_dirload_verify
+.import rom_dirload_transfer
+.import rom_dirload_address
+.import rom_dirload_begin
+.import rom_dirload_chrin
 
 .export rom_chrout_body
 .export rom_save_body
@@ -61,6 +67,12 @@
 .export rom_setnam_body
 .export rom_setlfs_body
 
+.export restore_zeropage
+.export backup_zeropage
+
+.export efs_init_setstartbank
+.export rom_conf_get_config
+.export rom_config_prepare_config
 
 
 .segment "EFS_CALL"
@@ -458,7 +470,7 @@
         bne @leave
 
       @dircheck:
-        jsr rom_directory_list_check
+        jsr rom_dirload_isrequested
         bcc @dirfind
         lda #%01000000  ; directory processing
         sta internal_state
@@ -528,7 +540,7 @@
         bne @leave
 
       @dircheck:
-        jsr rom_directory_list_check
+        jsr rom_dirload_isrequested
         bcc @fileload
 
       @dirload:
@@ -623,17 +635,17 @@
 ; --------------------------------------------------------------------
 ; ef read functions with manipulatable pointer
 
-/*.scope efs_readef
+;.scope efs_readef
 
-    .export efs_init_readef
-    .export efs_readef
-    .export efs_readef_low
-    .export efs_readef_high
-    .export efs_readef_read_and_inc
-    .export efs_readef_pointer_inc
-    .export efs_readef_pointer_dec
-    .export efs_readef_pointer_advance
-    .export efs_readef_pointer_reverse*/
+.export efs_init_readef
+.export efs_readef
+.export efs_readef_low
+.export efs_readef_high
+.export efs_readef_read_and_inc
+.export efs_readef_pointer_inc
+.export efs_readef_pointer_dec
+.export efs_readef_pointer_advance
+.export efs_readef_pointer_reverse
 
     efs_init_readef:
         ldy #<(@codeend - @code - 1)
@@ -933,7 +945,7 @@
 ;   3e/3f: pointer to destination / pointer to filename
 ;   io_end_address: state machine variable
 ;   io_end_address + 1: state machine variable
-
+/*
     dirload_area_var := io_end_address
     dirload_state_var := io_end_address + 1
     dirload_temp_var_zp := $3a
@@ -1344,7 +1356,7 @@
         rts*/
 
 
-    rom_dirload_sm_addresslow:
+/*    rom_dirload_sm_addresslow:
         lda io_start_address
         inc dirload_temp_state_zp
         rts
@@ -1568,7 +1580,7 @@
         lda dirload_state_var
         inc dirload_temp_state_zp
         clc
-        rts
+        rts*/
 
 
 ; --------------------------------------------------------------------

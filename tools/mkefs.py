@@ -154,6 +154,10 @@ def load_files_directory(filename):
             directory[l[0]] = dict();
             directory[l[0]]["name"] = l[0].strip()
             directory[l[0]]["type"] = l[1].strip()
+            if len(l) >= 3:
+                directory[l[0]]["hidden"] = l[2].strip()
+            else:
+                directory[l[0]]["hidden"] = "0"
     return directory
 
 
@@ -215,18 +219,27 @@ def main(argv):
         #pprint.pprint(value)
         name = dict()
         n = os.path.splitext(os.path.basename(value["name"]))
-        if (value["type"] == "1"):
-            # prg with startaddress
-            name["name"] = n[0]
-            name["type"] = 0x60|0x01  # normal prg file with start address
-            
-        elif (value["type"] == "3"):
-            # bin without startaddress
-            name["name"] = n[0]
-            name["type"] = 0x60|0x01  # normal prg file with start address
-            
-        else:
-            raise Exception("unknown type " + value["type"] + " of file " + value["name"])
+        
+        hidden = int(value["hidden"], 0)
+        if hidden != 0:
+            hidden = 0x80
+        type = int(value["type"], 0)
+        if type > 0x1e:
+            raise Exception("invalid type " + value["type"] + " of file " + value["name"])
+
+        name["type"] = 0x60 | hidden | type
+        name["name"] = n[0]
+
+#        if (value["type"] == "1"):
+#            # prg with startaddress
+#            name["name"] = n[0]
+#            name["type"] = 0x60|0x01  # normal prg file with start address            
+#        elif (value["type"] == "3"):
+#            # bin without startaddress
+#            name["name"] = n[0]
+#            name["type"] = 0x60|0x01  # normal prg file with start address           
+#        else:
+#            raise Exception("unknown type " + value["type"] + " of file " + value["name"])
 
         if (uppercase):
             name["name"] = name["name"].upper()
@@ -235,7 +248,7 @@ def main(argv):
         entry = efs_makefileentry(content, maxsize)
         efs_makedirentry(name, entry)
         if verbose:
-            print("added file " + value["name"] + " as " + name["name"]  +" (" + value["type"] + ") of " +(str(len(content)))+ " bytes")
+            print("added file " + value["name"] + " as " + name["name"]  +" (" + str(name["type"]) + ") of " +(str(len(content)))+ " bytes")
 
     efs_terminatedir()
     dirs_path = os.path.join(destination_path, nameprefix + ".dir.prg")
