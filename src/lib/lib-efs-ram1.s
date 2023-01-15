@@ -189,34 +189,17 @@
         rts
 
         ; variable code area
-        ; 15 bytes
     efs_generic_command:
-
         .repeat GENERIC_COMMAND_SIZE
         .byte $60
         .endrepeat
 
-;    efs_set_startbank:
-        ; safest way to set eapi shadow bank
-        ; A: bank
-        ; 6 bytes
-;        jsr EAPISetBank
-;        jmp efs_enter_pha
-
-;    efs_verify_byte:
-;        jmp efs_return  ; rel_verify_byte
-
-;    efs_write_byte:
-;        jmp efs_return  ; rel_write_byte
-
 
     efs_io_byte:
-;    efs_io_byte_low = efs_io_byte + 1
-;    efs_io_byte_high = efs_io_byte + 2
         ; load byte in A
         ; 3 bytes
-        ; lda $ffff  ; $ad, $ff, $ff (no)
         ; jsr EAPIWriteFlashInc  ; $20, <EAPIWriteFlashInc, >EAPIWriteFlashInc
+        ; jsr EAPIWriteFlash  ; $20, <EAPIWriteFlash, >EAPIWriteFlash
         jsr EAPIReadFlashInc  ; $20, <EAPIReadFlashInc, >EAPIReadFlashInc
 
     efs_enter_pha:
@@ -225,6 +208,7 @@
         pha
 
     efs_enter:
+        ; 11 bytes
         lda #EASYFLASH_LED | EASYFLASH_16K
         sta EASYFLASH_CONTROL
         lda #EFSLIB_ROM_BANK
@@ -232,6 +216,7 @@
         pla
 
     efs_return:
+        ; 1 byte
         rts
 
 

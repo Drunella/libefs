@@ -44,7 +44,7 @@
 
 .import efs_init_setstartbank
 
-.import rom_conf_get_config
+.import rom_config_get_value
 .import rom_config_prepare_config
 
 .export rom_dirload_isrequested
@@ -132,7 +132,7 @@
 
       @area1:
         lda #libefs_config::areas
-        jsr rom_conf_get_config
+        jsr rom_config_get_value
         cmp #$03
         bne @done
         lda dirload_area_var

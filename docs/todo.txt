@@ -1,32 +1,32 @@
 ToDo
 ====
 
-- fast reading of file w/o eapi
-  small code in $DF80 with an optimized loop
+- (ok) reading of file w/o eapi
+  small code in $DF80 with an optimized loop (well, not optimized)
 
 - different library variants
   + read and open only, no write, no verify
     does not need extra space
     average performance
   + better performance (?)
-    needs appr. 128 (half page) of non-bankable memory
+    needs appr. 128 (half page) of non-bankable memory (no)
     ($0100-$7fff, $c000-$cfff)
   + write and verify
-    needs appr. another 64 bytes of non-bankable memory
+    needs appr. another 64 bytes of non-bankable memory (no)
   + variant could be set at runtime
-  + read only without eapi
+  + (ok) read only without eapi
   + eapi in permanent location
   + eapi in temporary location
 
-- read directory "$"
+- (ok) read directory "$"
 
-- open implementation
+- (ok) open implementation
   + commands: none
   + open does all preparations
   + chrin only loads characters, no zeropage in chrin
   + close does nothing (ends state)
-- close implementation
-- chrin implementation
+- (ok) close implementation
+- (ok) chrin implementation
 
 - save
   + commands: scratch, validate (defragment)

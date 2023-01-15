@@ -23,7 +23,7 @@
 #include "util.h"
 
 
-#define MENU_START_Y 3
+#define MENU_START_Y 2
 #define OUTPUT_START_Y 11
 #define CONSOLE_START_Y 15
 #define ADDRESS 0x3000
@@ -32,10 +32,8 @@
 static void draw_startmenu(void) {
     clrscr();
     textcolor(COLOR_GRAY2);
-    //     01234567890123456789001234567890123456789
-    cputs("          libefs Test Cartridge\r\n"
-          "       Copyright (c) 2023 Drunella\r\n"
-          "\r\n");
+    //     0123456789012345678901234567890123456789
+    cputs("libefs Test Cartridge  (c) 2023 Drunella");
 }
 
 void draw_version(void)
@@ -120,7 +118,7 @@ void readfile(void)
     uint8_t retval, status;
     uint8_t data;
     uint16_t checksum = 0;
-    char* address = ADDRESS;
+    char* address = (char*)(ADDRESS);
     uint8_t header = 2;
     
     while (true) {
@@ -170,21 +168,44 @@ void readdir(uint8_t device)
 }
 
 
+void scratchfile(uint8_t device, char* cmdname)
+{
+    uint8_t retval, status;
+    
+    cmdname[0] = 's';
+    cmdname[1] = '0';
+    cmdname[2] = ':';
+
+    menu_clear(CONSOLE_START_Y, 24);
+    gotoxy(0, CONSOLE_START_Y);
+    EFS_setnam_wrapper(cmdname, strlen(cmdname));
+    EFS_setlfs_wrapper(device, 0); // do not relocate
+    retval = EFS_open_wrapper();
+    status = EFS_readst_wrapper();
+    EFS_close_wrapper();
+    cprintf("scratch: st=$%02x, rt=%d\n\r", status, retval);
+}
+
+
 void main(void)
 {
     bool repaint;
-    static char filename[17];
+    static char filename_data[20];
     uint8_t secondary;
+    char* filename;
+    char* commandname;
     char* address;
     uint8_t device;
     //uint16_t systimer;
     uint8_t sysident;
     
+    filename = &filename_data[3];
+    commandname = &filename_data[0];
     repaint = true;
     bgcolor(COLOR_BLACK);
     bordercolor(COLOR_BLACK);
     draw_startmenu();
-    sprintf(filename, "data3k");
+    sprintf(filename, "delme384");
     secondary = 0;
     memset((char*)ADDRESS, 0, 0x6000);
     device = 0;
@@ -204,8 +225,9 @@ void main(void)
             menu_option(0, wherey(), 'C', "Clear memory");
             menu_option(0, wherey(), '1', "Load file");
             menu_option(0, wherey(), '2', "Verify file");
+            menu_option(0, wherey(), '7', "Scratch file");
             menu_option(0, wherey(), 'Q', "Quit to basic");
-            menu_option(0, wherey(), 'D', "Device");
+            //menu_option(0, wherey(), 'D', "Device");
             gotoxy(0, MENU_START_Y);
             menu_option(20, wherey(), 'S', "Toggle secondry");
             menu_option(20, wherey(), '0', "Fail tests");
@@ -287,6 +309,12 @@ void main(void)
         case '6':
             gotoxy(0, CONSOLE_START_Y);
             readdir(device);
+            repaint == true;
+            break;
+
+        case '7':
+            gotoxy(0, CONSOLE_START_Y);
+            scratchfile(device, commandname);
             repaint == true;
             break;
 

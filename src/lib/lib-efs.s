@@ -71,7 +71,7 @@
 .export backup_zeropage
 
 .export efs_init_setstartbank
-.export rom_conf_get_config
+.export rom_config_get_value
 .export rom_config_prepare_config
 
 
@@ -185,16 +185,16 @@
     efs_init_eapi_body:
         tax
 
-        lda $65
+        lda #$65
         cmp $b800
         bne @error
-        lda $61
+        lda #$61
         cmp $b801
         bne @error
-        lda $70
+        lda #$70
         cmp $b802
         bne @error
-        lda $69
+        lda #$69
         cmp $b803
         bne @error
 
@@ -321,30 +321,6 @@
     efs_readmem_ext_high = efs_generic_command + 5
 
 
-/*    efs_init_readef:
-        ldy #<(@codeend - @code - 1)
-      : lda @code, y
-        sta efs_generic_command, y
-        dey
-        bpl :-
-        clc
-        rts
-
-      @code: ; 12 bytes
-        jsr EAPIGetBank
-        sta EASYFLASH_BANK
-        lda $8000  ; read from banked memory; byte 7, 8
-        jmp efs_enter_pha
-      @codeend:
-      .if (@codeend - @code) > GENERIC_COMMAND_SIZE
-      .error "dynamic code readef to large"
-      .endif
-
-    efs_readef = efs_generic_command
-    efs_readef_low = efs_generic_command + 7
-    efs_readef_high = efs_generic_command + 8*/
-
-
     efs_init_eapireadinc:
         lda #$20  ; jsr
         sta efs_io_byte
@@ -361,6 +337,16 @@
         lda #<EAPIWriteFlashInc
         sta efs_io_byte + 1
         lda #>EAPIWriteFlashInc
+        sta efs_io_byte + 2
+        rts
+
+
+    efs_init_eapiwrite:
+        lda #$20  ; jsr
+        sta efs_io_byte
+        lda #<EAPIWriteFlash
+        sta efs_io_byte + 1
+        lda #>EAPIWriteFlash
         sta efs_io_byte + 2
         rts
 
@@ -463,11 +449,24 @@
         sta error_byte
 
         lda internal_state  ; check if file open
-        beq @dircheck
+        beq @scratchcheck
         lda #ERROR_FILE_OPEN
         sta error_byte
         sec
         bne @leave
+
+      @scratchcheck:
+        jsr rom_scratch_isrequested
+        bcc @dircheck
+        lda #%0010000  ; no processing
+        sta internal_state
+        jsr efs_directory_search
+        bcs @leave     ; not found
+        jsr rom_scratch_begin  ; this finishes the operation
+        jmp @leave
+
+      ; ### check for disk drive commands
+      ; "R0:..."  rename file ###
 
       @dircheck:
         jsr rom_dirload_isrequested
@@ -722,7 +721,7 @@
 
     zp_pointer_configuration = $35 ; $36
 
-    rom_conf_get_config:
+    rom_config_get_value:
         ; config is stored in 35/36
         ; config address parameter in a
         pha  ; save a
@@ -742,6 +741,19 @@
         pla
         tax
         pla  ; it will pop the result
+        rts
+
+
+    rom_config_get_areastart:
+        ; the value to get to area x
+        ; only values 1, 2, 3 are allowed
+        tay 
+        dey
+        lda #libefs_config::area_0
+      : cli
+        adc #.sizeof(libefs_area)
+        dey
+        bne :-
         rts
 
 
@@ -934,653 +946,161 @@
         rts
 
 
-
 ; --------------------------------------------------------------------
-; directory list functions
+; scratch file functions
 ; usage:
-;   37: temporary state machine state
-;   38/39: temporary file size
-;   3a: temporary variable
-;   3c/3d: address to state maching processing function
-;   3e/3f: pointer to destination / pointer to filename
-;   io_end_address: state machine variable
-;   io_end_address + 1: state machine variable
-/*
-    dirload_area_var := io_end_address
-    dirload_state_var := io_end_address + 1
-    dirload_temp_var_zp := $3a
-    dirload_temp_state_zp := $37
+;  35/36: configuration pointer
+;     37: used area
+;  3e/3f: pointer to name
+; return:
 
-    rom_directory_list_check:
+    rom_scratch_isrequested:
+        ; returns .C set if scratch requested 
         lda filename_address
-        sta $3e
+        sta zp_var_xe
         lda filename_address + 1
-        sta $3f
+        sta zp_var_xf
 
+        ; check for letter S
         ldy #$00
-        lda #$24        ; '$'
-        cmp ($3e), y     ; no fit
+        lda #$53    ; 'S'
+        cmp (zp_var_xe), y
+        bne @nomatch
+
+        ; check for ':'
+        iny
+        lda #$3a    ; ':'
+        cmp (zp_var_xe), y
+        beq @match
+
+        ; check for a number: 0 < n <= x <= m < $ff
+        lda (zp_var_xe), y    ; no fit
+        clc
+        adc #$ff - $30        ; lower bound $30
+        adc #$39 - $30 + $01  ; upper bound $39
+        bcc @nomatch          ; .C clear -> not in range
+
+        ; check for ':'
+        iny
+        lda #$3a    ; ':'
+        cmp (zp_var_xe), y
+        bne @nomatch
+
+      @match:
+        ; advance filename pointer by y + 1
+        sec  ; +1
+        tya
+        adc zp_var_xe
+        sta zp_var_xe
         bne :+
+        inc zp_var_xf
+      : lda zp_var_xe
+        sta filename_address
+        lda zp_var_xf
+        sta filename_address + 1
+
+        iny ; decrease length by y + 1
+      : dec filename_length
+        dey
+        bne :-
 
         sec
         rts
-      : clc
-        rts
 
-
-    rom_dirload_begin:
-;        jsr efs_init_setstartbank
-;        lda #$00  ; ### 0, could be different bank CONFIG ###
-;        jsr efs_generic_command
-
-        ; set read code
-;        jsr efs_init_readef
-;        lda #$00
-;        sta efs_readef_low
-;        lda #$a0
-;        sta efs_readef_high
-        lda #$00
-        sta dirload_area_var
-        jsr efs_dirload_nextarea
-
-        lda internal_state
-        and #$c0
-        ora #$01
-        sta internal_state
-        lda #$01
-        sta dirload_temp_state_zp
-        lda #$00
-        sta dirload_state_var
-        rts
-
-
-    efs_dirload_nextarea:
-        ; prepares the data for the next area
-        ; dirload_area_var contains current area
-        ; returns .C set if there us no next
-        ; dirload_area_var contains the next area
-        jsr rom_config_prepare_config
-
-        ; area 0: read only efs
-        lda dirload_area_var
-        bne @area1  ; current area 0 -> list 1
-        lda #libefs_config::area_0
-        jsr rom_dirload_prepare
-        jmp @cont
-
-      @area1:
-        lda #libefs_config::areas
-        jsr rom_conf_get_config
-        cmp #$03
-        bne @done
-        lda dirload_area_var
-        cmp #$01
-        bne @area2  ; current area 1; != list 2
-        lda #libefs_config::area_1
-        jsr rom_dirload_prepare
-        jmp @cont
-
-      @area2:
-        lda dirload_area_var
-        cmp #$01
-        bne @done  ; current area 2; != list 3
-        lda #libefs_config::area_2
-        jsr rom_dirload_prepare
-
-      @cont:
-        inc dirload_area_var
+      @nomatch:
         clc
         rts
 
-      @done:
-        sec
-        rts
 
-
-    rom_dirload_prepare:
+/*    rom_dirsearch_address:
         ; set pointer and length of directory
         ; a offset in configuration
-        sta dirload_temp_var_zp
+        sta dirsearch_temp_var_zp
+
+        jsr rom_config_prepare_config
 
         jsr efs_init_setstartbank
-        ldy dirload_temp_var_zp
+        ;lda #$00  ; ### 0, could be different bank
+        ldy dirsearch_temp_var_zp
         lda ($35), y  ; at libefs_config::libefs_area::bank
         jsr efs_generic_command
 
         ; set read ef code
         jsr efs_init_readef
 
-        inc dirload_temp_var_zp
-        ldy dirload_temp_var_zp
+        inc dirsearch_temp_var_zp
+        ldy dirsearch_temp_var_zp
         lda ($35), y  ; at libefs_config::libefs_area::addr low
         sta efs_readef_low
 
-        inc dirload_temp_var_zp
-        ldy dirload_temp_var_zp
+        inc dirsearch_temp_var_zp
+        ldy dirsearch_temp_var_zp
         lda ($35), y  ; at libefs_config::libefs_area::addr high
         sta efs_readef_high
 
-        ; banking mode and area size is irrelevant in dirload
-        rts
+        ; banking mode and area size is irrelevant in dirsearch
+        rts*/
 
 
-    rom_dirload_address:
-        lda #$01
-        sta $3e
-        lda #$04
-        sta $3f
-        lda #LIBEFS_FLAGS_RELOCATE
-        bit efs_flags
-        bne :+              ; set: load to X/Y, clear: no relocate
-        jmp :++
-      : lda io_start_address  ; load to relocation address (X/Y)
-        sta $3e
-        lda io_start_address + 1
-        sta $3f
+    rom_scratch_begin:
+        ; configuration is at the correct area
+        jsr efs_init_eapiwriteinc  ; prepare dynamic code
 
-      : lda $3e
-        sta io_start_address
-        lda $3f
-        sta io_start_address + 1
-
-        rts
-
-
-    rom_dirload_chrin:
-        jsr backup_zeropage
-        lda internal_state
-        and #$3f  ; remove the upper bits
-        sta dirload_temp_state_zp
-      @again:
-        jsr rom_dirload_next_byte
-        tay
-        lda internal_state
-        and #$c0    ; only take the upper bits
-        ora dirload_temp_state_zp  ; or the state
-        sta internal_state
-        lda dirload_temp_state_zp  ; check if state is zero
-        beq @eof    ; state 0 means end
-        bcs @again  ; C set, skip writing and repeat
-        jsr restore_zeropage
-        tya
-        clc
-        rts
-      @eof:
-        jsr restore_zeropage
-        tya
-        sec
-        rts
-
-
-    rom_dirload_transfer:
-        jsr rom_dirload_next_byte  ; skip load address
-        jsr rom_dirload_next_byte
-
-        ldy #$00
-      @loop:
-        jsr rom_dirload_next_byte
-        ldx dirload_temp_state_zp
-        beq @eof   ; state 0 means end
-        bcs @loop  ; C set, skip writing and repeat
-        ldy #$00
-        sta ($3e), y
-        inc $3e
-        bne @loop
-        inc $3f
-        jmp @loop
-
-      @eof:
-        clc
-        tya
-        adc $3e
-        sta $3e
-        bcc :+
-        inc $3f
-      : lda $3e
-        bne :+
-        dec $3f
-      : dec $3e
-
-        lda #$40
-        sta status_byte
-        lda #$00
-        sta internal_state  ; must be reset here
-
-        lda $3e
-        sta io_end_address
-        lda $3f
-        sta io_end_address + 1
-
-        clc
-        rts
-
-
-    rom_dirload_verify:
-        ; dirload verify not supported -> device not present error
-        lda #ERROR_DEVICE_NOT_PRESENT
-        sta error_byte
-        lda #$00
-        sta io_end_address
-        sta io_end_address + 1
-        sec
-        rts
-
-
-    rom_dirload_next_byte:
-        lda dirload_temp_state_zp
-        asl
-        tax
-        lda rom_dirload_statemachine, x
-        sta $3c
-        lda rom_dirload_statemachine + 1, x
-        sta $3d
-        clc
-        jmp ($003c)
-
-    rom_dirload_statemachine:
-        .addr rom_dirload_sm_finish        ; 0
-        .addr rom_dirload_sm_addresslow    ; 1
-        .addr rom_dirload_sm_addresshigh   ; 2
-        .addr rom_dirload_sm_addrdummy     ; 3
-        .addr rom_dirload_sm_addrdummy     ; 4
-        .addr rom_dirload_sm_zero          ; 5
-        .addr rom_dirload_sm_zero          ; 6
-        .addr rom_dirload_sm_reverseon     ; 7
-        .addr rom_dirload_sm_quotationmark ; 8
-        .addr rom_dirload_sm_diskname      ; 9
-        .addr rom_dirload_sm_quotationmark ; 10
-        .addr rom_dirload_sm_space         ; 11
-        .addr rom_dirload_sm_space         ; 12
-        .addr rom_dirload_sm_space         ; 13
-        .addr rom_dirload_sm_space         ; 14
-        .addr rom_dirload_sm_space         ; 15
-        .addr rom_dirload_sm_space         ; 16
-        .addr rom_dirload_sm_space         ; 17
-        .addr rom_dirload_sm_linenend      ; 18
-
-        sm_finish = 19
-        .addr rom_dirload_sm_addrdummy     ; 19
-        .addr rom_dirload_sm_addrdummy     ; 20
-        .addr rom_dirload_sm_freelow       ; 21
-        .addr rom_dirload_sm_freehigh      ; 22
-        .addr rom_dirload_sm_blocksfree    ; 23
-        .addr rom_dirload_sm_zero          ; 24
-        .addr rom_dirload_sm_zero          ; 25
-        .addr rom_dirload_sm_zero          ; 26
-        .addr rom_dirload_sm_finish        ; 27
-
-        sm_nextfile = 28
-        .addr rom_dirload_sm_addrdummy     ; 28
-        .addr rom_dirload_sm_addrdummy     ; 29
-        .addr rom_dirload_sm_sizelow       ; 30
-        .addr rom_dirload_sm_sizehigh      ; 31
-        .addr rom_dirload_sm_sizeskip      ; 32
-        .addr rom_dirload_sm_quotationmark ; 33
-        .addr rom_dirload_sm_filename      ; 34
-        .addr rom_dirload_sm_quotationmark ; 35
-        .addr rom_dirload_sm_type_begin    ; 36
-        .addr rom_dirload_sm_type_next     ; 37
-        .addr rom_dirload_sm_type_next     ; 38
-        .addr rom_dirload_sm_type_next     ; 39
-        .addr rom_dirload_sm_writeprot     ; 40
-        .addr rom_dirload_sm_space         ; 41
-        .addr rom_dirload_sm_space         ; 42
-        .addr rom_dirload_sm_linenend      ; 43
-
-
-    rom_dirload_diskname_text:
-        .byte "easyflash fs    "  ; length 16
-        rom_dirload_diskname_textlen = * - rom_dirload_diskname_text - 1
-
-    rom_dirload_blocksfree_text:
-        .byte "blocks free.             "
-        rom_dirload_blocksfree_textlen = * - rom_dirload_blocksfree_text - 1
-
-    rom_dirload_types_text:
-        ; set type: prg, crt, oce, xba; < for low; > for high, +/* for ultimax
-        .byte " prg"
-        .byte "-prg"
-        .byte "+prg"
-        .byte "-crt"
-        .byte " crt"
-        .byte "+crt"
-        .byte "*crt"
-        .byte "+ocn"
-        .byte "-ocn"
-        .byte " xba"
-        .byte " xba"
-        .byte " xba"
-
-
-    rom_dirload_sm_writeprot:
-        ; if in device 0 area, always write protected
-        lda dirload_area_var
+        ; filedata are set
+        ; if in area 1 -> write protected
+        lda zp_var_x7
         cmp #$01
-        beq :+    ; read only
-        lda #$20
-        bne :++
-      : lda #$3c  ; '<'
-      : inc dirload_temp_state_zp
-        clc
-        rts
+        bne @scratch
+        lda #ERROR_WRITE_PROTECTED
+        sta error_byte
+        bne @error
 
-    rom_dirload_sm_finish:
-        ; finish does not produce a byte
-        lda #$00
-        sta dirload_temp_state_zp
-        clc
-        rts
-
-    rom_dirload_sm_skip:
-        lda #$00
-        sta dirload_state_var
-        inc dirload_temp_state_zp
-        sec
-        rts
-
-    rom_dirload_sm_space:
-        lda #$20
-        inc dirload_temp_state_zp
-        rts
-
-    rom_dirload_checkboundary:
-        ; check if directory cursor is out of bounds
-        ; .C set if out of bounds
-        ; ### correct boundary configuration
-        lda efs_readef_high
-        cmp #$b8
-        rts
-
-    rom_dirload_sm_linenend:
-        ; produces $00 and decides if new filename
-        ; if filename -> 20
-        ; if finish -> 15
-        lda #16  ; pointer starts at begin of dir entry
+      @scratch:
+        lda #16  ; advance pointer to flags
         jsr efs_readef_pointer_advance
-        jsr rom_dirload_checkboundary
-        bcs @areadone   ; directory terminates
-        jsr efs_readef  ; read flag
-        ; ### test hidden
-        and #%00011111  ; mask out hidden and reserved flag fields
-        ;sta dirload_temp_var_zp
-        bne @invalid  ; is file invalid -> no
-        lda #8  ; -> yes, invalid
-        jsr efs_readef_pointer_advance
-        jmp rom_dirload_sm_linenend
 
-      @invalid:
-        ;lda dirload_temp_var_zp  ; terminator ?
-        cmp #$1f
-        bne @nextfile  ; no terminator -> nextfile
-      @areadone:  ; directory area is done, check next
-        jsr efs_dirload_nextarea
-        bcc rom_dirload_sm_linenend  ; more areas -> repeat
-        lda #sm_finish  ; no further areas finish directory
-        sta dirload_temp_state_zp
+        ; prepare bank
+        jsr efs_init_setstartbank
+        lda zp_var_x7
+        jsr rom_config_get_areastart
+        tay
+        lda (zp_var_x5), y  ; at libefs_config::areax::bank
+        jsr efs_generic_command
+
+        iny                 ; banking mode
+        iny
+        iny
+        lda (zp_var_x5), y  ; at libefs_config::areax::mode
+;        tax                 ; save mode in x
+
+;        lda efs_readef_high  ; and address
+;        cmp #$b0
+;        bcc :+
+;        clc
+;        adc #$40
+;      : tay
+;        txa
+        ldx efs_readef_low
+        ldy efs_readef_high
+        jsr EAPISetPtr
+
+        ldx #$01
         lda #$00
-        clc
+        tay
+        jsr EAPISetLen
+
+        lda #$60
+        sec  ; set to check for minieapi failures
+        jsr efs_io_byte
+        lda #ERROR_WRITE_ERROR
+        bcs @error
+        lda #ERROR_FILE_SCRATCHED
+
+      @error:
+        ; c flag set according to writeflash result
+        sta error_byte
         rts
-
-      @nextfile:
-        lda #sm_nextfile  ; go to file line
-        sta dirload_temp_state_zp
-        lda #$00
-        clc
-        rts
-
-/*    rom_dirload_sm_devlow:
-        lda efs_device
-        and #$0f
-        clc
-        adc #$30 
-        cmp #$3a
-        bmi :+    ; if > 9 
-        clc
-        adc #$07  ; add 7 for a-f
-      : inc dirload_temp_state_zp
-        rts
-
-    rom_dirload_sm_devhigh:
-        lda efs_device
-        lsr
-        lsr
-        lsr
-        lsr
-        clc
-        adc #$30
-        cmp #$3a
-        bmi :+    ; if > 9
-        clc
-        adc #$07  ; add 7 for a-f
-      : inc dirload_temp_state_zp
-        rts*/
-
-
-/*    rom_dirload_sm_addresslow:
-        lda io_start_address
-        inc dirload_temp_state_zp
-        rts
-
-    rom_dirload_sm_addresshigh:
-        lda io_start_address + 1
-        inc dirload_temp_state_zp
-        rts
-
-    rom_dirload_sm_addrdummy:
-        lda #$00
-        sta dirload_state_var
-        lda #$01
-        inc dirload_temp_state_zp
-        rts
-
-    rom_dirload_sm_zero:
-        lda #$00
-        inc dirload_temp_state_zp
-        rts
-
-    rom_dirload_sm_reverseon:
-        lda #$12
-        inc dirload_temp_state_zp
-        rts
-
-    rom_dirload_sm_quotationmark:
-        lda #$00
-        sta dirload_state_var
-        lda #$22
-        inc dirload_temp_state_zp
-        rts
-
-    rom_dirload_sm_diskname:
-        ldx dirload_state_var
-        lda rom_dirload_diskname_text, x
-        inc dirload_state_var
-        cpx #rom_dirload_diskname_textlen
-        bne :+
-        inc dirload_temp_state_zp
-        ldx #$00
-        stx dirload_state_var
-      : clc
-        rts
-
-    rom_dirload_sm_blocksfree:
-        ldx dirload_state_var
-        lda rom_dirload_blocksfree_text, x
-        inc dirload_state_var
-        cpx #rom_dirload_blocksfree_textlen
-        bne :+
-        inc dirload_temp_state_zp
-        ldx #$00
-        stx dirload_state_var
-      : clc
-        rts
-
-    rom_dirload_sm_filename:
-        ; pointer is at the name
-        ldx dirload_state_var
-        jsr efs_readef_read_and_inc
-        bne :+
-        lda #$20  ; space if 0 char
-      : inc dirload_state_var
-        cpx #15
-        bne :+
-        inc dirload_temp_state_zp
-        ldx #$00
-        stx dirload_state_var
         
-      : clc
-        rts
-
-    rom_dirload_sm_sizelow:
-        ; pointer is at flags
-        lda #5  ; advance to size low
-        jsr efs_readef_pointer_advance
-        jsr efs_readef_read_and_inc  ; size low
-        beq :+
-        lda #$01
-      : sta $38  ; a is 0 after branch
-        jsr efs_readef  ; read mid
-        clc
-        adc $38
-        inc dirload_temp_state_zp
-        rts
-
-
-    rom_compare16:
-        ; A: high value
-        ; X: low value
-        ; val1(X/A) >= Val2(f8/f9) => C set
-        ; https://codebase64.org/doku.php?id=base:16-bit_comparison
-        ; a            ; Val1 high
-        cmp $39        ; Val2 high
-        bcc @LsThan    ; hiVal1 < hiVal2 --> Val1 < Val2
-        bne @GrtEqu    ; hiVal1 != hiVal2 --> Val1 > Val2
-        txa            ; Val1 low
-        cmp $38        ; Val2 low
-        ;beq Equal     ; Val1 = Val2
-        bcs @GrtEqu    ; loVal1 >= loVal2 --> Val1 >= Val2
-      @LsThan:
-        sec
-        rts
-      @GrtEqu:
-        clc
-        rts
-
-    rom_dirload_sm_sizehigh:
-        ; pointer is at size mid
-        jsr efs_readef_pointer_dec
-        jsr efs_readef_read_and_inc  ;low
-        beq :+
-        lda #$01
-      : sta $38  ; a is zero iafter branch
-        jsr efs_readef_read_and_inc  ;mid
-        clc
-        adc $38
-        sta $38
-        lda #$00
-        sta $39
-        jsr efs_readef ; high
-        adc $39
-        sta $39
-
-        inc dirload_temp_state_zp
-        lda #23  ; reverse pointer to name
-        jsr efs_readef_pointer_reverse
-
-        lda #$00
-        ldx #$09
-        jsr rom_compare16
-        bcs :+     ; 10 >= f8/f9 ($0009)
-        lda #$03   ; print 3 spaces
-        sta dirload_state_var
-        jmp @done
-
-      : lda #$00
-        ldx #$63
-        jsr rom_compare16
-        bcs :+     ; 100 >= f8/f9 ($0063)
-        lda #$02   ; print 2 spaces
-        sta dirload_state_var
-        jmp @done
-
-      : lda #$03
-        ldx #$e7
-        jsr rom_compare16
-        bcs :+     ; 1000 >= f8/f9 ($03e7)
-        lda #$01   ; print 1 spaces
-        sta dirload_state_var
-        jmp @done
-
-      : lda #$00   ; print 0 spaces
-        sta dirload_state_var
-
-        ; size in blocks is in f8/f9
-        ; calculate how many spaces to skip (0, 1, 2 ,3)
-        ; 9    -> $0009
-        ; 99   -> $0063
-        ; 999  -> $03e7
-        ; 9999 -> $270f
-        ; https://codebase64.org/doku.php?id=base:16-bit_absolute_comparison
-
-      @done:
-        lda $39
-        clc
-        rts
-
-
-    rom_dirload_sm_sizeskip:
-        lda dirload_state_var
-        bne :+
-        inc dirload_temp_state_zp
-        sec
-        rts
-      : lda #$20
-        dec dirload_state_var
-        clc
-        rts
-
-
-    rom_dirload_sm_type_begin:
-        ; pointer is at flags
-        jsr efs_readef
-        and #$1f
-        cmp #$09
-        bcc :+
-        sbc #$09 - $03  ; reduce by reserved values ($04 - $0f)
-      : sec
-        sbc #$01
-        asl a
-        asl a
-        sta dirload_state_var
-
-        lda #8  ; advance pointer to begin of next name
-        jsr efs_readef_pointer_advance
-        ; no return here
-
-    rom_dirload_sm_type_next:
-        lda dirload_state_var
-        inc dirload_state_var
-        tax
-        lda rom_dirload_types_text, x
-        inc dirload_temp_state_zp
-        clc
-        rts
-
-
-    rom_dirload_sm_freelow:
-        ; calculate the free blocks
-        ; ### other area  
-        ; in area 0 nothing free
-        lda #$00
-        sta dirload_state_var
-        inc dirload_temp_state_zp
-        clc
-        rts
-
-    rom_dirload_sm_freehigh:
-        lda dirload_state_var
-        inc dirload_temp_state_zp
-        clc
-        rts*/
 
 
 ; --------------------------------------------------------------------
@@ -1590,14 +1110,17 @@
 ;   37: name check result
 ;   3e/3f: pointer to name
 ; return:
+;   37: area
 ;   38: bank
 ;   39/3a: offset in bank (with $8000 added)
 ;   3b/3c/3d: size
+;   read_ef: pointer is at begin of directory entry
 
 ;    dir_read_byte_low = efs_io_byte + 1
 ;    dir_read_byte_high = efs_io_byte + 2
 
-    dirsearch_temp_var_zp := $37
+    dirsearch_area_var_zp := $37
+    dirsearch_temp_var_zp := $38
     dirsearch_name_pointer_zp := $3e
     dirsearch_entry_zp := $3b
 
@@ -1609,11 +1132,13 @@
 
         jsr rom_config_prepare_config
         lda #libefs_config::areas
-        jsr rom_conf_get_config
+        jsr rom_config_get_value
         cmp #$03
         beq :+
 
         ; read only efs
+        lda #$01
+        sta dirsearch_area_var_zp
         lda #libefs_config::area_0
         jsr rom_dirsearch_begin
         jsr rom_dirsearch_find
@@ -1622,14 +1147,20 @@
         rts
         
         ; rw efs
-      : lda #libefs_config::area_0
+      : lda #$01
+        sta dirsearch_area_var_zp
+        lda #libefs_config::area_0
         jsr rom_dirsearch_begin
         jsr rom_dirsearch_find
         bcc @found
+        lda #$02
+        sta dirsearch_area_var_zp
         lda #libefs_config::area_1
         jsr rom_dirsearch_begin
         jsr rom_dirsearch_find
         bcc @found
+        lda #$03
+        sta dirsearch_area_var_zp
         lda #libefs_config::area_2
         jsr rom_dirsearch_begin
         jsr rom_dirsearch_find
@@ -1668,6 +1199,11 @@
         sta $3c
         jsr efs_readef_read_and_inc  ; efs_io_byte
         sta $3d
+
+        ; reverse to flag
+        lda #24  ; reverse pointer to name
+        jsr efs_readef_pointer_reverse
+        clc
 
         rts
 
@@ -1785,7 +1321,7 @@
 
         lda filename_length
         bne @repeat
-        lda #$08       ; no filename: status=0, error=8, C
+        lda #ERROR_MISSING_FILENAME  ; no filename: status=0, error=8, C
         bne @error      ; jmp to error
 
       @repeat:
@@ -1796,11 +1332,13 @@
         jsr efs_readef_read_and_inc  ; efs_io_byte    ; load next char
         jsr rom_dirsearch_is_terminator
         bcs @error4    ; terminator, file not found
+        cmp #$00       ; compare for invalid
+        beq @nomatch   ; file not valid
         jsr rom_dirsearch_checkboundary
         bcs @error4    ; over bounds, file not found
         jmp @next
       @error4:
-        lda #$04       ; file not found: status=0, error=4, C
+        lda #ERROR_FILE_NOT_FOUND  ; file not found: status=0, C
       @error:
         sta error_byte
         sec
@@ -1808,8 +1346,11 @@
 
       @next:
         ; no test if hidden
+;        and #%00011111  ; mask out hidden and reserved flag fields
+;        beq :+          ; file invalid
         lda dirsearch_temp_var_zp
         bne @match
+      @nomatch:
         lda #$07
         jsr efs_readef_pointer_advance
         jmp @repeat
