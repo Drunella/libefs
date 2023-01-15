@@ -45,7 +45,7 @@
 EASYFLASH_IO_BANK = $de00
 
 
-.segment "EFS_RAM2"
+.segment "EFS_MINIEAPI"
 
     EAPIWriteFlash:          ;  $df80
         rts

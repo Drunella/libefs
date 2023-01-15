@@ -60,7 +60,7 @@
 .export efs_enter
 
 
-.segment "EFS_RAM1"
+.segment "EFS_RAM"
 
 ; --------------------------------------------------------------------
 ; efs jump table

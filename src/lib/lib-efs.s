@@ -25,13 +25,13 @@
 .include "../../version.txt"
 
 
-.import __EFS_RAM1_LOAD__
-.import __EFS_RAM1_RUN__
-.import __EFS_RAM1_SIZE__
+.import __EFS_RAM_LOAD__
+.import __EFS_RAM_RUN__
+.import __EFS_RAM_SIZE__
 
-.import __EFS_RAM2_LOAD__
-.import __EFS_RAM2_RUN__
-.import __EFS_RAM2_SIZE__
+.import __EFS_MINIEAPI_LOAD__
+.import __EFS_MINIEAPI_RUN__
+.import __EFS_MINIEAPI_SIZE__
 
 .import backup_zeropage_data
 .import backup_memory_config
@@ -160,9 +160,9 @@
 
     efs_init_body:
         ; copy code to df00
-        ldx #<__EFS_RAM1_SIZE__ - 1
-    :   lda __EFS_RAM1_LOAD__,x
-        sta __EFS_RAM1_RUN__,x
+        ldx #<__EFS_RAM_SIZE__ - 1
+    :   lda __EFS_RAM_LOAD__,x
+        sta __EFS_RAM_RUN__,x
         dex
         bpl :-
         clc
@@ -173,9 +173,9 @@
 
     efs_init_minieapi_body:
         ; copy code to df80
-        ldx #<__EFS_RAM2_SIZE__ - 1
-    :   lda __EFS_RAM2_LOAD__,x
-        sta __EFS_RAM2_RUN__,x
+        ldx #<__EFS_MINIEAPI_SIZE__ - 1
+    :   lda __EFS_MINIEAPI_LOAD__,x
+        sta __EFS_MINIEAPI_RUN__,x
         dex
         bpl :-
         clc
