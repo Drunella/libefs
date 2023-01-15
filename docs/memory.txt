@@ -19,21 +19,21 @@ Internal States
 
 $00: file not open
 $01: file read/verify operation
-§02: directory operation 
-
+$02: directory operation 
+$80: other operation in progress that does not supprt chrin
 
 
 Memory Configuration
 ====================
 
 $DF00:  (libefs jumptable and in/out code; variables)
-$DF80:  (eapi)
+$DF80:  (eapi) or minieapi
 
 
 Configuration
 =============
 
-Configuration starts at:
+Configuration starts at 00:1:1b18
 
 00:1:1bxx: 
 00-17:    [ef name]
@@ -53,6 +53,7 @@ Configuration starts at:
 31:       call rom function on defragmentation
 32,33:    low/high address of rom function in memory ($8000 - $bffff), must be in bank 0
 34-37:    empty
+
 
 Cartridge Memory Map
 ====================

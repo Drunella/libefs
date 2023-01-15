@@ -77,7 +77,7 @@ void fail_tests_3(void)
     
 }
 
-void loadverify(uint8_t device, char* filename, uint8_t verify, uint8_t secondary)
+void loadverify(char* filename, uint8_t verify, uint8_t secondary)
 {
     uint8_t retval, status;
     uint32_t timer, seconds;
@@ -86,7 +86,7 @@ void loadverify(uint8_t device, char* filename, uint8_t verify, uint8_t secondar
     menu_clear(CONSOLE_START_Y, 24);
     gotoxy(0, CONSOLE_START_Y);
     EFS_setnam_wrapper(filename, strlen(filename));
-    EFS_setlfs_wrapper(device, secondary);
+    EFS_setlfs_wrapper(1, secondary);
     cprintf("start\n\r");
     TIMER_reset();
     retval = EFS_load_wrapper((char*)(ADDRESS), verify);
@@ -99,14 +99,14 @@ void loadverify(uint8_t device, char* filename, uint8_t verify, uint8_t secondar
     cprintf("st: $%02x, timer = %lu.%06lu sec\n\r", status, seconds, timer);
 }
 
-void openfile(uint8_t device, char* filename, uint8_t secondary)
+void openfile(char* filename, uint8_t secondary)
 {
     uint8_t retval, status;
 
     menu_clear(CONSOLE_START_Y, 24);
     gotoxy(0, CONSOLE_START_Y);
     EFS_setnam_wrapper(filename, strlen(filename));
-    EFS_setlfs_wrapper(device, secondary);
+    EFS_setlfs_wrapper(1, secondary);
     retval = EFS_open_wrapper();
     status = EFS_readst_wrapper();
     cprintf("open: sc=%d, rt=%d, st=$%02x\n\r", secondary, retval, status);
@@ -150,7 +150,7 @@ void closefile(void)
 }
 
 
-void readdir(uint8_t device)
+void readdir()
 {
     uint8_t retval, status;
     char* address;
@@ -158,7 +158,7 @@ void readdir(uint8_t device)
     menu_clear(CONSOLE_START_Y, 24);
     gotoxy(0, CONSOLE_START_Y);
     EFS_setnam_wrapper("$", 1);
-    EFS_setlfs_wrapper(device, 0); // do not relocate
+    EFS_setlfs_wrapper(1, 0); // do not relocate
     retval = EFS_load_wrapper((char*)(ADDRESS), 0);
     address = EFS_get_endadress();
     status = EFS_readst_wrapper();
@@ -168,7 +168,7 @@ void readdir(uint8_t device)
 }
 
 
-void scratchfile(uint8_t device, char* cmdname)
+void scratchfile(char* cmdname)
 {
     uint8_t retval, status;
     
@@ -179,7 +179,7 @@ void scratchfile(uint8_t device, char* cmdname)
     menu_clear(CONSOLE_START_Y, 24);
     gotoxy(0, CONSOLE_START_Y);
     EFS_setnam_wrapper(cmdname, strlen(cmdname));
-    EFS_setlfs_wrapper(device, 0); // do not relocate
+    EFS_setlfs_wrapper(15, 0); // command channel, do not relocate
     retval = EFS_open_wrapper();
     status = EFS_readst_wrapper();
     EFS_close_wrapper();
@@ -195,8 +195,6 @@ void main(void)
     char* filename;
     char* commandname;
     char* address;
-    uint8_t device;
-    //uint16_t systimer;
     uint8_t sysident;
     
     filename = &filename_data[3];
@@ -208,7 +206,6 @@ void main(void)
     sprintf(filename, "delme384");
     secondary = 0;
     memset((char*)ADDRESS, 0, 0x6000);
-    device = 0;
     
     //sysident = TIMER_get_system();
     sysident = SYS_get_system();
@@ -227,7 +224,6 @@ void main(void)
             menu_option(0, wherey(), '2', "Verify file");
             menu_option(0, wherey(), '7', "Scratch file");
             menu_option(0, wherey(), 'Q', "Quit to basic");
-            //menu_option(0, wherey(), 'D', "Device");
             gotoxy(0, MENU_START_Y);
             menu_option(20, wherey(), 'S', "Toggle secondry");
             menu_option(20, wherey(), '0', "Fail tests");
@@ -238,7 +234,6 @@ void main(void)
             gotoxy(0, OUTPUT_START_Y);
             //cprintf("%x (4a:60,9 a6:60,1 51:50,9 c0:50,1)\n\r", sysident);
             draw_system(sysident);
-            cprintf("device: '%d'\n\r", device);
             cprintf("filename: '%s'\n\r", filename);
             cprintf("secondary: %d\n\r", secondary);
             draw_version();
@@ -258,12 +253,12 @@ void main(void)
             repaint = true;
             break;
 
-        case 'd':
+/*        case 'd':
             menu_clear(OUTPUT_START_Y,24);
             cprintf("device: ");
             device = atoi(gettextxy(wherex(), wherey(), 3));
             repaint = true;
-            break;
+            break;*/
 
         case 'c':
             memset((char*)ADDRESS, 0, 0x6000);
@@ -282,17 +277,17 @@ void main(void)
             break;
 
         case '1':
-            loadverify(device, filename, 0, secondary);
+            loadverify(filename, 0, secondary);
             repaint = true;
             break;
 
         case '2':
-            loadverify(device, filename, 1, secondary);
+            loadverify(filename, 1, secondary);
             repaint = true;
             break;
 
         case '3':
-            openfile(device, filename, secondary);
+            openfile(filename, secondary);
             repaint = true;
             break;
 
@@ -308,13 +303,13 @@ void main(void)
 
         case '6':
             gotoxy(0, CONSOLE_START_Y);
-            readdir(device);
+            readdir();
             repaint == true;
             break;
 
         case '7':
             gotoxy(0, CONSOLE_START_Y);
-            scratchfile(device, commandname);
+            scratchfile(commandname);
             repaint == true;
             break;
 

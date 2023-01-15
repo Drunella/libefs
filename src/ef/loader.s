@@ -104,7 +104,7 @@
         sta $de02
 
         ; load menu
-        ldx #$00  ; efs device
+        lda #$01  ; channel (only 15 matters)
         ldy #$00  ; secondary address: relocate load
         jsr EFS_setlfs
         lda #menu_name_length

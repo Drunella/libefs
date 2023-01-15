@@ -67,6 +67,8 @@
 
     EFS_setlfs:  ; @ $DF00
         ; parameter:
+        ;    A: logical channel (15 for commands)
+        ;    X: device number (will be ignored)
         ;    Y: secondary address (0: relocate)
         ; return: none
         jsr efs_bankin

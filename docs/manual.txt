@@ -67,10 +67,9 @@ Minieapi provides the eapi functions EAPIGetBank, EAPISetBank, EAPISetPtr,
 EAPISetLen and EAPIReadFlashInc. EAPISetSlot and EAPIGetSlot is not available. 
 See the EasyFlash Programmer Reference for more information.
 
-Calling EAPIWriteFlash in minieapi will do nothing harmful.
-Calling EAPIEraseSector, EAPIWriteFlashInc or EAPISetSlot has undefined 
-behaviour ranging from jamming the cpu, crashing the computer or having no
-effact at all.
+Calling EAPIWriteFlash, EAPIEraseSector and EAPIGetSlot in minieapi will do
+nothing, they will immediately return. Calling EAPIWriteFlashInc is identical 
+to EAPISetBank. Calling EAPISetSlot will change the current bank, but not the slot.
 
 
 libefs
@@ -78,7 +77,6 @@ libefs
 
 EFS_setlfs ($df00)
 Parameter:
-  X: number of efs structure;
   Y: secondary address (0: relocate)
 Return: 
   none
@@ -117,11 +115,16 @@ Return:
   A: error code
   .C: set if error
 Error:
+  $01: file scratched (not an error)
   $02: file open
   $04: file not found
-  $05: device not present (?)
+  $05: device not present (not implemented)
   $08: missing filename
-
+  $1a: write protected
+Supported commands:
+  "$" will load the directory
+  "S0:[filename]" will delete a file
+  
 
 EFS_close ($df18)
 Parameter: 

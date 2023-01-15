@@ -357,13 +357,22 @@
 ; zerpage usage only after zeropage backup
 
     rom_setlfs_body:
-        ;stx efs_device
-        ;lda #$00
+        pha  ; store logical number
+
+        lda #$00  ; secondary address for relocation
         cpy #$00
         bne :+    ; zero => relocate
         lda #LIBEFS_FLAGS_RELOCATE
       : sta efs_flags
-        jmp efs_bankout  ; ends with rts
+
+        pla  ; logical number
+        cmp #$0f  ; command channel
+        bne :+
+        lda #LIBEFS_FLAGS_COMMAND
+        ora efs_flags
+        sta efs_flags
+
+      : jmp efs_bankout  ; ends with rts
 
 
     rom_setnam_body:
@@ -449,24 +458,22 @@
         sta error_byte
 
         lda internal_state  ; check if file open
-        beq @scratchcheck
+        beq @commandcheck
         lda #ERROR_FILE_OPEN
         sta error_byte
         sec
         bne @leave
 
-      @scratchcheck:
-        jsr rom_scratch_isrequested
-        bcc @dircheck
-        lda #%0010000  ; no processing
+      @commandcheck:
+        lda efs_flags
+        and #LIBEFS_FLAGS_COMMAND  ; command channel
+        beq @dircheck
+        lda #%00100000  ; no processing
         sta internal_state
-        jsr efs_directory_search
-        bcs @leave     ; not found
-        jsr rom_scratch_begin  ; this finishes the operation
+        jsr rom_command_begin
+        bcs @leave
+        jsr rom_command_process
         jmp @leave
-
-      ; ### check for disk drive commands
-      ; "R0:..."  rename file ###
 
       @dircheck:
         jsr rom_dirload_isrequested
@@ -947,14 +954,158 @@
 
 
 ; --------------------------------------------------------------------
-; scratch file functions
+; commands processing functions
 ; usage:
 ;  35/36: configuration pointer
 ;     37: used area
+;     38: command
 ;  3e/3f: pointer to name
 ; return:
 
-    rom_scratch_isrequested:
+    rom_command_begin:
+        lda filename_address
+        sta zp_var_xe
+        lda filename_address + 1
+        sta zp_var_xf
+
+        ldy #$00
+        lda (zp_var_xe), y
+        sta zp_var_x8
+
+        ; check for ':'
+        iny
+        lda #$3a    ; ':'
+        cmp (zp_var_xe), y
+        beq @match
+
+        ; check for a number: 0 < n <= x <= m < $ff
+        lda (zp_var_xe), y    ; no fit
+        clc
+        adc #$ff - $30        ; lower bound $30
+        adc #$39 - $30 + $01  ; upper bound $39
+        bcc @nomatch          ; .C clear -> not in range
+
+        ; check for ':'
+        iny
+        lda #$3a    ; ':'
+        cmp (zp_var_xe), y
+        beq @match
+
+      @nomatch:
+        lda #ERROR_SYNTAX_ERROR_30
+        sta error_byte
+        sec
+        rts
+
+      @match:
+        ; advance filename pointer by y + 1
+        sec  ; +1
+        tya
+        adc zp_var_xe
+        sta zp_var_xe
+        bne :+
+        inc zp_var_xf
+      : lda zp_var_xe
+        sta filename_address
+        lda zp_var_xf
+        sta filename_address + 1
+
+        iny ; decrease length by y + 1
+      : dec filename_length
+        dey
+        bne :-
+
+        clc
+        rts
+
+
+    rom_command_process:
+        lda zp_var_x8
+
+        cmp #$53    ; 'S'
+        bne @nomatch
+        ; scratch
+        jsr efs_directory_search
+        bcs @leave     ; not found
+        jsr rom_scratch_process
+        rts  ; error and .C set in rom_scratch_process
+
+      @leave:
+        rts
+        
+      @nomatch:
+        lda #ERROR_SYNTAX_ERROR_31
+        sta error_byte
+        sec
+        rts
+
+
+    rom_scratch_process:
+        ; configuration is at the correct area
+        jsr efs_init_eapiwriteinc  ; prepare dynamic code
+
+        ; filedata are set
+        ; if in area 1 -> write protected
+        lda zp_var_x7
+        cmp #$01
+        bne @scratch
+        lda #ERROR_WRITE_PROTECTED
+        sta error_byte
+        bne @error
+
+      @scratch:
+        lda #16  ; advance pointer to flags
+        jsr efs_readef_pointer_advance
+
+        ; prepare bank
+        jsr efs_init_setstartbank
+        lda zp_var_x7
+        jsr rom_config_get_areastart
+        tay
+        lda (zp_var_x5), y  ; at libefs_config::areax::bank
+        jsr efs_generic_command
+
+        iny                 ; banking mode
+        iny
+        iny
+        lda (zp_var_x5), y  ; at libefs_config::areax::mode
+        ldx efs_readef_low
+        ldy efs_readef_high
+        jsr EAPISetPtr
+
+        ldx #$01
+        lda #$00
+        tay
+        jsr EAPISetLen
+
+        lda #$60
+        sec  ; set to check for minieapi failures
+        jsr efs_io_byte
+        lda #ERROR_WRITE_ERROR
+        bcs @error
+        lda #ERROR_FILE_SCRATCHED
+
+      @error:
+        ; c flag set according to writeflash result
+        sta error_byte
+        rts
+
+
+/*      @scratchcheck:
+        jsr rom_scratch_isrequested
+        bcc @dircheck
+        lda #%0010000  ; no processing
+        sta internal_state
+        jsr efs_directory_search
+        bcs @leave     ; not found
+        jsr rom_scratch_begin  ; this finishes the operation
+        jmp @leave
+
+      ; ### check for disk drive commands
+      ; "R0:..."  rename file ###
+*/
+
+/*    rom_scratch_isrequested:
         ; returns .C set if scratch requested 
         lda filename_address
         sta zp_var_xe
@@ -1009,7 +1160,7 @@
 
       @nomatch:
         clc
-        rts
+        rts*/
 
 
 /*    rom_dirsearch_address:
@@ -1042,7 +1193,7 @@
         rts*/
 
 
-    rom_scratch_begin:
+/*    rom_scratch_process:
         ; configuration is at the correct area
         jsr efs_init_eapiwriteinc  ; prepare dynamic code
 
@@ -1099,7 +1250,7 @@
       @error:
         ; c flag set according to writeflash result
         sta error_byte
-        rts
+        rts*/
         
 
 
