@@ -146,11 +146,11 @@ build/ef/files.list:
 	./tools/mkdata.py -f build/files/data56789012345.prg -a 0x3000 -s 1025 >> build/ef/files.list
 	./tools/mkdata.py -f build/files/data8k.prg -a 0xa000 -s 8192 >> build/ef/files.list
 	./tools/mkdata.py -f build/files/data7k.prg -a 0xe000 -s 7936 >> build/ef/files.list
-	./tools/mkdata.py -f build/files/data9b.prg -a 0x3000 -s 2302 >> build/ef/files.list
-	./tools/mkdata.py -f build/files/data10b.prg -a 0x3000 -s 2303 >> build/ef/files.list
-	./tools/mkdata.py -f build/files/data99b.prg -a 0x3000 -s 25342 >> build/ef/files.list
-	./tools/mkdata.py -f build/files/data100b.prg -a 0x3000 -s 25343 >> build/ef/files.list
-	./tools/mkdata.py -f build/files/data1000b.prg -a 0x3000 -s 255998 >> build/ef/files.list
+	./tools/mkdata.py -f build/files/data9k.prg -a 0x3000 -s 2302 >> build/ef/files.list
+	./tools/mkdata.py -f build/files/data10k.prg -a 0x3000 -s 2303 >> build/ef/files.list
+	./tools/mkdata.py -f build/files/data99k.prg -a 0x3000 -s 25342 >> build/ef/files.list
+	./tools/mkdata.py -f build/files/data100k.prg -a 0x3000 -s 25343 >> build/ef/files.list
+	./tools/mkdata.py -f build/files/data1000k.prg -a 0x3000 -s 255998 >> build/ef/files.list
 
 
 # build efs rw

@@ -93,11 +93,38 @@ void loadverify(char* filename, uint8_t verify, uint8_t secondary)
     timer = UINT32_MAX - TIMER_measure();
     address = EFS_get_endadress();
     if (verify == 0) cprintf("l: "); else cprintf("v: ");
-    cprintf("sc=%d, rt=%d, sa=$%4x, ea=$%4x\n\r", secondary, retval, ADDRESS, address);
+    cprintf("sc=%d, rt=%d, sa=$%04x, ea=$%04x\n\r", secondary, retval, ADDRESS, address);
     status = EFS_readst_wrapper();
     seconds = timer / 1000000; timer = timer % 1000000;
     cprintf("st: $%02x, timer = %lu.%06lu sec\n\r", status, seconds, timer);
 }
+
+void savefile(char* filename, char* address, uint16_t size)
+{
+    uint8_t retval, status;
+    uint32_t timer, seconds;
+    char* endaddress;
+    uint8_t* startaddress = (uint8_t*)(0x0040);
+
+    startaddress[0] = (uint8_t)((uint16_t)address & 0xff);
+    startaddress[1] = (uint8_t)((uint16_t)address >> 8);
+    endaddress = address + size;
+        
+    menu_clear(CONSOLE_START_Y, 24);
+    gotoxy(0, CONSOLE_START_Y);
+    EFS_setnam_wrapper(filename, strlen(filename));
+    EFS_setlfs_wrapper(1, 0);  // no secondary
+    cprintf("start\n\r");
+    TIMER_reset();
+    retval = EFS_save_wrapper(address, 0x40);
+    timer = UINT32_MAX - TIMER_measure();
+    cprintf("rt=%d, sa=$%04x se=$%04x\n\r", retval, address, address+size);
+    status = EFS_readst_wrapper();
+    seconds = timer / 1000000; timer = timer % 1000000;
+    cprintf("st=$%02x, timer=%lu.%06lu s\n\r", status, seconds, timer);
+
+}
+
 
 void openfile(char* filename, uint8_t secondary)
 {
@@ -187,6 +214,23 @@ void scratchfile(char* cmdname)
 }
 
 
+void createdata(uint16_t size, char* prefix, char* suffix)
+{
+    char* address = (char*)(ADDRESS);
+    uint16_t i;
+    uint16_t* seed = (uint16_t*)(0x00a1);  // some timer
+    
+    srand(*seed);
+    
+    for (i=0; i<size; i++) {
+        address[i] = (uint8_t)rand();
+    }
+    
+    sprintf(&address[0], "%s", prefix);
+    sprintf(&address[size-strlen(suffix)], "%s", suffix);
+}
+
+
 void main(void)
 {
     bool repaint;
@@ -196,6 +240,7 @@ void main(void)
     char* commandname;
     char* address;
     uint8_t sysident;
+    uint8_t cleartoggle;
     
     filename = &filename_data[3];
     commandname = &filename_data[0];
@@ -206,6 +251,7 @@ void main(void)
     sprintf(filename, "delme384");
     secondary = 0;
     memset((char*)ADDRESS, 0, 0x6000);
+    cleartoggle = 0;
     
     //sysident = TIMER_get_system();
     sysident = SYS_get_system();
@@ -231,6 +277,7 @@ void main(void)
             menu_option(20, wherey(), '4', "Close file");
             menu_option(20, wherey(), '5', "Read file");
             menu_option(20, wherey(), '6', "Directory");
+            menu_option(20, wherey(), '8', "Save file");
             gotoxy(0, OUTPUT_START_Y);
             //cprintf("%x (4a:60,9 a6:60,1 51:50,9 c0:50,1)\n\r", sysident);
             draw_system(sysident);
@@ -261,8 +308,15 @@ void main(void)
             break;*/
 
         case 'c':
-            memset((char*)ADDRESS, 0, 0x6000);
-            memset((char*)0xc000, 0, 0x0d00);
+            if (cleartoggle == 0) {
+                memset((char*)ADDRESS, 0, 0x6000);
+                memset((char*)0xc000, 0, 0x0d00);
+                cleartoggle = 1;
+            } else {
+                memset((char*)ADDRESS, 0, 0x6000);
+                createdata(1100, "saveme1k", "finish123456789");
+                cleartoggle = 0;
+            }
             repaint = true;
             break;
 
@@ -310,6 +364,12 @@ void main(void)
         case '7':
             gotoxy(0, CONSOLE_START_Y);
             scratchfile(commandname);
+            repaint == true;
+            break;
+
+        case '8':
+            gotoxy(0, CONSOLE_START_Y);
+            savefile(filename, (char*)(ADDRESS), 1100);
             repaint == true;
             break;
 

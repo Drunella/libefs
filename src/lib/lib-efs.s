@@ -99,15 +99,13 @@
     EFS_init_mini_eapi: ; @ $8006
         jmp efs_init_eapi_body
 
-    EFS_init_XXX: ; @ $8009
-        rts
-        nop
-        nop
+    EFS_validate: ; @ $8009
+        ; validates (defragments) the rw area
+        jmp efs_validate_body
 
-    EFS_init_YYY: ; @ $800c
-        rts
-        nop
-        nop
+    EFS_format: ; @ $800c
+        ; initializes (erases) the rw area
+        jmp efs_format_body
 
         .byte $00
 
@@ -351,6 +349,16 @@
         rts
 
 
+    efs_validate_body:
+        rts
+        ; ###
+
+
+    efs_format_body:
+        rts
+        ; ###
+
+
 ; --------------------------------------------------------------------
 ; efs body functions
 ; need to leave with 'jmp efs_bankout'
@@ -578,14 +586,6 @@
         jmp @leave
 
       @fileloadverify:
-;        lda libefs_configuration
-;        and #LIBEFS_CONFIG_VERIFY  ;  verify possible
-;        bne @verifyok
-;        lda #ERROR_DEVICE_NOT_PRESENT
-;        sta error_byte
-;        sec
-;        jmp @leave
-;      @verifyok:
         jsr rom_fileload_verify
 
       @leave:
@@ -609,32 +609,68 @@
         sta io_start_address
         lda $01, x
         sta io_start_address + 1
+
         jsr backup_zeropage
 
-        bit internal_state  ; we check for bit 7/6 == 1/1
-        bpl @fileopen  ; branch if bit 7 is clear
-        bvs @fileopen  ; branch if bit 6 is clear
-
-        sec  ; ###
-        lda #ERROR_DEVICE_NOT_PRESENT
+        lda #$00
+        sta status_byte
         sta error_byte
-        jmp @done
 
-;        jsr rom_save_execute ###
-;        jmp @done
-
-      @fileopen:
+        lda internal_state
+        beq @dircheck
         lda #ERROR_FILE_OPEN
         sta error_byte
+        sec
+        bne @leave
 
-      @done:
+      @dircheck:
+        jsr rom_dirload_isrequested
+        bcc @checkname
+        lda #ERROR_MISSING_FILENAME
+        sta error_byte
+        sec
+        bne @leave
+
+      @checkname:
+        jsr efs_directory_search
+        bcs @savefile ; not found
+        lda #ERROR_FILE_EXISTS  ; ### delete instead?
+        sta error_byte
+        sec
+        bne @leave
+
+      @savefile:
+        jsr rom_filesave_begin
+        
+      @leave:
         php  ; save carry
-
+        lda #$00
+        sta internal_state
         jsr restore_zeropage
-        lda error_byte
-
         plp
+        lda error_byte
         jmp efs_bankout  ; ends with rts
+
+
+;        jsr backup_zeropage
+;        bit internal_state  ; we check for bit 7/6 == 1/1
+;        bpl @fileopen  ; branch if bit 7 is clear
+;        bvs @fileopen  ; branch if bit 6 is clear
+;        sec  ; ###
+;        lda #ERROR_DEVICE_NOT_PRESENT
+;        sta error_byte
+;        jmp @done
+;        jsr rom_save_execute ###
+;        jmp @done
+;      @fileopen:
+;        lda #ERROR_FILE_OPEN
+;        sta error_byte
+;      @done:
+;        php  ; save carry
+;        jsr restore_zeropage
+;        lda error_byte
+;        plp
+;        jmp efs_bankout  ; ends with rts
 
 
 
@@ -652,6 +688,8 @@
 .export efs_readef_pointer_dec
 .export efs_readef_pointer_advance
 .export efs_readef_pointer_reverse
+.export efs_readef_pointer_setall
+.export efs_readef_pointer_set
 
     efs_init_readef:
         ldy #<(@codeend - @code - 1)
@@ -683,12 +721,17 @@
         pla  ; to have the correct cpu states
         rts
 
+    efs_readef_pointer_set:
+        ; X/Y
+        stx efs_readef_low
+        sty efs_readef_high
+        rts
+
     efs_readef_pointer_inc:
         inc efs_readef_low
         bne :+
         inc efs_readef_high
-      : ;lda efs_readef_high
-        rts
+      : rts
 
     efs_readef_pointer_dec:
         lda efs_readef_low
@@ -703,8 +746,7 @@
         sta efs_readef_low
         bcc :+
         inc efs_readef_high
-      : ;lda efs_readef_high
-        rts
+      : rts
 
     efs_readef_pointer_reverse:
         tax
@@ -715,10 +757,30 @@
         sta efs_readef_low
         bcs :+
         dec efs_readef_high
-      : ;lda efs_readef_high
+      : rts
+
+    efs_readef_pointer_setall:
+        pha  ; save a
+        txa
+        pha  ; save x
+        tya
+        pha  ; save y
+
+        jsr efs_init_setstartbank
+        tsx
+        lda $0103, x  ; a register
+        jsr efs_generic_command
+
+        ; set read ef code
+        jsr efs_init_readef
+
+        pla
+        sta efs_readef_high
+        pla
+        sta efs_readef_low
+        pla
         rts
 
-;.endscope
 
 
 
@@ -764,6 +826,11 @@
         rts
 
 
+    rom_config_get_activearea:
+        ; check which area is active
+        ; if both are empty, getthe area 2
+
+
     rom_config_prepare_config:
         lda LIBEFS_CONFIG_START + 0
         cmp #$4c
@@ -795,6 +862,41 @@
         sta zp_pointer_configuration
         lda #>efs_default_config
         sta zp_pointer_configuration + 1
+        rts
+
+
+
+; --------------------------------------------------------------------
+; efs save functions
+; parameter:
+;   fe/ff: name
+;   io_start_address
+;   io_end_address
+;   filename_address:
+;   filename_length:
+
+    rom_filesave_begin:
+        ; ### calculate file space
+        ; ### if file space < size: defragment
+
+        ; ### calculate free space
+        ; ### if space < size: error
+        
+        ; ### get empty file begin
+        ; ### get empty dir entry
+        ; ### write name, flags, bank, offset; write size (open: remember size address)
+        
+        ; ### write data
+        ; ### hint: not closed saved file has size 0xffffff, wich is
+        ; ### impossible; we find this and we can correct it:
+        ; ###   delete this dile and defragment
+
+
+        clc
+        rts
+
+    rom_filesave_address:
+
         rts
 
 
@@ -898,7 +1000,6 @@
 
     rom_fileload_verify:
         jsr efs_init_readmem  ; prepare verify command
-        ;ldy #$00
       @loop:
         jsr efs_io_byte
         bcs @eof  ; eof
@@ -907,12 +1008,6 @@
         jsr efs_generic_command
         cmp $37
         bne @mismatch
-;        iny
-;        bne @loop
-;        inc $3f
-;        jmp @loop
-        ;ldy #$00
-        ;sta ($3e), y
         inc $3e
         bne @loop
         inc $3f
@@ -1090,168 +1185,6 @@
         sta error_byte
         rts
 
-
-/*      @scratchcheck:
-        jsr rom_scratch_isrequested
-        bcc @dircheck
-        lda #%0010000  ; no processing
-        sta internal_state
-        jsr efs_directory_search
-        bcs @leave     ; not found
-        jsr rom_scratch_begin  ; this finishes the operation
-        jmp @leave
-
-      ; ### check for disk drive commands
-      ; "R0:..."  rename file ###
-*/
-
-/*    rom_scratch_isrequested:
-        ; returns .C set if scratch requested 
-        lda filename_address
-        sta zp_var_xe
-        lda filename_address + 1
-        sta zp_var_xf
-
-        ; check for letter S
-        ldy #$00
-        lda #$53    ; 'S'
-        cmp (zp_var_xe), y
-        bne @nomatch
-
-        ; check for ':'
-        iny
-        lda #$3a    ; ':'
-        cmp (zp_var_xe), y
-        beq @match
-
-        ; check for a number: 0 < n <= x <= m < $ff
-        lda (zp_var_xe), y    ; no fit
-        clc
-        adc #$ff - $30        ; lower bound $30
-        adc #$39 - $30 + $01  ; upper bound $39
-        bcc @nomatch          ; .C clear -> not in range
-
-        ; check for ':'
-        iny
-        lda #$3a    ; ':'
-        cmp (zp_var_xe), y
-        bne @nomatch
-
-      @match:
-        ; advance filename pointer by y + 1
-        sec  ; +1
-        tya
-        adc zp_var_xe
-        sta zp_var_xe
-        bne :+
-        inc zp_var_xf
-      : lda zp_var_xe
-        sta filename_address
-        lda zp_var_xf
-        sta filename_address + 1
-
-        iny ; decrease length by y + 1
-      : dec filename_length
-        dey
-        bne :-
-
-        sec
-        rts
-
-      @nomatch:
-        clc
-        rts*/
-
-
-/*    rom_dirsearch_address:
-        ; set pointer and length of directory
-        ; a offset in configuration
-        sta dirsearch_temp_var_zp
-
-        jsr rom_config_prepare_config
-
-        jsr efs_init_setstartbank
-        ;lda #$00  ; ### 0, could be different bank
-        ldy dirsearch_temp_var_zp
-        lda ($35), y  ; at libefs_config::libefs_area::bank
-        jsr efs_generic_command
-
-        ; set read ef code
-        jsr efs_init_readef
-
-        inc dirsearch_temp_var_zp
-        ldy dirsearch_temp_var_zp
-        lda ($35), y  ; at libefs_config::libefs_area::addr low
-        sta efs_readef_low
-
-        inc dirsearch_temp_var_zp
-        ldy dirsearch_temp_var_zp
-        lda ($35), y  ; at libefs_config::libefs_area::addr high
-        sta efs_readef_high
-
-        ; banking mode and area size is irrelevant in dirsearch
-        rts*/
-
-
-/*    rom_scratch_process:
-        ; configuration is at the correct area
-        jsr efs_init_eapiwriteinc  ; prepare dynamic code
-
-        ; filedata are set
-        ; if in area 1 -> write protected
-        lda zp_var_x7
-        cmp #$01
-        bne @scratch
-        lda #ERROR_WRITE_PROTECTED
-        sta error_byte
-        bne @error
-
-      @scratch:
-        lda #16  ; advance pointer to flags
-        jsr efs_readef_pointer_advance
-
-        ; prepare bank
-        jsr efs_init_setstartbank
-        lda zp_var_x7
-        jsr rom_config_get_areastart
-        tay
-        lda (zp_var_x5), y  ; at libefs_config::areax::bank
-        jsr efs_generic_command
-
-        iny                 ; banking mode
-        iny
-        iny
-        lda (zp_var_x5), y  ; at libefs_config::areax::mode
-;        tax                 ; save mode in x
-
-;        lda efs_readef_high  ; and address
-;        cmp #$b0
-;        bcc :+
-;        clc
-;        adc #$40
-;      : tay
-;        txa
-        ldx efs_readef_low
-        ldy efs_readef_high
-        jsr EAPISetPtr
-
-        ldx #$01
-        lda #$00
-        tay
-        jsr EAPISetLen
-
-        lda #$60
-        sec  ; set to check for minieapi failures
-        jsr efs_io_byte
-        lda #ERROR_WRITE_ERROR
-        bcs @error
-        lda #ERROR_FILE_SCRATCHED
-
-      @error:
-        ; c flag set according to writeflash result
-        sta error_byte
-        rts*/
-        
 
 
 ; --------------------------------------------------------------------
@@ -1591,3 +1524,164 @@
         rts
 */
 
+
+/*      @scratchcheck:
+        jsr rom_scratch_isrequested
+        bcc @dircheck
+        lda #%0010000  ; no processing
+        sta internal_state
+        jsr efs_directory_search
+        bcs @leave     ; not found
+        jsr rom_scratch_begin  ; this finishes the operation
+        jmp @leave
+
+      ; ### check for disk drive commands
+      ; "R0:..."  rename file ###
+*/
+
+/*    rom_scratch_isrequested:
+        ; returns .C set if scratch requested 
+        lda filename_address
+        sta zp_var_xe
+        lda filename_address + 1
+        sta zp_var_xf
+
+        ; check for letter S
+        ldy #$00
+        lda #$53    ; 'S'
+        cmp (zp_var_xe), y
+        bne @nomatch
+
+        ; check for ':'
+        iny
+        lda #$3a    ; ':'
+        cmp (zp_var_xe), y
+        beq @match
+
+        ; check for a number: 0 < n <= x <= m < $ff
+        lda (zp_var_xe), y    ; no fit
+        clc
+        adc #$ff - $30        ; lower bound $30
+        adc #$39 - $30 + $01  ; upper bound $39
+        bcc @nomatch          ; .C clear -> not in range
+
+        ; check for ':'
+        iny
+        lda #$3a    ; ':'
+        cmp (zp_var_xe), y
+        bne @nomatch
+
+      @match:
+        ; advance filename pointer by y + 1
+        sec  ; +1
+        tya
+        adc zp_var_xe
+        sta zp_var_xe
+        bne :+
+        inc zp_var_xf
+      : lda zp_var_xe
+        sta filename_address
+        lda zp_var_xf
+        sta filename_address + 1
+
+        iny ; decrease length by y + 1
+      : dec filename_length
+        dey
+        bne :-
+
+        sec
+        rts
+
+      @nomatch:
+        clc
+        rts*/
+
+
+/*    rom_dirsearch_address:
+        ; set pointer and length of directory
+        ; a offset in configuration
+        sta dirsearch_temp_var_zp
+
+        jsr rom_config_prepare_config
+
+        jsr efs_init_setstartbank
+        ;lda #$00  ; ### 0, could be different bank
+        ldy dirsearch_temp_var_zp
+        lda ($35), y  ; at libefs_config::libefs_area::bank
+        jsr efs_generic_command
+
+        ; set read ef code
+        jsr efs_init_readef
+
+        inc dirsearch_temp_var_zp
+        ldy dirsearch_temp_var_zp
+        lda ($35), y  ; at libefs_config::libefs_area::addr low
+        sta efs_readef_low
+
+        inc dirsearch_temp_var_zp
+        ldy dirsearch_temp_var_zp
+        lda ($35), y  ; at libefs_config::libefs_area::addr high
+        sta efs_readef_high
+
+        ; banking mode and area size is irrelevant in dirsearch
+        rts*/
+
+
+/*    rom_scratch_process:
+        ; configuration is at the correct area
+        jsr efs_init_eapiwriteinc  ; prepare dynamic code
+
+        ; filedata are set
+        ; if in area 1 -> write protected
+        lda zp_var_x7
+        cmp #$01
+        bne @scratch
+        lda #ERROR_WRITE_PROTECTED
+        sta error_byte
+        bne @error
+
+      @scratch:
+        lda #16  ; advance pointer to flags
+        jsr efs_readef_pointer_advance
+
+        ; prepare bank
+        jsr efs_init_setstartbank
+        lda zp_var_x7
+        jsr rom_config_get_areastart
+        tay
+        lda (zp_var_x5), y  ; at libefs_config::areax::bank
+        jsr efs_generic_command
+
+        iny                 ; banking mode
+        iny
+        iny
+        lda (zp_var_x5), y  ; at libefs_config::areax::mode
+;        tax                 ; save mode in x
+
+;        lda efs_readef_high  ; and address
+;        cmp #$b0
+;        bcc :+
+;        clc
+;        adc #$40
+;      : tay
+;        txa
+        ldx efs_readef_low
+        ldy efs_readef_high
+        jsr EAPISetPtr
+
+        ldx #$01
+        lda #$00
+        tay
+        jsr EAPISetLen
+
+        lda #$60
+        sec  ; set to check for minieapi failures
+        jsr efs_io_byte
+        lda #ERROR_WRITE_ERROR
+        bcs @error
+        lda #ERROR_FILE_SCRATCHED
+
+      @error:
+        ; c flag set according to writeflash result
+        sta error_byte
+        rts*/

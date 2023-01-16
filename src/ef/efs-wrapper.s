@@ -33,6 +33,7 @@
 .export _EFS_close_wrapper
 .export _EFS_chrin_wrapper
 .export _EFS_chrout_wrapper
+.export _EFS_save_wrapper
 
 .export _SYS_get_system
 .export _TIMER_get_system
@@ -179,6 +180,27 @@
 
         stx end_address
         sty end_address + 1
+
+        bcc :+
+        cmp #$00
+        bne :+
+        lda #$ff
+    :   ldx #$00
+        rts
+
+
+    ; uint8_t __fastcall__ EFS_save_wrapper(char* endaddress, uint8_t endzpvar);
+    _EFS_save_wrapper:
+        pha        ; zpvar in A
+        jsr popax  ; addr in A/X
+        pha
+        txa
+        tay
+        pla
+        tax
+        pla
+
+        jsr EFS_save
 
         bcc :+
         cmp #$00
