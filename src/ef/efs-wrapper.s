@@ -189,17 +189,22 @@
         rts
 
 
-    ; uint8_t __fastcall__ EFS_save_wrapper(char* endaddress, uint8_t endzpvar);
+    ; uint8_t __fastcall__ EFS_save_wrapper(char* startaddress, char* endaddress);
     _EFS_save_wrapper:
-        pha        ; zpvar in A
-        jsr popax  ; addr in A/X
-        pha
+        pha        ; endaddress in A/X; high
         txa
+        pha        ; low
+
+        jsr popax  ; startaddress in A/X -> $40/41
+        sta $40    
+        stx $41
+
+        pla
         tay
         pla
         tax
-        pla
 
+        lda #$40
         jsr EFS_save
 
         bcc :+

@@ -36,11 +36,12 @@
         .byte $03
         ;    bank lo/hi addr mode size
         .byte $00, $00, $a0, $d0,   0  ; area 0: bank 0, $a000, mode lhlh, ignore size
-        .byte  32, $00, $80, $b0,  32  ; area 1: low side
-        .byte  32, $00, $a0, $d4,  32  ; area 2: high side
-        .byte $01                      ; defragment: yes
+        .byte  32, $00, $80, $d0,  32  ; area 1: lower banks
+        .byte  48, $00, $80, $d0,  32  ; area 2: upper banks
+        .byte $01                      ; defragment warning: yes
         .addr __EFS_CONFIG_RUN__ + efs_defragment_warning_offset
-        .byte $00, $00, $00, $00       ; empty
+        .addr __EFS_CONFIG_RUN__ + efs_defragment_allclear_offset
+        .byte $00, $00   ; empty
 
     efs_config_size = * - efs_config
     .if efs_config_size <> 32
@@ -53,8 +54,14 @@
         rts
 
     efs_defragment_warning_size = * - efs_defragment_warning
-    .if efs_config_size > 200
-    .error "efs_defragment_warning too large"
-    .endif
 
 
+    efs_defragment_allclear:
+    efs_defragment_allclear_offset = * - ef_name
+        rts
+
+    efs_defragment_allclear_size = * - efs_defragment_allclear
+
+;    .if efs_config_size > 200
+;    .error "efs_defragment_warning too large"
+;    .endif

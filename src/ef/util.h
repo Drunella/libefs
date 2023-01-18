@@ -42,7 +42,7 @@ uint8_t __fastcall__ EFS_open_wrapper(void);
 uint8_t __fastcall__ EFS_close_wrapper(void);
 uint8_t __fastcall__ EFS_chrin_wrapper(uint8_t* data);
 uint8_t __fastcall__ EFS_chrout_wrapper(uint8_t data);
-uint8_t __fastcall__ EFS_save_wrapper(char* endaddress, uint8_t endzpvar);
+uint8_t __fastcall__ EFS_save_wrapper(char* startaddress, char* endaddress);
 
 uint8_t __fastcall__ SYS_get_system();
 uint16_t __fastcall__ TIMER_get_system();

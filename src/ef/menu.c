@@ -104,10 +104,10 @@ void savefile(char* filename, char* address, uint16_t size)
     uint8_t retval, status;
     uint32_t timer, seconds;
     char* endaddress;
-    uint8_t* startaddress = (uint8_t*)(0x0040);
+//    uint8_t* startaddress = (uint8_t*)(0x0040);
 
-    startaddress[0] = (uint8_t)((uint16_t)address & 0xff);
-    startaddress[1] = (uint8_t)((uint16_t)address >> 8);
+//    startaddress[0] = (uint8_t)((uint16_t)address & 0xff);
+//    startaddress[1] = (uint8_t)((uint16_t)address >> 8);
     endaddress = address + size;
         
     menu_clear(CONSOLE_START_Y, 24);
@@ -116,9 +116,9 @@ void savefile(char* filename, char* address, uint16_t size)
     EFS_setlfs_wrapper(1, 0);  // no secondary
     cprintf("start\n\r");
     TIMER_reset();
-    retval = EFS_save_wrapper(address, 0x40);
+    retval = EFS_save_wrapper(address, endaddress);
     timer = UINT32_MAX - TIMER_measure();
-    cprintf("rt=%d, sa=$%04x se=$%04x\n\r", retval, address, address+size);
+    cprintf("rt=%d, sa=$%04x se=$%04x\n\r", retval, address, endaddress);
     status = EFS_readst_wrapper();
     seconds = timer / 1000000; timer = timer % 1000000;
     cprintf("st=$%02x, timer=%lu.%06lu s\n\r", status, seconds, timer);
@@ -314,7 +314,7 @@ void main(void)
                 cleartoggle = 1;
             } else {
                 memset((char*)ADDRESS, 0, 0x6000);
-                createdata(1100, "saveme1k", "finish123456789");
+                createdata(1100, filename, "finish123456789");
                 cleartoggle = 0;
             }
             repaint = true;

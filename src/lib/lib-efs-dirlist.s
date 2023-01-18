@@ -60,9 +60,11 @@
 ; --------------------------------------------------------------------
 ; directory list functions
 ; usage:
+;   35/36: configuration
 ;   37: temporary state machine state
 ;   38/39: temporary file size
 ;   3a: temporary variable
+;   3b: 
 ;   3c/3d: address to state maching processing function
 ;   3e/3f: pointer to destination / pointer to filename
 ;   io_end_address: state machine variable
@@ -182,7 +184,14 @@
         lda ($35), y  ; at libefs_config::libefs_area::addr high
         sta efs_readef_high
 
-        ; banking mode and area size is irrelevant in dirload
+        ; banking mode and size is irrelevant in dirload
+;        inc dirload_temp_var_zp
+;        inc dirload_temp_var_zp
+;        ldy dirload_temp_var_zp
+;        lda ($35), y  ; at libefs_config::libefs_area::size
+;        tay
+;        dey
+        ;sty ### 
         rts
 
 
@@ -694,6 +703,7 @@
         ; calculate the free blocks
         ; ### other area  
         ; in area 0 nothing free
+        ; ### calculate free blocks in current area
         lda #$00
         sta dirload_state_var
         inc dirload_temp_state_zp

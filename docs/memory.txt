@@ -51,7 +51,10 @@ Configuration starts at 00:1:1b18
 2f:       banking mode
 30:       number of banks used (must be divisible by 8)
 31:       call rom function on defragmentation
-32,33:    low/high address of rom function in memory ($8000 - $bffff), must be in bank 0
+32,33:    low/high address of rom function in memory ($8000 - $bfff), must be in bank 0
+          to start and update defragmentation warning
+34,35:    low/high address of rpm function in memory 
+          to finish defragmentation warning
 34-37:    empty
 
 

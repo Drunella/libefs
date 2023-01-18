@@ -45,11 +45,13 @@ ERROR_DEVICE_NOT_PRESENT = $05
 ERROR_NO_INPUT_FILE      = $06
 ERROR_NO_OUTPUT_FILE     = $07
 ERROR_MISSING_FILENAME   = $08
+
 ERROR_WRITE_ERROR        = $19  ; 25
 ERROR_WRITE_PROTECTED    = $1a  ; 26
 ERROR_SYNTAX_ERROR_30    = $1e  ; 30
 ERROR_SYNTAX_ERROR_31    = $1f  ; 31
 ERROR_FILE_EXISTS        = $3f  ; 63
+ERROR_DISK_FULL          = $48  ; 72
 
 STATUS_EOF       = $40
 STATUS_MISMATCH  = $10
@@ -65,6 +67,8 @@ LIBEFS_CONFIG_START = $bb18
 LIBEFS_FLAGS_RELOCATE = $01
 LIBEFS_FLAGS_VERIFY   = $02
 LIBEFS_FLAGS_COMMAND  = $04
+LIBEFS_FLAGS_AREA1    = $40  ; must be bit 6
+LIBEFS_FLAGS_AREA2    = $80  ; must be bit 7
 
 ; eapi data and functions
 EAPI_SOURCE  = $b800  ; $a000 (hirom) + 1800
@@ -121,8 +125,8 @@ EAPIGetSlot       = $df9b
 
 ; lib efs config struct
 .struct libefs_area
-    bank .byte
-    addr .word
+    bank .byte  ; must not change
+    addr .word  ; this ordering !!!
     mode .byte
     size .byte
 .endstruct
@@ -135,6 +139,8 @@ EAPIGetSlot       = $df9b
     area_1 .tag libefs_area
     area_2 .tag libefs_area
     dfcall .byte
-    dfaddr .addr 
+    dfwarning .addr 
+    dfclearall .addr
+
 .endstruct
 
