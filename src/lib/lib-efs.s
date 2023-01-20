@@ -407,7 +407,7 @@
         sta status_byte - 1
         lda #$60
         sta status_byte + 1
-
+        rts
 
 
 ; --------------------------------------------------------------------
@@ -420,25 +420,14 @@
 
         ; rw areas available?
         jsr rom_config_rw_available
-        bcc @busycheck
-;        lda #libefs_config::areas
-;        jsr rom_config_get_value
-;        cmp #$03
-;        beq @busycheck
-;        lda #ERROR_DEVICE_NOT_PRESENT
-        bne @error
-        rts
+        bcs @error
 
-      @busycheck:
         lda internal_state  ; check if file open
         beq @process
         lda #ERROR_FILE_OPEN
         bne @error
 
       @process:
-;        jsr rom_config_activearea
-;        jsr rom_flags_set_area
-
         jsr rom_flags_get_area
         tax
         jsr rom_flags_get_area_invert
@@ -448,23 +437,28 @@
         jsr rom_flags_get_area
         jsr rom_defragment_erasearea
 
-;        jsr rom_config_prepare_config
-
-        clc
         rts
 
-    @error:
+      @error:
         sec
         rts
 
 
     efs_format_body:
+        jsr rom_config_prepare_config
+
+        ; rw areas available?
+        jsr rom_config_rw_available
+        bcs @error
+
         lda #$01
         jsr rom_defragment_erasearea
-        bcs :+
+        bcs @error
         lda #$02
         jsr rom_defragment_erasearea
-      : rts
+        rts
+      @error:
+        rts
 
 
     rom_setlfs_body:
@@ -1426,11 +1420,11 @@
 
     rom_defragment_erasearea:
         ; area to erase in a
-        pha
-        jsr rom_config_prepare_config  ; ### necessary?
+;        pha
+;        jsr rom_config_prepare_config  ; ### necessary?
 
-        jsr rom_config_rw_available
-        bcs @error_pla
+;        jsr rom_config_rw_available
+;        bcs @error_pla
 
         ; rw areas available?
 ;        lda #libefs_config::areas
@@ -1438,12 +1432,11 @@
 ;        cmp #$03
 ;        bne @error_pla
 
-        pla
+;        pla
         cmp #$00
         beq @error
         cmp #$01
         beq @next
-        jmp @error
         cmp #$02
         beq @next
         jmp @error
@@ -1815,6 +1808,8 @@
         ; checks if conditions to save are fulfilled
         ; .sec if save is not possible
         jsr rom_config_prepare_config  ; first call to config
+        jsr efs_init_readef
+        jsr efs_init_eapiwriteinc
 
         ; rw areas available?
         jsr rom_config_rw_available   ; maybe check earlier?
@@ -1865,6 +1860,10 @@
         jsr rom_defragment_erasearea
 
         jsr rom_config_prepare_config  ; set new configuration
+        jsr efs_init_readef
+        jsr efs_init_eapiwriteinc
+
+
 ;        jsr rom_config_activearea
 ;        jsr rom_flags_set_area
 
@@ -2195,6 +2194,8 @@
         ;   filename_length
         ; result
         jsr rom_config_prepare_config
+        jsr efs_init_readef
+
 ;        jsr rom_config_activearea
 ;        jsr rom_flags_set_area
  
@@ -2204,6 +2205,8 @@
 ;        jsr rom_config_get_value
         jsr rom_config_get_area_bank
         sta zp_var_x8
+        jsr efs_setstartbank_ext
+
         lda #$00      ; ### get from config
         sta zp_var_x9
         lda #$18      ; ### get from config, relative offset
@@ -2285,10 +2288,10 @@
         lda #$d0   ; ### bank mode from config
         jsr EAPISetPtr        
 
-        ldx #24
-        ldy #$00
-        lda #$00
-        jsr EAPISetLen
+;        ldx #24
+;        ldy #$00
+;        lda #$00
+;        jsr EAPISetLen
 
         lda filename_address
         sta zp_var_xe
