@@ -58,6 +58,8 @@ EAPIGetSlot       = $df9b
 EFS_init    = $8000
 EFS_init_minieapi = $8003
 EFS_init_eapi = $8006
+EFS_defragment = $8009
+EFS_format = $800c
 
 EFS_setlfs  = $DF00
 EFS_setnam  = $DF06

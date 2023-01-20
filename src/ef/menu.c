@@ -148,6 +148,9 @@ void readfile(void)
     char* address = (char*)(ADDRESS);
     uint8_t header = 2;
     
+    menu_clear(CONSOLE_START_Y, 24);
+    gotoxy(0, CONSOLE_START_Y);
+
     while (true) {
         retval = EFS_chrin_wrapper(&data);
         if (retval != 0) break;
@@ -170,6 +173,7 @@ void closefile(void)
 
     menu_clear(CONSOLE_START_Y, 24);
     gotoxy(0, CONSOLE_START_Y);
+
     retval = EFS_close_wrapper();
     status = EFS_readst_wrapper();
     cprintf("close: rt=%d, st=$%02x\n\r", retval, status);
@@ -184,6 +188,7 @@ void readdir()
 
     menu_clear(CONSOLE_START_Y, 24);
     gotoxy(0, CONSOLE_START_Y);
+
     EFS_setnam_wrapper("$", 1);
     EFS_setlfs_wrapper(1, 0); // do not relocate
     retval = EFS_load_wrapper((char*)(ADDRESS), 0);
@@ -205,6 +210,7 @@ void scratchfile(char* cmdname)
 
     menu_clear(CONSOLE_START_Y, 24);
     gotoxy(0, CONSOLE_START_Y);
+
     EFS_setnam_wrapper(cmdname, strlen(cmdname));
     EFS_setlfs_wrapper(15, 0); // command channel, do not relocate
     retval = EFS_open_wrapper();
@@ -213,12 +219,37 @@ void scratchfile(char* cmdname)
     cprintf("scratch: st=$%02x, rt=%d\n\r", status, retval);
 }
 
+void format()
+{
+    uint8_t retval;
+
+    menu_clear(CONSOLE_START_Y, 24);
+    gotoxy(0, CONSOLE_START_Y);
+
+    retval = EFS_format_wrapper();
+    cprintf("format: rt=%d\n\r", retval);
+}
+
+void defragment()
+{
+    uint8_t retval;
+
+    menu_clear(CONSOLE_START_Y, 24);
+    gotoxy(0, CONSOLE_START_Y);
+
+    retval = EFS_defragment_wrapper();
+    cprintf("defragment: rt=%d\n\r", retval);
+
+}
 
 void createdata(uint16_t size, char* prefix, char* suffix)
 {
     char* address = (char*)(ADDRESS);
     uint16_t i;
     uint16_t* seed = (uint16_t*)(0x00a1);  // some timer
+
+    menu_clear(CONSOLE_START_Y, 24);
+    gotoxy(0, CONSOLE_START_Y);
     
     srand(*seed);
     
@@ -270,9 +301,10 @@ void main(void)
             menu_option(0, wherey(), '2', "Verify file");
             menu_option(0, wherey(), '7', "Scratch file");
             menu_option(0, wherey(), 'Q', "Quit to basic");
+            menu_option(0, wherey(), '9', "Format");
             gotoxy(0, MENU_START_Y);
-            menu_option(20, wherey(), 'S', "Toggle secondry");
-            menu_option(20, wherey(), '0', "Fail tests");
+            menu_option(20, wherey(), 'S', "Toggle sec.");
+            menu_option(20, wherey(), '0', "Defragment");
             menu_option(20, wherey(), '3', "Open file");
             menu_option(20, wherey(), '4', "Close file");
             menu_option(20, wherey(), '5', "Read file");
@@ -326,7 +358,8 @@ void main(void)
             break;
 
         case '0':
-            fail_tests_3();
+            //fail_tests_3();
+            defragment();
             repaint = true;
             break;
 
@@ -370,6 +403,12 @@ void main(void)
         case '8':
             gotoxy(0, CONSOLE_START_Y);
             savefile(filename, (char*)(ADDRESS), 1100);
+            repaint == true;
+            break;
+
+        case '9':
+            gotoxy(0, CONSOLE_START_Y);
+            format();
             repaint == true;
             break;
 

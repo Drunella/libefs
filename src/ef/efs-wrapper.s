@@ -24,6 +24,8 @@
 
 .import _cputc
 
+.export _EFS_defragment_wrapper
+.export _EFS_format_wrapper
 .export _EFS_get_endadress
 .export _EFS_readst_wrapper
 .export _EFS_setnam_wrapper
@@ -49,6 +51,50 @@
 
 
 .segment "CODE"
+
+    ; uint8_t __fastcall__ EFS_defragment_wrapper(void);
+    _EFS_defragment_wrapper:
+        ; bank easyflash in
+        lda #$37
+        sta $01
+        lda #$87   ; led, 16k mode
+        sta $de02
+        lda #$00   ; EFSLIB_ROM_BANK
+        sta $de00
+
+        jsr EFS_defragment
+        pha
+
+        lda #$36
+        sta $01
+        lda #$04   ; easyflash off
+        sta $de02
+        pla
+        ldx #$00
+        rts
+        
+
+    ; uint8_t __fastcall__ EFS_format_wrapper(void);
+    _EFS_format_wrapper:
+        ; bank easyflash in
+        lda #$37
+        sta $01
+        lda #$87   ; led, 16k mode
+        sta $de02
+        lda #$00   ; EFSLIB_ROM_BANK
+        sta $de00
+
+        jsr EFS_format
+        pha
+
+        lda #$36
+        sta $01
+        lda #$04   ; easyflash off
+        sta $de02        
+        pla
+        ldx #$00
+        rts
+        
 
     ; char* __fastcall__ EFS_get_endadress(void);
     _EFS_get_endadress:

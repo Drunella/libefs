@@ -1,6 +1,11 @@
 ToDo
 ====
 
+- changes: only one banking mode necessary?
+- changes: only one size field necessary?
+- fixed functions to get area 1 and 2 data
+- only use one readef method with several initializations
+
 - rw efs
   + alternate between two equally sized areas (ll and lh of same banks
     or lh of different banks or mixed)

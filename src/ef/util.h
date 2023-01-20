@@ -33,6 +33,9 @@ void menu_clear(uint8_t start, uint8_t stop);
 void menu_option(uint8_t x, uint8_t y, char key, char *desc);
 char* gettextxy(uint8_t x, uint8_t y, uint8_t len);
 
+uint8_t __fastcall__ EFS_format_wrapper(void);
+uint8_t __fastcall__ EFS_defragment_wrapper(void);
+
 char* __fastcall__ EFS_get_endadress(void);
 uint8_t __fastcall__ EFS_readst_wrapper(void);
 void __fastcall__ EFS_setnam_wrapper(char* name, uint8_t length);
