@@ -42,7 +42,7 @@
 .import efs_readef_high
 .import efs_readef_low
 
-.import efs_init_setstartbank
+.import efs_setstartbank_ext
 
 .import rom_config_get_value
 .import rom_config_prepare_config
@@ -146,7 +146,7 @@
 
       @area2:
         lda dirload_area_var
-        cmp #$01
+        cmp #$02
         bne @done  ; current area 2; != list 3
         lda #libefs_config::area_2
         jsr rom_dirload_prepare
@@ -166,10 +166,11 @@
         ; a offset in configuration
         sta dirload_temp_var_zp
 
-        jsr efs_init_setstartbank
+;        jsr efs_init_setstartbank
         ldy dirload_temp_var_zp
         lda ($35), y  ; at libefs_config::libefs_area::bank
-        jsr efs_generic_command
+;        jsr efs_generic_command
+        jsr efs_setstartbank_ext
 
         ; set read ef code
         jsr efs_init_readef

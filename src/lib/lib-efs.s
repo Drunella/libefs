@@ -70,7 +70,9 @@
 .export restore_zeropage
 .export backup_zeropage
 
-.export efs_init_setstartbank
+;.export efs_init_setstartbank
+.export efs_setstartbank_ext
+
 .export rom_config_get_value
 .export rom_config_prepare_config
 
@@ -254,7 +256,7 @@
       .endif
 
 
-    efs_init_setstartbank:
+/*    efs_init_setstartbank:
         ldy #<(@codeend - @code - 1)
       : lda @code, y
         sta efs_generic_command, y
@@ -269,7 +271,7 @@
        @codeend:
       .if (@codeend - @code) > GENERIC_COMMAND_SIZE
       .error "dynamic code setstartbank to large"
-      .endif
+      .endif*/
 
 
     efs_init_readmem:
@@ -860,10 +862,11 @@
         tya
         pha  ; save y
 
-        jsr efs_init_setstartbank
+;;        jsr efs_init_setstartbank
         tsx
         lda $0103, x  ; a register
-        jsr efs_generic_command
+;;        jsr efs_generic_command
+        jsr efs_setstartbank_ext
 
         ; set read ef code
         jsr efs_init_readef
@@ -1826,9 +1829,10 @@
         ;   39/3a: offset in bank (with $8000 added)
         ;   3b/3c/fd: size
         ;   3e/3f: filedata
-        jsr efs_init_setstartbank   ; prepare bank
+;        jsr efs_init_setstartbank   ; prepare bank
         lda zp_var_x8
-        jsr efs_generic_command
+;        jsr efs_generic_command
+        jsr efs_setstartbank_ext
 
         jsr efs_init_readmem
         
@@ -2136,9 +2140,10 @@
         lda $3d  ; efs_directory_entry + efs_directory::size_upper
         jsr EAPISetLen
 
-        jsr efs_init_setstartbank
+;        jsr efs_init_setstartbank
         lda $38  ; efs_directory_entry + efs_directory::bank
-        jsr efs_generic_command
+;        jsr efs_generic_command
+        jsr efs_setstartbank_ext
 
         rts
 
@@ -2362,12 +2367,13 @@
         jsr efs_readef_pointer_advance
 
         ; prepare bank
-        jsr efs_init_setstartbank
+;        jsr efs_init_setstartbank
         jsr rom_flags_get_area
         jsr rom_config_get_areastart
         tay
         lda (zp_var_x5), y  ; at libefs_config::areax::bank
-        jsr efs_generic_command
+;        jsr efs_generic_command
+        jsr efs_setstartbank_ext
 
         iny                 ; banking mode
         iny
@@ -2515,11 +2521,12 @@
 
         jsr rom_config_prepare_config
 
-        jsr efs_init_setstartbank
+;        jsr efs_init_setstartbank
         ;lda #$00  ; ### 0, could be different bank
         ldy dirsearch_temp_var_zp
         lda ($35), y  ; at libefs_config::libefs_area::bank
-        jsr efs_generic_command
+;        jsr efs_generic_command
+        jsr efs_setstartbank_ext
 
         ; set read ef code
         jsr efs_init_readef
@@ -2820,7 +2827,7 @@
 
         jsr rom_config_prepare_config
 
-        jsr efs_init_setstartbank
+        jsr efs_init_set startbank
         ;lda #$00  ; ### 0, could be different bank
         ldy dirsearch_temp_var_zp
         lda ($35), y  ; at libefs_config::libefs_area::bank
@@ -2861,7 +2868,7 @@
         jsr efs_readef_pointer_advance
 
         ; prepare bank
-        jsr efs_init_setstartbank
+        jsr efs_init_set startbank
         lda zp_var _x7
         jsr rom_config_get_areastart
         tay
