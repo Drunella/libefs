@@ -33,14 +33,28 @@
 .import restore_zeropage
 .import backup_zeropage
 
-.import efs_init_readef
-.import efs_readef_pointer_reverse
-.import efs_readef_pointer_dec
-.import efs_readef_read_and_inc
-.import efs_readef_pointer_advance
-.import efs_readef
-.import efs_readef_high
-.import efs_readef_low
+.import efs_init_readef_bank
+.import efs_init_readef_bank_rely
+.import efs_readef_bank
+.import efs_readef_bank_low
+.import efs_readef_bank_high
+.import efs_readef_bank_bank
+.import efs_readef_bank_read_and_inc
+.import efs_readef_bank_pointer_inc
+.import efs_readef_bank_pointer_dec
+.import efs_readef_bank_pointer_advance
+.import efs_readef_bank_pointer_reverse
+.import efs_readef_bank_pointer_setall
+.import efs_readef_bank_pointer_set
+
+;.import efs_init_readef
+;.import efs_readef_pointer_reverse
+;.import efs_readef_pointer_dec
+;.import efs_readef_read_and_inc
+;.import efs_readef_pointer_advance
+;.import efs_readef
+;.import efs_readef_high
+;.import efs_readef_low
 
 .import efs_setstartbank_ext
 
@@ -93,16 +107,6 @@
 
 
     rom_dirload_begin:
-;        jsr efs_init_setstartbank
-;        lda #$00  ; ### 0, could be different bank CONFIG ###
-;        jsr efs_generic_command
-
-        ; set read code
-;        jsr efs_init_readef
-;        lda #$00
-;        sta efs_readef_low
-;        lda #$a0
-;        sta efs_readef_high
         lda #$00
         sta dirload_area_var
         jsr efs_dirload_nextarea
@@ -132,6 +136,7 @@
         jsr rom_dirload_prepare
         jmp @cont
 
+        ; ### only look into active area
       @area1:
         lda #libefs_config::areas
         jsr rom_config_get_value
@@ -166,24 +171,28 @@
         ; a offset in configuration
         sta dirload_temp_var_zp
 
+        ; set read ef code
+        jsr efs_init_readef_bank
+
 ;        jsr efs_init_setstartbank
         ldy dirload_temp_var_zp
         lda ($35), y  ; at libefs_config::libefs_area::bank
 ;        jsr efs_generic_command
         jsr efs_setstartbank_ext
+        sta efs_readef_bank_bank
 
-        ; set read ef code
-        jsr efs_init_readef
+;        ; set read ef code
+;        jsr efs_init_readef_bank
 
         inc dirload_temp_var_zp
         ldy dirload_temp_var_zp
         lda ($35), y  ; at libefs_config::libefs_area::addr low
-        sta efs_readef_low
+        sta efs_readef_bank_low
 
         inc dirload_temp_var_zp
         ldy dirload_temp_var_zp
         lda ($35), y  ; at libefs_config::libefs_area::addr high
-        sta efs_readef_high
+        sta efs_readef_bank_high
 
         ; banking mode and size is irrelevant in dirload
 ;        inc dirload_temp_var_zp
@@ -419,7 +428,7 @@
         ; check if directory cursor is out of bounds
         ; .C set if out of bounds
         ; ### correct boundary configuration
-        lda efs_readef_high
+        lda efs_readef_bank_high
         cmp #$b8
         rts
 
@@ -428,16 +437,16 @@
         ; if filename -> 20
         ; if finish -> 15
         lda #16  ; pointer starts at begin of dir entry
-        jsr efs_readef_pointer_advance
+        jsr efs_readef_bank_pointer_advance
         jsr rom_dirload_checkboundary
         bcs @areadone   ; directory terminates
-        jsr efs_readef  ; read flag
+        jsr efs_readef_bank  ; read flag
         sta dirload_temp_var_zp
         and #%00011111  ; mask out hidden and reserved flag fields
         bne @notinvalid  ; is file invalid -> no
       @invalid:
         lda #8  ; -> yes, invalid
-        jsr efs_readef_pointer_advance
+        jsr efs_readef_bank_pointer_advance
         jmp rom_dirload_sm_linenend
 
       @notinvalid:
@@ -551,7 +560,7 @@
     rom_dirload_sm_filename:
         ; pointer is at the name
         ldx dirload_state_var
-        jsr efs_readef_read_and_inc
+        jsr efs_readef_bank_read_and_inc
         bne :+
         lda #$20  ; space if 0 char
       : inc dirload_state_var
@@ -567,12 +576,12 @@
     rom_dirload_sm_sizelow:
         ; pointer is at flags
         lda #5  ; advance to size low
-        jsr efs_readef_pointer_advance
-        jsr efs_readef_read_and_inc  ; size low
+        jsr efs_readef_bank_pointer_advance
+        jsr efs_readef_bank_read_and_inc  ; size low
         beq :+
         lda #$01
       : sta $38  ; a is 0 after branch
-        jsr efs_readef  ; read mid
+        jsr efs_readef_bank  ; read mid
         clc
         adc $38
         inc dirload_temp_state_zp
@@ -601,24 +610,24 @@
 
     rom_dirload_sm_sizehigh:
         ; pointer is at size mid
-        jsr efs_readef_pointer_dec
-        jsr efs_readef_read_and_inc  ;low
+        jsr efs_readef_bank_pointer_dec
+        jsr efs_readef_bank_read_and_inc  ;low
         beq :+
         lda #$01
       : sta $38  ; a is zero iafter branch
-        jsr efs_readef_read_and_inc  ;mid
+        jsr efs_readef_bank_read_and_inc  ;mid
         clc
         adc $38
         sta $38
         lda #$00
         sta $39
-        jsr efs_readef ; high
+        jsr efs_readef_bank ; high
         adc $39
         sta $39
 
         inc dirload_temp_state_zp
         lda #23  ; reverse pointer to name
-        jsr efs_readef_pointer_reverse
+        jsr efs_readef_bank_pointer_reverse
 
         lda #$00
         ldx #$09
@@ -675,7 +684,7 @@
 
     rom_dirload_sm_type_begin:
         ; pointer is at flags
-        jsr efs_readef
+        jsr efs_readef_bank
         and #$1f
         cmp #$09
         bcc :+
@@ -687,7 +696,7 @@
         sta dirload_state_var
 
         lda #8  ; advance pointer to begin of next name
-        jsr efs_readef_pointer_advance
+        jsr efs_readef_bank_pointer_advance
         ; no return here
 
     rom_dirload_sm_type_next:

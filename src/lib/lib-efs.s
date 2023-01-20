@@ -365,7 +365,7 @@
     efs_setstartbank_ext:
         ; jsr EAPISetBank  :  $20, <EAPISetBank, >EAPISetBank
         ; jmp efs_enter_pha : $4c, <efs_enter_pha, >efs_enter_pha
-        efs_bankout_source := __EFS_RAM_LOAD__ + (__EFS_RAM_RUN__ - efs_bankout)
+        efs_bankout_source := __EFS_RAM_LOAD__ + (efs_bankout - __EFS_RAM_RUN__)
         pha
         lda #$20
         sta efs_bankout + 0
@@ -775,6 +775,7 @@
 
 ;.scope efs_readef
 
+/*
 .export efs_init_readef
 .export efs_readef
 .export efs_readef_low
@@ -877,7 +878,7 @@
         sta efs_readef_low
         pla
         rts
-
+*/
 
 
 ; --------------------------------------------------------------------
@@ -885,6 +886,7 @@
 ; and independent bank storage
 
 .export efs_init_readef_bank
+.export efs_init_readef_bank_rely
 .export efs_readef_bank
 .export efs_readef_bank_low
 .export efs_readef_bank_high
@@ -1110,7 +1112,7 @@
     rom_config_activearea:
         ; .C set if error
         ; config must be initialized
-        jsr efs_init_readef
+        jsr efs_init_readef_bank
 
         lda #libefs_config::area_1
         jsr rom_config_checkarea
@@ -1234,14 +1236,14 @@
         pla
         tax
         pla
-        jsr efs_readef_pointer_setall
+        jsr efs_readef_bank_pointer_setall
 
         lda #16
-        jsr efs_readef_pointer_advance
-        jsr efs_readef
+        jsr efs_readef_bank_pointer_advance
+        jsr efs_readef_bank
         pha
         lda #16
-        jsr efs_readef_pointer_reverse
+        jsr efs_readef_bank_pointer_reverse
         pla
         cmp #$ff
         beq :+
@@ -1763,9 +1765,9 @@
         ;   3e/3f: name
         jsr efs_init_eapiwriteinc  ; repair dynamic code
 
-        lda efs_readef_low
+        lda efs_readef_bank_low
         tax
-        lda efs_readef_high
+        lda efs_readef_bank_high
         tay
         lda #$d0   ; ### bank mode from config
         jsr EAPISetPtr        
@@ -1905,46 +1907,46 @@
         ;   38: bank
         ;   39/3a: offset in bank (without $8000 added)
         ;   x/y: address of next dir entry
-;        lda efs_readef_low
+;        lda efs_readef_bank_low
 ;        pha
-;        lda efs_readef_high
+;        lda efs_readef_bank_high
 ;        pha
         
         lda #16
-        jsr efs_readef_pointer_advance
+        jsr efs_readef_bank_pointer_advance
 
       @loop:
-        jsr efs_readef_read_and_inc
+        jsr efs_readef_bank_read_and_inc
         cmp #$ff
         beq @leave
-        jsr efs_readef_read_and_inc  ; reads bank
+        jsr efs_readef_bank_read_and_inc  ; reads bank
         sta zp_var_x8
-        jsr efs_readef_pointer_inc   ; reserved
-        jsr efs_readef_read_and_inc  ; offset low
+        jsr efs_readef_bank_pointer_inc   ; reserved
+        jsr efs_readef_bank_read_and_inc  ; offset low
         sta zp_var_x9
-        jsr efs_readef_read_and_inc  ; offset high
+        jsr efs_readef_bank_read_and_inc  ; offset high
         sta zp_var_xa
-        jsr efs_readef_read_and_inc  ; size low
+        jsr efs_readef_bank_read_and_inc  ; size low
         sta zp_var_xb
-        jsr efs_readef_read_and_inc  ; size mid
+        jsr efs_readef_bank_read_and_inc  ; size mid
         sta zp_var_xc
-        jsr efs_readef_read_and_inc  ; size high
+        jsr efs_readef_bank_read_and_inc  ; size high
         sta zp_var_xd
 
         lda #16    ; add by name 
-        jsr efs_readef_pointer_advance
+        jsr efs_readef_bank_pointer_advance
         jmp @loop
 
       @leave:
         lda #17    ; to directory begin
-        jsr efs_readef_pointer_reverse
-;        ldx efs_readef_low
-;        ldy efs_readef_high
+        jsr efs_readef_bank_pointer_reverse
+;        ldx efs_readef_bank_low
+;        ldy efs_readef_bank_high
 
 ;        pla
-;        sta efs_readef_high
+;        sta efs_readef_bank_high
 ;        pla
-;        sta efs_readef_low
+;        sta efs_readef_bank_low
 
         rts
 
@@ -1979,28 +1981,28 @@
         ; directory is set properly
         ; returns free directory entries in a
         ; the last entry does not count
-        lda efs_readef_low
+        lda efs_readef_bank_low
         pha
-        lda efs_readef_high
+        lda efs_readef_bank_high
         pha
         
         ldx #$00
         lda #16
-        jsr efs_readef_pointer_advance
+        jsr efs_readef_bank_pointer_advance
 
       : dex
-        jsr efs_readef
+        jsr efs_readef_bank
         cmp #$ff
         beq :+
         lda #24
-        jsr efs_readef_pointer_advance
+        jsr efs_readef_bank_pointer_advance
         jmp :-
 
         ; reset directory
       : pla 
-        sta efs_readef_high
+        sta efs_readef_bank_high
         pla
-        sta efs_readef_low
+        sta efs_readef_bank_low
 
         txa
         rts
@@ -2012,14 +2014,14 @@
         ; directory is set properly
         ; returns free space in
         ; 3b/3c/3d (low/mid/high)
-        lda efs_readef_low
+        lda efs_readef_bank_low
         pha
-        lda efs_readef_high
+        lda efs_readef_bank_high
         pha
         
         ldx #$00
         lda #16
-        jsr efs_readef_pointer_advance
+        jsr efs_readef_bank_pointer_advance
         lda #$00
         sta zp_var_xb
         sta zp_var_xc
@@ -2027,37 +2029,37 @@
 
       @loop:
         ; ### check overflow
-        jsr efs_readef
+        jsr efs_readef_bank
         cmp #$ff
         beq @leave
         and #$1f
         beq @skip
         lda #5  ; move to size
-        jsr efs_readef_pointer_advance
+        jsr efs_readef_bank_pointer_advance
         clc
-        jsr efs_readef_read_and_inc
+        jsr efs_readef_bank_read_and_inc
         adc zp_var_xb
         sta zp_var_xb
-        jsr efs_readef_read_and_inc
+        jsr efs_readef_bank_read_and_inc
         adc zp_var_xc
         sta zp_var_xc
-        jsr efs_readef
+        jsr efs_readef_bank
         adc zp_var_xd
         sta zp_var_xd
         lda #17
-        jsr efs_readef_pointer_advance
+        jsr efs_readef_bank_pointer_advance
         jmp @loop
       @skip:
         lda #24
-        jsr efs_readef_pointer_advance
+        jsr efs_readef_bank_pointer_advance
         jmp @loop
 
         ; reset directory
       @leave:
         pla 
-        sta efs_readef_high
+        sta efs_readef_bank_high
         pla
-        sta efs_readef_low
+        sta efs_readef_bank_low
 
         rts
 
@@ -2068,14 +2070,14 @@
         ; directory is set properly
         ; returns free space in
         ; 3b/3c/fd (low/mid/high)
-        lda efs_readef_low
+        lda efs_readef_bank_low
         pha
-        lda efs_readef_high
+        lda efs_readef_bank_high
         pha
 
         ldx #$00
         lda #16
-        jsr efs_readef_pointer_advance
+        jsr efs_readef_bank_pointer_advance
         lda #$00
         sta zp_var_xb
         sta zp_var_xc
@@ -2083,31 +2085,31 @@
 
       @loop:
         ; ### check overflow
-        jsr efs_readef
+        jsr efs_readef_bank
         cmp #$ff
         beq :+  ; leave
         lda #5  ; move to size
-        jsr efs_readef_pointer_advance
+        jsr efs_readef_bank_pointer_advance
         clc
-        jsr efs_readef_read_and_inc
+        jsr efs_readef_bank_read_and_inc
         adc zp_var_xb
         sta zp_var_xb
-        jsr efs_readef_read_and_inc
+        jsr efs_readef_bank_read_and_inc
         adc zp_var_xc
         sta zp_var_xc
-        jsr efs_readef
+        jsr efs_readef_bank
         adc zp_var_xd
         sta zp_var_xd
         lda #17
-        jsr efs_readef_pointer_advance
+        jsr efs_readef_bank_pointer_advance
 
         jmp @loop
 
         ; reset directory
       : pla
-        sta efs_readef_high
+        sta efs_readef_bank_high
         pla
-        sta efs_readef_low
+        sta efs_readef_bank_low
 
         rts
 
@@ -2132,7 +2134,7 @@
         clc
         adc #$80
         tay
-        lda #$d0  ; eapi bank mode
+        lda #$d0  ; eapi bank mode ### from config
         jsr EAPISetPtr
 
         ldx $3b  ; efs_directory_entry + efs_directory::size_low
@@ -2364,7 +2366,7 @@
 
       @scratch:
         lda #16  ; advance pointer to flags
-        jsr efs_readef_pointer_advance
+        jsr efs_readef_bank_pointer_advance
 
         ; prepare bank
 ;        jsr efs_init_setstartbank
@@ -2379,8 +2381,8 @@
         iny
         iny
         lda (zp_var_x5), y  ; at libefs_config::areax::mode
-        ldx efs_readef_low
-        ldy efs_readef_high
+        ldx efs_readef_bank_low
+        ldy efs_readef_bank_high
         jsr EAPISetPtr
 
         ldx #$01
@@ -2466,6 +2468,7 @@
         lda #libefs_config::area_2
         jsr rom_dirsearch_begin
         jsr rom_dirsearch_find
+        bcc @found
 
         ; not found
         lda #$00
@@ -2487,28 +2490,28 @@
     rom_dirsearch_filedata:
         ; position is at flags, bank is the next data to load
         ; all zp variables are free and can be used
-        jsr efs_readef_read_and_inc  ; efs_io_byte  ; bank
+        jsr efs_readef_bank_read_and_inc  ; efs_io_byte  ; bank
         sta $38
-        jsr efs_readef_read_and_inc  ; efs_io_byte  ; bank high
+        jsr efs_readef_bank_read_and_inc  ; efs_io_byte  ; bank high
 
         ; offset
-        jsr efs_readef_read_and_inc  ; efs_io_byte
+        jsr efs_readef_bank_read_and_inc  ; efs_io_byte
         sta $39
-        jsr efs_readef_read_and_inc  ; efs_io_byte
+        jsr efs_readef_bank_read_and_inc  ; efs_io_byte
         ; memory offset will be added later
         sta $3a
 
         ; size
-        jsr efs_readef_read_and_inc  ; efs_io_byte
+        jsr efs_readef_bank_read_and_inc  ; efs_io_byte
         sta $3b
-        jsr efs_readef_read_and_inc  ; efs_io_byte
+        jsr efs_readef_bank_read_and_inc  ; efs_io_byte
         sta $3c
-        jsr efs_readef_read_and_inc  ; efs_io_byte
+        jsr efs_readef_bank_read_and_inc  ; efs_io_byte
         sta $3d
 
         ; reverse to flag
         lda #24  ; reverse pointer to name
-        jsr efs_readef_pointer_reverse
+        jsr efs_readef_bank_pointer_reverse
         clc
 
         rts
@@ -2519,6 +2522,9 @@
         ; a offset in configuration
         sta dirsearch_temp_var_zp
 
+        ; set read ef code
+        jsr efs_init_readef_bank
+
         jsr rom_config_prepare_config
 
 ;        jsr efs_init_setstartbank
@@ -2527,19 +2533,20 @@
         lda ($35), y  ; at libefs_config::libefs_area::bank
 ;        jsr efs_generic_command
         jsr efs_setstartbank_ext
+        sta efs_readef_bank_bank
 
-        ; set read ef code
-        jsr efs_init_readef
+;        ; set read ef code
+;        jsr efs_init_readef_bank
 
         inc dirsearch_temp_var_zp
         ldy dirsearch_temp_var_zp
         lda ($35), y  ; at libefs_config::libefs_area::addr low
-        sta efs_readef_low
+        sta efs_readef_bank_low
 
         inc dirsearch_temp_var_zp
         ldy dirsearch_temp_var_zp
         lda ($35), y  ; at libefs_config::libefs_area::addr high
-        sta efs_readef_high
+        sta efs_readef_bank_high
 
         ; banking mode and area size is irrelevant in dirsearch
         rts
@@ -2551,7 +2558,7 @@
         ldy #$00
         ldx #$00
       @loop:
-        jsr efs_readef_read_and_inc  ; load next char
+        jsr efs_readef_bank_read_and_inc  ; load next char
         sta dirsearch_entry_zp
         inx
         
@@ -2570,7 +2577,7 @@
         bne @loop            ; more characters
         cpy #$10             ; full name length reached
         beq @match           ;   -> match
-        jsr efs_readef_read_and_inc  ; load next char
+        jsr efs_readef_bank_read_and_inc  ; load next char
         sta dirsearch_entry_zp
         inx
         lda dirsearch_entry_zp  ; if == \0
@@ -2579,7 +2586,7 @@
       @next:
         cpx #$10
         beq :+
-        jsr efs_readef_read_and_inc  ; load next char
+        jsr efs_readef_bank_read_and_inc  ; load next char
         inx
         bne @next
       : lda #$00
@@ -2589,7 +2596,7 @@
       @match:
         cpx #$10
         beq :+
-        jsr efs_readef_read_and_inc  ; load next char
+        jsr efs_readef_bank_read_and_inc  ; load next char
         inx
         bne @match
       : lda #$01
@@ -2600,7 +2607,7 @@
     rom_dirsearch_checkboundary:
         ; check if directory cursor is out of bounds
         ; .C set if out of bounds
-        lda efs_readef_high
+        lda efs_readef_bank_high
         cmp #$b8        
         rts
 
@@ -2636,7 +2643,7 @@
         jsr rom_dirsearch_checkname
 
         ; test if more entries
-        jsr efs_readef_read_and_inc  ; efs_io_byte    ; load next char
+        jsr efs_readef_bank_read_and_inc  ; efs_io_byte    ; load next char
         jsr rom_dirsearch_is_terminator
         bcs @error4    ; terminator, file not found
         cmp #$00       ; compare for invalid
@@ -2659,7 +2666,7 @@
         bne @match
       @nomatch:
         lda #$07
-        jsr efs_readef_pointer_advance
+        jsr efs_readef_bank_pointer_advance
         jmp @repeat
 
       @match:
@@ -2839,12 +2846,12 @@
         inc dirsearch_temp_var_zp
         ldy dirsearch_temp_var_zp
         lda ($35), y  ; at libefs_config::libefs_area::addr low
-        sta efs_readef_low
+        sta efs_read ef_low
 
         inc dirsearch_temp_var_zp
         ldy dirsearch_temp_var_zp
         lda ($35), y  ; at libefs_config::libefs_area::addr high
-        sta efs_readef_high
+        sta efs_read ef_high
 
         ; banking mode and area size is irrelevant in dirsearch
         rts*/
@@ -2865,7 +2872,7 @@
 
       @scratch:
         lda #16  ; advance pointer to flags
-        jsr efs_readef_pointer_advance
+        jsr efs_read ef_pointer_advance
 
         ; prepare bank
         jsr efs_init_set startbank
@@ -2881,15 +2888,15 @@
         lda (zp_var_x5), y  ; at libefs_config::areax::mode
 ;        tax                 ; save mode in x
 
-;        lda efs_readef_high  ; and address
+;        lda efs_read ef_high  ; and address
 ;        cmp #$b0
 ;        bcc :+
 ;        clc
 ;        adc #$40
 ;      : tay
 ;        txa
-        ldx efs_readef_low
-        ldy efs_readef_high
+        ldx efs_read ef_low
+        ldy efs_read ef_high
         jsr EAPISetPtr
 
         ldx #$01

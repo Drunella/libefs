@@ -155,7 +155,7 @@ build/ef/files.list:
 
 # build efs rw
 build/ef/efs-rw.dir.prg build/ef/efs-rw.files.prg: build/ef/files-rw.list
-	tools/mkefs.py -v -u -s 256000 -o 6144 -m lh -b 32 -n efs-rw -l ./build/ef/files-rw.list -f . -d ./build/ef
+	tools/mkefs.py -v -u -s 256000 -o 6144 -m lh -b 48 -n efs-rw -l ./build/ef/files-rw.list -f . -d ./build/ef
 
 # test files rw
 build/ef/files-rw.list:
