@@ -399,6 +399,16 @@
         rts
 
 
+    efs_temp_var1 := status_byte - 1
+    efs_temp_var2 := status_byte + 1
+
+    efs_finish_tempvars:
+        lda #$a9
+        sta status_byte - 1
+        lda #$60
+        sta status_byte + 1
+
+
 
 ; --------------------------------------------------------------------
 ; efs body functions
@@ -409,11 +419,13 @@
         jsr rom_config_prepare_config
 
         ; rw areas available?
-        lda #libefs_config::areas
-        jsr rom_config_get_value
-        cmp #$03
-        beq @busycheck
-        lda #ERROR_DEVICE_NOT_PRESENT
+        jsr rom_config_rw_available
+        bcc @busycheck
+;        lda #libefs_config::areas
+;        jsr rom_config_get_value
+;        cmp #$03
+;        beq @busycheck
+;        lda #ERROR_DEVICE_NOT_PRESENT
         bne @error
         rts
 
@@ -424,8 +436,8 @@
         bne @error
 
       @process:
-        jsr rom_config_activearea
-        jsr rom_flags_set_area
+;        jsr rom_config_activearea
+;        jsr rom_flags_set_area
 
         jsr rom_flags_get_area
         tax
@@ -435,6 +447,8 @@
 
         jsr rom_flags_get_area
         jsr rom_defragment_erasearea
+
+;        jsr rom_config_prepare_config
 
         clc
         rts
@@ -1098,6 +1112,84 @@
       : clc
         rts
 
+    rom_config_get_area_bank:
+        jsr rom_flags_get_area
+        jsr rom_config_areaoffset
+        clc
+        adc #libefs_area::bank
+        jmp rom_config_get_value
+
+    rom_config_get_area_bank_invert:
+        jsr rom_flags_get_area_invert
+        jsr rom_config_areaoffset
+        clc
+        adc #libefs_area::bank
+        jmp rom_config_get_value
+
+    rom_config_get_are_bank_zero:
+        lda #libefs_config::area_0 + libefs_area::bank
+        jmp rom_config_get_value
+
+
+    rom_config_get_area_addr_low:
+        jsr rom_flags_get_area
+        jsr rom_config_areaoffset
+        clc
+        adc #libefs_area::addr
+        jmp rom_config_get_value
+
+    rom_config_get_area_addr_low_invert:
+        jsr rom_flags_get_area_invert
+        jsr rom_config_areaoffset
+        clc
+        adc #libefs_area::addr
+        jmp rom_config_get_value
+
+
+    rom_config_get_area_addr_high:
+        jsr rom_flags_get_area
+        jsr rom_config_areaoffset
+        clc
+        adc #libefs_area::addr + 1
+        jmp rom_config_get_value
+
+    rom_config_get_area_addr_high_invert:
+        jsr rom_flags_get_area_invert
+        jsr rom_config_areaoffset
+        clc
+        adc #libefs_area::addr + 1
+        jmp rom_config_get_value
+
+
+    rom_config_get_area_mode:
+        jsr rom_flags_get_area
+        jsr rom_config_areaoffset
+        clc
+        adc #libefs_area::mode
+        jmp rom_config_get_value
+
+    rom_config_get_area_mode_invert:
+        jsr rom_flags_get_area_invert
+        jsr rom_config_areaoffset
+        clc
+        adc #libefs_area::mode
+        jmp rom_config_get_value
+
+
+    rom_config_get_area_size:
+        jsr rom_flags_get_area
+        jsr rom_config_areaoffset
+        clc
+        adc #libefs_area::size
+        jmp rom_config_get_value
+
+    rom_config_get_area_size_invert:
+        jsr rom_flags_get_area_invert
+        jsr rom_config_areaoffset
+        clc
+        adc #libefs_area::size
+        jmp rom_config_get_value
+
 
     rom_config_get_value:
         ; config is stored in 35/36
@@ -1122,7 +1214,7 @@
         rts
 
 
-    rom_config_activearea:
+/*    rom_config_activearea:
         ; .C set if error
         ; config must be initialized
         jsr efs_init_readef
@@ -1146,6 +1238,29 @@
         jsr rom_config_get_areastart
         jsr rom_config_set_activearea
         pla
+        rts*/
+
+    rom_config_areaoffset:
+        ; the value to get to area x
+        ; only values 0, 1, 2 are allowed
+        clc
+        cmp #$00
+        beq @area0
+        cmp #$01
+        beq @area1
+        cmp #$02
+        beq @area2
+
+      @area0:
+        lda #libefs_config::area_0
+        rts
+
+      @area1:
+        lda #libefs_config::area_1
+        rts
+
+      @area2:
+        lda #libefs_config::area_2
         rts
 
 
@@ -1173,17 +1288,49 @@
         sta zp_pointer_configuration
         lda #>LIBEFS_CONFIG_START
         sta zp_pointer_configuration + 1
-        rts
+;        rts
+        jmp @next
 
       @default:
         lda #<efs_default_config
         sta zp_pointer_configuration
         lda #>efs_default_config
         sta zp_pointer_configuration + 1
+;        rts
+
+      @next:
+        jsr rom_config_rw_available
+        bcc @nextrw
+        lda #$00
+        jsr rom_flags_set_area
         rts
 
+      @nextrw:
+        jsr efs_init_readef
 
-    rom_config_get_areastart:
+        lda #libefs_config::area_1
+        jsr rom_config_checkarea
+        bcc :+  ; check area 2
+        ; in area 1
+        lda #$01
+        bne @check
+
+      : lda #libefs_config::area_2
+        jsr rom_config_checkarea
+        bcc :+
+        ; in area 2
+        lda #$02
+        bne @check
+      : lda #$01  ; both empty, area 1
+      @check:
+;        pha
+;        jsr rom_config_get_areastart
+;        jsr rom_config_set_activearea
+        jsr rom_flags_set_area
+;        pla
+        rts
+
+/*    rom_config_get_areastart:
         ; the value to get to area x
         ; only values 0, 1, 2 are allowed
         cmp #$00
@@ -1211,10 +1358,10 @@
 ;        adc #.sizeof(libefs_area)
 ;        dey
 ;        bne :-
-;        rts
+;        rts*/
 
 
-    rom_config_set_activearea:
+/*    rom_config_set_activearea:
         ; sets the config pointer to the area start
         ; area distance value in a
         ;jsr rom_config_get_areastart
@@ -1223,7 +1370,7 @@
         sta zp_pointer_configuration
         bcc :+
         inc zp_pointer_configuration + 1
-      : rts
+      : rts*/
 
 
     rom_config_checkarea:
@@ -1280,33 +1427,44 @@
     rom_defragment_erasearea:
         ; area to erase in a
         pha
-        jsr rom_config_prepare_config
+        jsr rom_config_prepare_config  ; ### necessary?
+
+        jsr rom_config_rw_available
+        bcs @error_pla
 
         ; rw areas available?
-        lda #libefs_config::areas
-        jsr rom_config_get_value
-        cmp #$03
-        bne @error_pla
+;        lda #libefs_config::areas
+;        jsr rom_config_get_value
+;        cmp #$03
+;        bne @error_pla
 
         pla
         cmp #$00
         beq @error
-
-        ; ### only allow area 1 and 2
+        cmp #$01
+        beq @next
+        jmp @error
+        cmp #$02
+        beq @next
+        jmp @error
 
         ; go to area
-        jsr rom_config_get_areastart
-        jsr rom_config_set_activearea
+      @next:
+        jsr rom_flags_set_area
+;        jsr rom_config_get_areastart
+;        jsr rom_config_set_activearea
 
         ; init erase sector call
         jsr efs_init_eapierasesector
 
-        lda #libefs_area::bank
-        jsr rom_config_get_value
+;        lda #libefs_area::bank
+;        jsr rom_config_get_value
+        jsr rom_config_get_area_bank
         sta zp_var_x8
 
-        lda #libefs_area::mode
-        jsr rom_config_get_value
+;        lda #libefs_area::mode
+;        jsr rom_config_get_value
+        jsr rom_config_get_area_mode
         sta zp_var_x7
 
         lda #$80  ; for ll and lh
@@ -1317,8 +1475,9 @@
         lda #$a0  ; for hh
         sta zp_var_xa
 
-      : lda #libefs_area::size
-        jsr rom_config_get_value
+;      : lda #libefs_area::size
+;        jsr rom_config_get_value
+      : jsr rom_config_get_area_size
         lsr a
         lsr a
         lsr a
@@ -1375,14 +1534,12 @@
         ; copies all files to the inactive area and formats the active area
         ; x : old area
         ; y : new area
-        ; 37: mode
-
-        ; ### file and dir reading will be done by efs_readef (stores bank and address)
-        ; ### additional storage will save the unused address (dir when file reading, etc)
-
-        ; ### writing will be done with EAPISetPtr and EAPIWriteFlashInc
-        ; ### data to write will be stored in 38: bank; 39/3a: address; 3b/3c/fd: size
-        ; ### directory pointer will be stored in 3e/3f and filename_length(bank)
+        ; reading file and dir will be done by efs_readef (stores bank and address)
+        ;   additional storage will save the unused address (dir when file reading, etc)
+        ;   efs_temp_var1 (mode)
+        ; writing will be done with EAPISetPtr and EAPIWriteFlashInc
+        ;   data to write will be stored in 37: mode;  38: bank; 39/3a: address; 3b/3c/fd: size
+        ;   directory pointer will be stored in 3e/3f and efs_temp_var2(bank)
         tya  ; new area
         pha
         txa  ; old area
@@ -1393,49 +1550,62 @@
         jsr efs_init_eapiwriteinc
 
         ; prepare source
-        jsr rom_config_prepare_config
+;        jsr rom_config_prepare_config
         pla  ; old area
-        jsr rom_config_get_areastart
-        jsr rom_config_set_activearea
+        jsr rom_flags_set_area
+;        jsr rom_config_get_areastart
+;        jsr rom_config_set_activearea
 
-        ldy #$00
-        lda #libefs_area::bank
-        jsr rom_config_get_value
+        ;ldy #$00
+;        lda #libefs_area::bank
+;        jsr rom_config_get_value
+        jsr rom_config_get_area_bank
         sta efs_readef_bank
 
-        lda #libefs_area::addr
-        jsr rom_config_get_value
+;        lda #libefs_area::addr
+;        jsr rom_config_get_value
+        jsr rom_config_get_area_addr_low
         sta efs_readef_low
-        lda #libefs_area::addr + 1
-        jsr rom_config_get_value
+;        lda #libefs_area::addr + 1
+;        jsr rom_config_get_value
+        jsr rom_config_get_area_addr_high
         sta efs_readef_high
 
-        lda #libefs_area::mode
-        jsr rom_config_get_value
-        sta zp_var_x7
+;        lda #libefs_area::mode
+;        jsr rom_config_get_value
+        jsr rom_config_get_area_mode
+        sta efs_temp_var1
+;        sta zp_var_x7
 
         ; prepare destination
-        jsr rom_config_prepare_config
+;        jsr rom_config_prepare_config
         pla  ; new area
-        jsr rom_config_get_areastart
-        jsr rom_config_set_activearea
+;        jsr rom_config_get_areastart
+;        jsr rom_config_set_activearea
+;        jsr rom_flags_set_area
 
-        lda #libefs_area::bank  ; bank
-        jsr rom_config_get_value
+;        lda #libefs_area::bank  ; bank
+;        jsr rom_config_get_value
+        jsr rom_config_get_area_bank_invert
         sta zp_var_x8
-        sta filename_length
+        sta efs_temp_var2
 
-        lda #libefs_area::addr  ; address low
-        jsr rom_config_get_value
+;        lda #libefs_area::addr  ; address low
+;        jsr rom_config_get_value
+        jsr rom_config_get_area_addr_low_invert
         sta zp_var_x9  ; file pointer 
         sta zp_var_xe  ; dir pointer
 
-        lda #libefs_area::addr + 1 ; address high
-        jsr rom_config_get_value
+;        lda #libefs_area::addr + 1 ; address high
+;        jsr rom_config_get_value
+        jsr rom_config_get_area_addr_high_invert
         sta zp_var_xf  ; dir pointer
         clc
         adc #$18  ; ### offset for files start, from config?
         sta zp_var_xa  ; file pointer
+
+        jsr rom_config_get_area_mode_invert
+        sta zp_var_x7
 
         ; start iterating through source directory
       @loop:
@@ -1486,6 +1656,7 @@
 
       @leave:
         ; ### call defragment clearall
+        jsr efs_finish_tempvars
         rts
 
 
@@ -1493,7 +1664,7 @@
         ; all data prepared
 
         ; set dest address
-        lda filename_length  ; has the destination directory bank
+        lda efs_temp_var2  ; has the destination directory bank
         jsr efs_setstartbank_ext
         lda zp_var_x7  ; mode
         ldx zp_var_xe
@@ -1575,7 +1746,7 @@
         sta zp_var_x8  ; ### redundant ?
 
         jsr efs_readef_swap
-        lda filename_length  ; has the destination directory bank
+        lda efs_temp_var2  ; has the destination directory bank
         jsr efs_setstartbank_ext
 
         clc
@@ -1600,25 +1771,26 @@
         asl
         asl
         sta zp_var_x8
-        inc filename_length
+        inc efs_temp_var2
+        ; ### call defragment warning
       @noinc:
         rts
 
 
     rom_defragment_copy_data_sourceinc:
-        ; increases source file address according to mode ($37)
+        ; increases source file address according to mode (efs_temp_var1)
         ; inc to next position
         inc efs_readef_low
         bne @noinc
 
         ; inc page
         inc efs_readef_high
-        lda zp_var_x7
+        lda efs_temp_var1
         and #$e0
         cmp efs_readef_high
         bne @noinc
         ; inc bank
-        lda zp_var_x7
+        lda efs_temp_var1
         asl
         asl
         asl
@@ -1642,10 +1814,10 @@
     rom_filesave_conditions:
         ; checks if conditions to save are fulfilled
         ; .sec if save is not possible
-        jsr rom_config_prepare_config
+        jsr rom_config_prepare_config  ; first call to config
 
         ; rw areas available?
-        jsr rom_config_rw_available
+        jsr rom_config_rw_available   ; maybe check earlier?
         bcs @error
 ;        lda #libefs_config::areas
 ;        jsr rom_config_get_value
@@ -1654,8 +1826,8 @@
 ;        lda #ERROR_DEVICE_NOT_PRESENT
 ;        jmp @error
 
-        jsr rom_config_activearea
-        jsr rom_flags_set_area
+;        jsr rom_config_activearea
+;        jsr rom_flags_set_area
 
         ; check free space
         jsr rom_filesave_maxspace
@@ -1692,9 +1864,9 @@
         jsr rom_flags_get_area
         jsr rom_defragment_erasearea
 
-        jsr rom_config_prepare_config
-        jsr rom_config_activearea
-        jsr rom_flags_set_area
+        jsr rom_config_prepare_config  ; set new configuration
+;        jsr rom_config_activearea
+;        jsr rom_flags_set_area
 
         ; check conditions again, this time error
         jsr rom_filesave_freedirentries  ; free disk entries
@@ -1841,8 +2013,9 @@
         ; config must be set
         ; returns max blocks in 38/39/3a (low/mid/high)
         ; one chip contains 32 pages
-        lda #libefs_area::size
-        jsr rom_config_get_value
+        jsr rom_config_get_area_size
+;        lda #libefs_area::size
+;        jsr rom_config_get_value
         tax       ; save value
         lsr
         lsr
@@ -2022,12 +2195,14 @@
         ;   filename_length
         ; result
         jsr rom_config_prepare_config
-        jsr rom_config_activearea
-        jsr rom_flags_set_area
+;        jsr rom_config_activearea
+;        jsr rom_flags_set_area
  
         ; file start area
-        lda #libefs_area::bank
-        jsr rom_config_get_value
+
+;        lda #libefs_area::bank
+;        jsr rom_config_get_value
+        jsr rom_config_get_area_bank
         sta zp_var_x8
         lda #$00      ; ### get from config
         sta zp_var_x9
@@ -2464,6 +2639,7 @@
 ;   3e/3f: pointer to data
 ; 
     rom_fileload_begin:
+        ; ### load config
         jsr efs_init_eapireadinc  ; repair dynamic code
 
         ; directory entry
@@ -2707,18 +2883,20 @@
         jsr efs_readef_pointer_advance
 
         ; prepare bank
-;        jsr efs_init_setstartbank
-        jsr rom_flags_get_area
-        jsr rom_config_get_areastart
-        tay
-        lda (zp_var_x5), y  ; at libefs_config::areax::bank
-;        jsr efs_generic_command
+;        ;jsr efs_init_setstartbank
+;        jsr rom_flags_get_area
+;        jsr rom_config_get_areastart
+;        tay
+;        lda (zp_var_x5), y  ; at libefs_config::areax::bank
+        ;jsr efs_generic_command
+        jsr rom_config_get_area_bank
         jsr efs_setstartbank_ext
 
-        iny                 ; banking mode
-        iny
-        iny
-        lda (zp_var_x5), y  ; at libefs_config::areax::mode
+;        iny                 ; banking mode
+;        iny
+;        iny
+;        lda (zp_var_x5), y  ; at libefs_config::areax::mode
+        jsr rom_config_get_area_mode
         ldx efs_readef_low
         ldy efs_readef_high
         jsr EAPISetPtr
@@ -2769,7 +2947,7 @@
         sta dirsearch_name_pointer_zp + 1
 
         jsr rom_config_prepare_config
-        lda #libefs_config::areas
+        lda #libefs_config::areas  ; ###
         jsr rom_config_get_value
         cmp #$03
         beq :+
@@ -2863,7 +3041,7 @@
         ; set read ef code
         jsr efs_init_readef
 
-        jsr rom_config_prepare_config
+;        jsr rom_config_prepare_config
 
 ;        jsr efs_init_setstartbank
         ;lda #$00  ; ### 0, could be different bank

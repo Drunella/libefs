@@ -240,10 +240,7 @@ void defragment()
 
     cprintf("start\n\r");
     TIMER_reset();
-
     retval = EFS_defragment_wrapper();
-    cprintf("defragment: rt=%d\n\r", retval);
-
     timer = UINT32_MAX - TIMER_measure();
     seconds = timer / 1000000; timer = timer % 1000000;
     cprintf("defragment: rt=%d, timer=%lu.%06lu s\n\r", retval, seconds, timer);
