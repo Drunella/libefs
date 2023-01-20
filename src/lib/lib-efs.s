@@ -1086,6 +1086,19 @@
         rts
 
 
+    rom_config_rw_available:
+        ; rw areas available?
+        lda #libefs_config::areas
+        jsr rom_config_get_value
+        cmp #$03
+        beq :+
+        lda #ERROR_DEVICE_NOT_PRESENT
+        sec
+        rts
+      : clc
+        rts
+
+
     rom_config_get_value:
         ; config is stored in 35/36
         ; config address parameter in a
@@ -1616,17 +1629,15 @@
 
 
 ; --------------------------------------------------------------------
-; efs save functions
+; efs save functions for condition checking
 ; usage:
-;   38: bank
-;   39/3a: offset in bank (with $8000 added)
-;   3b/3c/fd: size
+;   3b/3c/fd: free size
+;   3e/3f: file size
 ; parameter
-;   fe/ff: name
 ;   io_start_address
 ;   io_end_address
-;   filename_address:
-;   filename_length:
+;   filename_address
+;   filename_length
 
     rom_filesave_conditions:
         ; checks if conditions to save are fulfilled
@@ -1634,41 +1645,368 @@
         jsr rom_config_prepare_config
 
         ; rw areas available?
-        lda #libefs_config::areas
-        jsr rom_config_get_value
-        cmp #$03
-        beq :+
-        lda #ERROR_DEVICE_NOT_PRESENT
-        sec
-        rts
-        
-      : jsr rom_config_activearea
+        jsr rom_config_rw_available
+        bcs @error
+;        lda #libefs_config::areas
+;        jsr rom_config_get_value
+;        cmp #$03
+;        beq @check1
+;        lda #ERROR_DEVICE_NOT_PRESENT
+;        jmp @error
+
+        jsr rom_config_activearea
         jsr rom_flags_set_area
 
-        ; enough directory entries
-        jsr rom_filesave_freedirentries
-        bne :+
+        ; check free space
+        jsr rom_filesave_maxspace
+        jsr rom_filesave_usedspace
+        jsr rom_filesave_addsize
+        jsr rom_filesave_checksize
+        bcc @check1
         lda #ERROR_DISK_FULL
-        sec
-        rts
+        jmp @error
 
-      : jsr rom_filesave_usedspace
-        jsr rom_filesave_freeblocks
-        lda zp_var_xb
-
-        ; ### check if file too large ?
-
+      @check1:
         ; ### check file size zero
+        
+      @check2:
+        ; check conditions
+        jsr rom_filesave_freedirentries  ; free disk entries
+        bcs @defragment
 
-        ; ### calculate file space
-        ; ### if file space < size: defragment
-
-        ; ### calculate free space
-        ; ### if space < size: error
+        jsr rom_filesave_maxspace
+        jsr rom_filesave_blockedspace  ; free space
+        jsr rom_filesave_addsize
+        jsr rom_filesave_checksize
+        bcs @defragment
 
         clc
         rts
 
+      @defragment:
+        jsr rom_flags_get_area
+        tax
+        jsr rom_flags_get_area_invert
+        tay
+        jsr rom_defragment_copy
+        jsr rom_flags_get_area
+        jsr rom_defragment_erasearea
+
+        jsr rom_config_prepare_config
+        jsr rom_config_activearea
+        jsr rom_flags_set_area
+
+        ; check conditions again, this time error
+        jsr rom_filesave_freedirentries  ; free disk entries
+        bcs @error
+
+        jsr rom_filesave_maxspace
+        jsr rom_filesave_blockedspace  ; free space
+        jsr rom_filesave_addsize
+        jsr rom_filesave_checksize
+        bcs @error
+
+        clc
+        rts
+      @error:
+        sec
+        sta error_byte
+        rts
+
+
+    rom_filesave_freedirentries:
+        ; config must be
+        ; directory is set properly
+        ; returns free directory entries in a
+        ; the last entry does not count
+        lda efs_readef_low
+        pha
+        lda efs_readef_high
+        pha
+
+        ldx #$00
+        lda #16
+        jsr efs_readef_pointer_advance
+
+      : dex
+        jsr efs_readef
+        cmp #$ff
+        beq :+
+        lda #24
+        jsr efs_readef_pointer_advance
+        jmp :-
+
+        ; reset directory
+      : pla
+        sta efs_readef_high
+        pla
+        sta efs_readef_low
+
+        txa
+        bne :+
+
+        lda #ERROR_DISK_FULL
+        sec
+        rts
+      : lda #$00
+        clc
+        rts
+
+
+    rom_filesave_checksize:
+        ; checks used file in 3b/3c/3d 
+        ; against available size in 38/39/3a
+;        sec
+;        lda io_end_address
+;        sbc io_start_address
+;        sta zp_var_xe
+;        lda io_end_address + 1
+;        sbc io_start_address + 1
+;        sta zp_var_xf
+
+;        lda zp_var_xd
+;        beq @compare
+;        clc  ; high byte >0? enough space
+;        rts
+      sec
+      lda zp_var_x8
+      sbc zp_var_xb
+      lda zp_var_x9
+      sbc zp_var_xc
+      lda zp_var_xa
+      sbc zp_var_xd
+      bmi :+
+      clc
+      rts
+    : sec
+      rts
+
+
+/*      @compare: ; N1: file size(3b/3c/3d); N2: available size(38/39/3a)
+        lda zp_var_xf  ; N1+1
+	eor zp_var_xc  ; N2+1
+	bmi @differentSigns
+ 
+      @sameSigns:
+	lda zp_var_xe  ; N1
+	cmp zp_var_xb  ; N2
+	lda zp_var_xf  ; N1+1
+	sbc zp_var_xc  ; N2+1
+	eor zp_var_xf  ; N1+1
+	bmi @num1IsBigger
+	jmp @num2IsBigger
+ 
+      @differentSigns:
+	clc
+	lda zp_var_xe  ; N1
+	adc zp_var_xb  ; N2
+	lda zp_var_xf  ; N1+1
+	adc zp_var_xc  ; N2+1
+	eor zp_var_xf  ; N1+1
+	bmi @num1IsBigger
+ 
+      @num2IsBigger:
+        clc
+        rts
+ 
+      @num1IsBigger:
+        sec
+        rts*/
+
+
+    rom_filesave_addsize:
+        ; fill size: io_end_address - io_start_address
+        ; temp result in 3e/3f
+        ; and add to 3b/3c/3d (low/mid/high)
+        sec
+        lda io_end_address
+        sbc io_start_address
+        sta zp_var_xe
+        lda io_end_address + 1
+        sbc io_start_address + 1
+        sta zp_var_xf
+
+        clc
+        lda zp_var_xe
+        adc zp_var_xb
+        sta zp_var_xb
+        lda zp_var_xf
+        adc zp_var_xc
+        sta zp_var_xc
+
+        rts
+
+
+    rom_filesave_maxspace:
+        ; config must be set
+        ; returns max blocks in 38/39/3a (low/mid/high)
+        ; one chip contains 32 pages
+        lda #libefs_area::size
+        jsr rom_config_get_value
+        tax       ; save value
+        lsr
+        lsr
+        lsr
+        sta zp_var_xa
+        txa      ; calulate midbyte
+        asl
+        asl
+        asl
+        asl
+        asl
+        sta zp_var_x9
+        lda #$00
+        sta zp_var_x8
+
+        sec       ; reduce by dirctory
+        lda zp_var_x9
+        sbc #$18  ; ### value from config
+        sta zp_var_x9
+        bcs :+
+        dec zp_var_xa
+
+      : rts
+
+
+    rom_filesave_usedspace:
+        ; space by real active files
+        ; config must be set correct
+        ; directory is set properly
+        ; returns free space in 3b/3c/3d (low/mid/high)
+        lda efs_readef_low
+        pha
+        lda efs_readef_high
+        pha
+
+        ldx #$00
+        lda #16
+        jsr efs_readef_pointer_advance
+        ;lda #$00
+        ;sta zp_var_xb
+        ;sta zp_var_xc
+        ;sta zp_var_xd
+
+      @loop:
+        ; ### check overflow
+        jsr efs_readef
+        cmp #$ff
+        beq @leave
+        and #$1f
+        beq @skip
+        lda #5  ; move to size
+        jsr efs_readef_pointer_advance
+
+/*        jsr efs_readef_read_and_inc
+        sec
+        tax
+        lda zp_var_xb
+        stx zp_var_xb
+        sdc zp_var_xb
+        sta zp_var_xb
+        jsr efs_readef_read_and_inc
+        tax
+        lda zp_var_xc
+        stx zp_var_xc
+        sdc zp_var_xc
+        sta zp_var_xc
+        jsr efs_readef_read_and_inc
+        tax
+        lda zp_var_xc
+        stx zp_var_xc
+        sdc zp_var_xc
+        sta zp_var_xc*/
+
+        clc
+        jsr efs_readef_read_and_inc
+        adc zp_var_xb
+        sta zp_var_xb
+        jsr efs_readef_read_and_inc
+        adc zp_var_xc
+        sta zp_var_xc
+        jsr efs_readef
+        adc zp_var_xd
+        sta zp_var_xd
+
+        lda #17
+        jsr efs_readef_pointer_advance
+        jmp @loop
+      @skip:
+        lda #24
+        jsr efs_readef_pointer_advance
+        jmp @loop
+
+        ; reset directory
+      @leave:
+        pla
+        sta efs_readef_high
+        pla
+        sta efs_readef_low
+
+        rts
+
+
+    rom_filesave_blockedspace:
+        ; space blocked by real and deleted files
+        ; config must be set, directory is set properly
+        ; returns free space in 3b/3c/fd (low/mid/high)
+        lda efs_readef_low
+        pha
+        lda efs_readef_high
+        pha
+
+        ldx #$00
+        lda #16
+        jsr efs_readef_pointer_advance
+        lda #$00
+        sta zp_var_xb
+        sta zp_var_xc
+        sta zp_var_xd
+
+      @loop:
+        ; ### check overflow
+        jsr efs_readef
+        cmp #$ff
+        beq :+  ; leave
+        lda #5  ; move to size
+        jsr efs_readef_pointer_advance
+        clc
+        jsr efs_readef_read_and_inc
+        adc zp_var_xb
+        sta zp_var_xb
+        jsr efs_readef_read_and_inc
+        adc zp_var_xc
+        sta zp_var_xc
+        jsr efs_readef
+        adc zp_var_xd
+        sta zp_var_xd
+        lda #17
+        jsr efs_readef_pointer_advance
+
+        jmp @loop
+
+        ; reset directory
+      : pla
+        sta efs_readef_high
+        pla
+        sta efs_readef_low
+
+        rts
+
+
+
+; --------------------------------------------------------------------
+; efs save functions for execution
+; usage:
+;   37: mode
+;   38: bank
+;   39/3a: offset in bank (with $8000 added)
+;   3b/3c/fd: size
+; parameter
+;   fe/ff: name
+;   io_start_address
+;   io_end_address
+;   filename_address
+;   filename_length
 
     rom_filesave_begin:
         ; prepare variables for save
@@ -1953,7 +2291,7 @@
 
 
 
-    rom_filesave_freeblocks:  ; ### ???
+/*    rom_filesave_freeblocks:  ; ### ???
         ; config must be set to either area 1 or 2
         ; returns free blocks in X/Y (x=low)
         ; one chip contains 32 pages
@@ -1973,10 +2311,10 @@
         asl
         asl
         tax
-        rts
+        rts*/
 
 
-    rom_filesave_freedirentries:  ; ### ???
+/*    rom_filesave_freedirentries:  ; ### ???
         ; config must be set to either area 1 or 2
         ; directory is set properly
         ; returns free directory entries in a
@@ -2005,10 +2343,10 @@
         sta efs_readef_low
 
         txa
-        rts
+        rts*/
 
 
-    rom_filesave_usedspace:  ; ### ???
+/*    rom_filesave_usedspace:  ; ### ???
         ; space by real active files
         ; config must be set to either area 1 or 2
         ; directory is set properly
@@ -2061,10 +2399,10 @@
         pla
         sta efs_readef_low
 
-        rts
+        rts*/
 
 
-    rom_filesave_blockedspace:  ; ### ???
+/*    rom_filesave_blockedspace:  ; ### ???
         ; space blocked by real and deleted files
         ; config must be set to either area 1 or 2
         ; directory is set properly
@@ -2111,7 +2449,7 @@
         pla
         sta efs_readef_low
 
-        rts
+        rts*/
 
 
 

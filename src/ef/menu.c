@@ -233,12 +233,20 @@ void format()
 void defragment()
 {
     uint8_t retval;
+    uint32_t seconds, timer;
 
     menu_clear(CONSOLE_START_Y, 24);
     gotoxy(0, CONSOLE_START_Y);
 
+    cprintf("start\n\r");
+    TIMER_reset();
+
     retval = EFS_defragment_wrapper();
     cprintf("defragment: rt=%d\n\r", retval);
+
+    timer = UINT32_MAX - TIMER_measure();
+    seconds = timer / 1000000; timer = timer % 1000000;
+    cprintf("defragment: rt=%d, timer=%lu.%06lu s\n\r", retval, seconds, timer);
 
 }
 
@@ -259,6 +267,94 @@ void createdata(uint16_t size, char* prefix, char* suffix)
     
     sprintf(&address[0], "%s", prefix);
     sprintf(&address[size-strlen(suffix)], "%s", suffix);
+}
+
+void createpattern(char* address, uint16_t size, uint32_t number)
+{
+    uint16_t i;
+
+    for (i=0; i<size; i++) {
+        address[i] = (uint8_t)i;
+    }
+
+    sprintf(address, "%lu", number);
+    address[size - 1] = 0xfe;
+}
+
+
+void longtest()
+{
+    // create test data at C000 to CAFF (2816 bytes)
+    // load and save this filem with a recognizable pattern
+    // also save, load and delete many other files
+    // after a run, the file must still be correct
+    uint8_t retval, status;
+    char* address = (char*)(ADDRESS);
+    uint16_t size = 2816;
+    uint16_t i;
+    char c;
+    uint32_t counter = 0;
+    uint32_t errors = 0;
+    uint32_t verify;
+    char filename[] = "myfile";
+
+    createpattern((char*)0xc000, size, counter);
+    EFS_setnam_wrapper(filename, strlen(filename));
+    EFS_setlfs_wrapper(1, 0);  // no secondary
+    retval = EFS_save_wrapper((char*)(0xc000), (char*)(0xc000) + size);
+    if (retval != 0) errors++;
+
+    while (true) {
+        c = 0;
+        if (kbhit()) c = cgetc();
+        if (c) break;
+        
+        menu_clear(CONSOLE_START_Y, 24);
+        gotoxy(0, CONSOLE_START_Y);
+        cprintf("test run: %lu (errors: %lu)\n\r", counter, errors);
+
+//        counter++;
+//        createpattern((char*)0xc000, size, counter);
+//        EFS_setnam_wrapper("myfile", 6);
+//        EFS_setlfs_wrapper(1, 0);  // no secondary
+//        retval = EFS_save_wrapper((char*)(0xc000), address + size);
+//        if (retval != 0) errors++;
+        
+//        for (i=0; i<4; i++) {
+            EFS_setnam_wrapper(filename, strlen(filename));
+            EFS_setlfs_wrapper(1, 0);
+            retval = EFS_load_wrapper(address, 0); // load
+            if (retval != 0) errors++;
+            
+            EFS_setnam_wrapper(filename, strlen(filename));
+            EFS_setlfs_wrapper(1, 0);
+            retval = EFS_load_wrapper(address, 1); // verify
+            if (retval != 0) errors++;
+            status = EFS_readst_wrapper();
+            if (status != 0x40) errors++;
+            
+            verify = atol(address);
+            if (verify != counter) errors++;
+            
+            counter++;
+            sprintf(address, "%lu", counter);
+            EFS_setnam_wrapper(filename, strlen(filename));
+            EFS_setlfs_wrapper(1, 0);
+            retval = EFS_save_wrapper(address, address + size);
+            if (retval != 0) errors++;
+            status = EFS_readst_wrapper();
+            if (status != 0x00) errors++;
+            
+//        }
+        
+    }
+
+    menu_clear(CONSOLE_START_Y, 24);
+    gotoxy(0, CONSOLE_START_Y);
+    cprintf("result: %lu runs, %lu errors\n\r", counter, errors);
+
+    
+    
 }
 
 
@@ -302,6 +398,7 @@ void main(void)
             menu_option(0, wherey(), '7', "Scratch file");
             menu_option(0, wherey(), 'Q', "Quit to basic");
             menu_option(0, wherey(), '9', "Format");
+            menu_option(0, wherey(), 'T', "Long Test");
             gotoxy(0, MENU_START_Y);
             menu_option(20, wherey(), 'S', "Toggle sec.");
             menu_option(20, wherey(), '0', "Defragment");
@@ -354,6 +451,11 @@ void main(void)
 
         case 's':
             if (secondary == 0) secondary = 1; else secondary = 0;
+            repaint = 1;
+            break;
+
+        case 't':
+            longtest();
             repaint = 1;
             break;
 
