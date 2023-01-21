@@ -1809,20 +1809,19 @@
         ; .sec if save is not possible
         jsr rom_config_prepare_config  ; first call to config
         jsr efs_init_readef
-        jsr efs_init_eapiwriteinc
+        jsr efs_init_eapireadinc
 
         ; rw areas available?
         jsr rom_config_rw_available   ; maybe check earlier?
         bcs @error
-;        lda #libefs_config::areas
-;        jsr rom_config_get_value
-;        cmp #$03
-;        beq @check1
-;        lda #ERROR_DEVICE_NOT_PRESENT
-;        jmp @error
 
-;        jsr rom_config_activearea
-;        jsr rom_flags_set_area
+        ; init read_ef
+        jsr rom_config_get_area_bank
+        sta efs_readef_bank
+        jsr rom_config_get_area_addr_low
+        sta efs_readef_low
+        jsr rom_config_get_area_addr_high
+        sta efs_readef_high
 
         ; check free space
         jsr rom_filesave_maxspace
@@ -1886,7 +1885,7 @@
 
 
     rom_filesave_freedirentries:
-        ; config must be
+        ; config must be set
         ; directory is set properly
         ; returns free directory entries in a
         ; the last entry does not count
@@ -2199,23 +2198,24 @@
 ;        jsr rom_config_activearea
 ;        jsr rom_flags_set_area
  
-        ; file start area
-
-;        lda #libefs_area::bank
-;        jsr rom_config_get_value
+        ; init read_ef
         jsr rom_config_get_area_bank
+        sta efs_readef_bank
         sta zp_var_x8
         jsr efs_setstartbank_ext
 
+        jsr rom_config_get_area_addr_low
+        sta efs_readef_low
+        jsr rom_config_get_area_addr_high
+        sta efs_readef_high
+
+        ; set file offset
         lda #$00      ; ### get from config
         sta zp_var_x9
         lda #$18      ; ### get from config, relative offset
         sta zp_var_xa
 
-;        jsr efs_init_readef
-
         jsr rom_filesave_nextentry
-        ; add size to buffer ### depending on mode ll, hh or lh
         clc
         lda zp_var_x9
         adc zp_var_xb
