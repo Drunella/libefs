@@ -15,7 +15,8 @@
 ; ----------------------------------------------------------------------------
 
 
-; ### implement conditional switches for non rom version
+; ### implement conditional switches for non rom version ???
+; ### segments for read only
 
 
 .feature c_comments
@@ -256,24 +257,6 @@
       .endif
 
 
-/*    efs_init_setstartbank:
-        ldy #<(@codeend - @code - 1)
-      : lda @code, y
-        sta efs_generic_command, y
-        dey
-        bpl :-
-        clc
-        rts
-
-       @code:
-        jsr EAPISetBank
-        jmp efs_enter_pha
-       @codeend:
-      .if (@codeend - @code) > GENERIC_COMMAND_SIZE
-      .error "dynamic code setstartbank to large"
-      .endif*/
-
-
     efs_init_readmem:
         ldy #<(@codeend - @code - 1)
       : lda @code, y
@@ -408,6 +391,7 @@
         lda #$60
         sta status_byte + 1
         rts
+
 
 
 ; --------------------------------------------------------------------
@@ -757,137 +741,6 @@
         jmp efs_bankout  ; ends with rts
 
 
-;        jsr backup_zeropage
-;        bit internal_state  ; we check for bit 7/6 == 1/1
-;        bpl @fileopen  ; branch if bit 7 is clear
-;        bvs @fileopen  ; branch if bit 6 is clear
-;        sec  ; ###
-;        lda #ERROR_DEVICE_NOT_PRESENT
-;        sta error_byte
-;        jmp @done
-;        jsr rom_save_execute ###
-;        jmp @done
-;      @fileopen:
-;        lda #ERROR_FILE_OPEN
-;        sta error_byte
-;      @done:
-;        php  ; save carry
-;        jsr restore_zeropage
-;        lda error_byte
-;        plp
-;        jmp efs_bankout  ; ends with rts
-
-
-; --------------------------------------------------------------------
-; ef read functions with manipulatable pointer
-
-;.scope efs_readef
-
-/*
-.export efs_init_readef
-.export efs_readef
-.export efs_readef_low
-.export efs_readef_high
-.export efs_readef_read_and_inc
-.export efs_readef_pointer_inc
-.export efs_readef_pointer_dec
-.export efs_readef_pointer_advance
-.export efs_readef_pointer_reverse
-.export efs_readef_pointer_setall
-.export efs_readef_pointer_set
-
-    efs_init_readef:
-        ldy #<(@codeend - @code - 1)
-      : lda @code, y
-        sta efs_generic_command, y
-        dey
-        bpl :-
-        clc
-        rts
-
-      @code: ; 12 bytes
-        jsr EAPIGetBank
-        sta EASYFLASH_BANK
-        lda $8000  ; read from banked memory; byte 7, 8
-        jmp efs_enter_pha
-      @codeend:
-      .if (@codeend - @code) > GENERIC_COMMAND_SIZE
-      .error "dynamic code readef to large"
-      .endif
-
-    efs_readef = efs_generic_command
-    efs_readef_low = efs_generic_command + 7
-    efs_readef_high = efs_generic_command + 8
-
-    efs_readef_read_and_inc:
-        jsr efs_readef
-        pha
-        jsr efs_readef_pointer_inc
-        pla  ; to have the correct cpu states
-        rts
-
-    efs_readef_pointer_set:
-        ; X/Y
-        stx efs_readef_low
-        sty efs_readef_high
-        rts
-
-    efs_readef_pointer_inc:
-        inc efs_readef_low
-        bne :+
-        inc efs_readef_high
-      : rts
-
-    efs_readef_pointer_dec:
-        lda efs_readef_low
-        bne :+
-        dec efs_readef_high
-      : dec efs_readef_low
-        rts
-
-    efs_readef_pointer_advance:
-        clc
-        adc efs_readef_low
-        sta efs_readef_low
-        bcc :+
-        inc efs_readef_high
-      : rts
-
-    efs_readef_pointer_reverse:
-        tax
-        lda efs_readef_low
-        stx efs_readef_low
-        sec
-        sbc efs_readef_low
-        sta efs_readef_low
-        bcs :+
-        dec efs_readef_high
-      : rts
-
-    efs_readef_pointer_setall:
-        pha  ; save a
-        txa
-        pha  ; save x
-        tya
-        pha  ; save y
-
-;;        jsr efs_init_setstartbank
-        tsx
-        lda $0103, x  ; a register
-;;        jsr efs_generic_command
-        jsr efs_setstartbank_ext
-
-        ; set read ef code
-        jsr efs_init_readef
-
-        pla
-        sta efs_readef_high
-        pla
-        sta efs_readef_low
-        pla
-        rts
-*/
-
 
 ; --------------------------------------------------------------------
 ; ef read functions with manipulatable pointer
@@ -1024,6 +877,7 @@
         stx efs_readef_storedaddr_high
         sta efs_readef_high
         rts
+
 
 
 ; --------------------------------------------------------------------
@@ -1208,32 +1062,6 @@
         rts
 
 
-/*    rom_config_activearea:
-        ; .C set if error
-        ; config must be initialized
-        jsr efs_init_readef
-
-        lda #libefs_config::area_1
-        jsr rom_config_checkarea
-        bcc :+  ; check area 2
-        ; in area 1
-        lda #$01
-        bne @check
-
-      : lda #libefs_config::area_2
-        jsr rom_config_checkarea
-        bcc :+
-        ; in area 2
-        lda #$02
-        bne @check
-      : lda #$01  ; both empty, area 1
-      @check:
-        pha
-        jsr rom_config_get_areastart
-        jsr rom_config_set_activearea
-        pla
-        rts*/
-
     rom_config_areaoffset:
         ; the value to get to area x
         ; only values 0, 1, 2 are allowed
@@ -1317,54 +1145,8 @@
         bne @check
       : lda #$01  ; both empty, area 1
       @check:
-;        pha
-;        jsr rom_config_get_areastart
-;        jsr rom_config_set_activearea
         jsr rom_flags_set_area
-;        pla
         rts
-
-/*    rom_config_get_areastart:
-        ; the value to get to area x
-        ; only values 0, 1, 2 are allowed
-        cmp #$00
-        beq @area0
-        cmp #$01
-        beq @area1
-        cmp #$02
-        beq @area2   
-
-      @area0:
-        lda #libefs_config::area_0
-        rts
-
-      @area1:
-        lda #libefs_config::area_1
-        rts
-
-      @area2:
-        lda #libefs_config::area_2
-        rts
-
-;        tay
-;        lda #libefs_config::area_0
-;      : clc
-;        adc #.sizeof(libefs_area)
-;        dey
-;        bne :-
-;        rts*/
-
-
-/*    rom_config_set_activearea:
-        ; sets the config pointer to the area start
-        ; area distance value in a
-        ;jsr rom_config_get_areastart
-        clc
-        adc zp_pointer_configuration
-        sta zp_pointer_configuration
-        bcc :+
-        inc zp_pointer_configuration + 1
-      : rts*/
 
 
     rom_config_checkarea:
@@ -1407,6 +1189,7 @@
         rts
 
 
+
 ; --------------------------------------------------------------------
 ; efs defragment functions
 ;   37: mode
@@ -1420,19 +1203,6 @@
 
     rom_defragment_erasearea:
         ; area to erase in a
-;        pha
-;        jsr rom_config_prepare_config  ; ### necessary?
-
-;        jsr rom_config_rw_available
-;        bcs @error_pla
-
-        ; rw areas available?
-;        lda #libefs_config::areas
-;        jsr rom_config_get_value
-;        cmp #$03
-;        bne @error_pla
-
-;        pla
         cmp #$00
         beq @error
         cmp #$01
@@ -1444,19 +1214,13 @@
         ; go to area
       @next:
         jsr rom_flags_set_area
-;        jsr rom_config_get_areastart
-;        jsr rom_config_set_activearea
 
         ; init erase sector call
         jsr efs_init_eapierasesector
 
-;        lda #libefs_area::bank
-;        jsr rom_config_get_value
         jsr rom_config_get_area_bank
         sta zp_var_x8
 
-;        lda #libefs_area::mode
-;        jsr rom_config_get_value
         jsr rom_config_get_area_mode
         sta zp_var_x7
 
@@ -1468,8 +1232,6 @@
         lda #$a0  ; for hh
         sta zp_var_xa
 
-;      : lda #libefs_area::size
-;        jsr rom_config_get_value
       : jsr rom_config_get_area_size
         lsr a
         lsr a
@@ -1542,55 +1304,30 @@
         jsr efs_init_readef_rely
         jsr efs_init_eapiwriteinc
 
-        ; prepare source
-;        jsr rom_config_prepare_config
         pla  ; old area
         jsr rom_flags_set_area
-;        jsr rom_config_get_areastart
-;        jsr rom_config_set_activearea
 
-        ;ldy #$00
-;        lda #libefs_area::bank
-;        jsr rom_config_get_value
         jsr rom_config_get_area_bank
         sta efs_readef_bank
 
-;        lda #libefs_area::addr
-;        jsr rom_config_get_value
         jsr rom_config_get_area_addr_low
         sta efs_readef_low
-;        lda #libefs_area::addr + 1
-;        jsr rom_config_get_value
         jsr rom_config_get_area_addr_high
         sta efs_readef_high
 
-;        lda #libefs_area::mode
-;        jsr rom_config_get_value
         jsr rom_config_get_area_mode
         sta efs_temp_var1
-;        sta zp_var_x7
 
         ; prepare destination
-;        jsr rom_config_prepare_config
         pla  ; new area
-;        jsr rom_config_get_areastart
-;        jsr rom_config_set_activearea
-;        jsr rom_flags_set_area
-
-;        lda #libefs_area::bank  ; bank
-;        jsr rom_config_get_value
         jsr rom_config_get_area_bank_invert
         sta zp_var_x8
         sta efs_temp_var2
 
-;        lda #libefs_area::addr  ; address low
-;        jsr rom_config_get_value
         jsr rom_config_get_area_addr_low_invert
         sta zp_var_x9  ; file pointer 
         sta zp_var_xe  ; dir pointer
 
-;        lda #libefs_area::addr + 1 ; address high
-;        jsr rom_config_get_value
         jsr rom_config_get_area_addr_high_invert
         sta zp_var_xf  ; dir pointer
         clc
@@ -1862,10 +1599,6 @@
         jsr efs_init_readef
         jsr efs_init_eapiwriteinc
 
-
-;        jsr rom_config_activearea
-;        jsr rom_flags_set_area
-
         ; check conditions again, this time error
         jsr rom_filesave_freedirentries  ; free disk entries
         bcs @error
@@ -1926,18 +1659,6 @@
     rom_filesave_checksize:
         ; checks used file in 3b/3c/3d 
         ; against available size in 38/39/3a
-;        sec
-;        lda io_end_address
-;        sbc io_start_address
-;        sta zp_var_xe
-;        lda io_end_address + 1
-;        sbc io_start_address + 1
-;        sta zp_var_xf
-
-;        lda zp_var_xd
-;        beq @compare
-;        clc  ; high byte >0? enough space
-;        rts
       sec
       lda zp_var_x8
       sbc zp_var_xb
@@ -1950,38 +1671,6 @@
       rts
     : sec
       rts
-
-
-/*      @compare: ; N1: file size(3b/3c/3d); N2: available size(38/39/3a)
-        lda zp_var_xf  ; N1+1
-	eor zp_var_xc  ; N2+1
-	bmi @differentSigns
- 
-      @sameSigns:
-	lda zp_var_xe  ; N1
-	cmp zp_var_xb  ; N2
-	lda zp_var_xf  ; N1+1
-	sbc zp_var_xc  ; N2+1
-	eor zp_var_xf  ; N1+1
-	bmi @num1IsBigger
-	jmp @num2IsBigger
- 
-      @differentSigns:
-	clc
-	lda zp_var_xe  ; N1
-	adc zp_var_xb  ; N2
-	lda zp_var_xf  ; N1+1
-	adc zp_var_xc  ; N2+1
-	eor zp_var_xf  ; N1+1
-	bmi @num1IsBigger
- 
-      @num2IsBigger:
-        clc
-        rts
- 
-      @num1IsBigger:
-        sec
-        rts*/
 
 
     rom_filesave_addsize:
@@ -2012,8 +1701,6 @@
         ; returns max blocks in 38/39/3a (low/mid/high)
         ; one chip contains 32 pages
         jsr rom_config_get_area_size
-;        lda #libefs_area::size
-;        jsr rom_config_get_value
         tax       ; save value
         lsr
         lsr
@@ -2066,26 +1753,6 @@
         beq @skip
         lda #5  ; move to size
         jsr efs_readef_pointer_advance
-
-/*        jsr efs_readef_read_and_inc
-        sec
-        tax
-        lda zp_var_xb
-        stx zp_var_xb
-        sdc zp_var_xb
-        sta zp_var_xb
-        jsr efs_readef_read_and_inc
-        tax
-        lda zp_var_xc
-        stx zp_var_xc
-        sdc zp_var_xc
-        sta zp_var_xc
-        jsr efs_readef_read_and_inc
-        tax
-        lda zp_var_xc
-        stx zp_var_xc
-        sdc zp_var_xc
-        sta zp_var_xc*/
 
         clc
         jsr efs_readef_read_and_inc
@@ -2423,11 +2090,6 @@
         ;   38: bank
         ;   39/3a: offset in bank (without $8000 added)
         ;   x/y: address of next dir entry
-;        lda efs_readef_low
-;        pha
-;        lda efs_readef_high
-;        pha
-        
         lda #16
         jsr efs_readef_pointer_advance
 
@@ -2456,178 +2118,7 @@
       @leave:
         lda #17    ; to directory begin
         jsr efs_readef_pointer_reverse
-;        ldx efs_readef_low
-;        ldy efs_readef_high
-
-;        pla
-;        sta efs_readef_high
-;        pla
-;        sta efs_readef_low
-
         rts
-
-
-
-
-/*    rom_filesave_freeblocks:  ; ### ???
-        ; config must be set to either area 1 or 2
-        ; returns free blocks in X/Y (x=low)
-        ; one chip contains 32 pages
-        lda #libefs_area::size
-        jsr rom_config_get_value
-        tax
-        dex      ; reduce by one for directory chip
-        txa      ; calculate highbyte
-        lsr
-        lsr
-        lsr
-        tay
-        txa      ; calulate lowbyte
-        asl
-        asl
-        asl
-        asl
-        asl
-        tax
-        rts*/
-
-
-/*    rom_filesave_freedirentries:  ; ### ???
-        ; config must be set to either area 1 or 2
-        ; directory is set properly
-        ; returns free directory entries in a
-        ; the last entry does not count
-        lda efs_readef_low
-        pha
-        lda efs_readef_high
-        pha
-        
-        ldx #$00
-        lda #16
-        jsr efs_readef_pointer_advance
-
-      : dex
-        jsr efs_readef
-        cmp #$ff
-        beq :+
-        lda #24
-        jsr efs_readef_pointer_advance
-        jmp :-
-
-        ; reset directory
-      : pla 
-        sta efs_readef_high
-        pla
-        sta efs_readef_low
-
-        txa
-        rts*/
-
-
-/*    rom_filesave_usedspace:  ; ### ???
-        ; space by real active files
-        ; config must be set to either area 1 or 2
-        ; directory is set properly
-        ; returns free space in
-        ; 3b/3c/3d (low/mid/high)
-        lda efs_readef_low
-        pha
-        lda efs_readef_high
-        pha
-        
-        ldx #$00
-        lda #16
-        jsr efs_readef_pointer_advance
-        lda #$00
-        sta zp_var_xb
-        sta zp_var_xc
-        sta zp_var_xd
-
-      @loop:
-        ; ### check overflow
-        jsr efs_readef
-        cmp #$ff
-        beq @leave
-        and #$1f
-        beq @skip
-        lda #5  ; move to size
-        jsr efs_readef_pointer_advance
-        clc
-        jsr efs_readef_read_and_inc
-        adc zp_var_xb
-        sta zp_var_xb
-        jsr efs_readef_read_and_inc
-        adc zp_var_xc
-        sta zp_var_xc
-        jsr efs_readef
-        adc zp_var_xd
-        sta zp_var_xd
-        lda #17
-        jsr efs_readef_pointer_advance
-        jmp @loop
-      @skip:
-        lda #24
-        jsr efs_readef_pointer_advance
-        jmp @loop
-
-        ; reset directory
-      @leave:
-        pla 
-        sta efs_readef_high
-        pla
-        sta efs_readef_low
-
-        rts*/
-
-
-/*    rom_filesave_blockedspace:  ; ### ???
-        ; space blocked by real and deleted files
-        ; config must be set to either area 1 or 2
-        ; directory is set properly
-        ; returns free space in
-        ; 3b/3c/fd (low/mid/high)
-        lda efs_readef_low
-        pha
-        lda efs_readef_high
-        pha
-
-        ldx #$00
-        lda #16
-        jsr efs_readef_pointer_advance
-        lda #$00
-        sta zp_var_xb
-        sta zp_var_xc
-        sta zp_var_xd
-
-      @loop:
-        ; ### check overflow
-        jsr efs_readef
-        cmp #$ff
-        beq :+  ; leave
-        lda #5  ; move to size
-        jsr efs_readef_pointer_advance
-        clc
-        jsr efs_readef_read_and_inc
-        adc zp_var_xb
-        sta zp_var_xb
-        jsr efs_readef_read_and_inc
-        adc zp_var_xc
-        sta zp_var_xc
-        jsr efs_readef
-        adc zp_var_xd
-        sta zp_var_xd
-        lda #17
-        jsr efs_readef_pointer_advance
-
-        jmp @loop
-
-        ; reset directory
-      : pla
-        sta efs_readef_high
-        pla
-        sta efs_readef_low
-
-        rts*/
 
 
 
@@ -2659,9 +2150,7 @@
         lda $3d  ; efs_directory_entry + efs_directory::size_upper
         jsr EAPISetLen
 
-;        jsr efs_init_setstartbank
         lda $38  ; efs_directory_entry + efs_directory::bank
-;        jsr efs_generic_command
         jsr efs_setstartbank_ext
 
         rts
@@ -2697,10 +2186,6 @@
         bcs @eof
         ldy #$00
         sta ($3e), y
-;        iny
-;        bne @loop
-;        inc $3f
-;        jmp @loop
         inc $3e
         bne @loop
         inc $3f
@@ -2778,6 +2263,7 @@
         rts
       : sec
         rts
+
 
 
 ; --------------------------------------------------------------------
@@ -2886,19 +2372,9 @@
         jsr efs_readef_pointer_advance
 
         ; prepare bank
-;        ;jsr efs_init_setstartbank
-;        jsr rom_flags_get_area
-;        jsr rom_config_get_areastart
-;        tay
-;        lda (zp_var_x5), y  ; at libefs_config::areax::bank
-        ;jsr efs_generic_command
         jsr rom_config_get_area_bank
         jsr efs_setstartbank_ext
 
-;        iny                 ; banking mode
-;        iny
-;        iny
-;        lda (zp_var_x5), y  ; at libefs_config::areax::mode
         jsr rom_config_get_area_mode
         ldx efs_readef_low
         ldy efs_readef_high
@@ -2935,10 +2411,6 @@
 ;   3b/3c/3d: size
 ;   read_ef: pointer is at begin of directory entry
 
-;    dir_read_byte_low = efs_io_byte + 1
-;    dir_read_byte_high = efs_io_byte + 2
-
-;    dirsearch_area_var_zp := $37
     dirsearch_temp_var_zp := $38
     dirsearch_name_pointer_zp := $3e
     dirsearch_entry_zp := $3b
@@ -3044,18 +2516,10 @@
         ; set read ef code
         jsr efs_init_readef
 
-;        jsr rom_config_prepare_config
-
-;        jsr efs_init_setstartbank
-        ;lda #$00  ; ### 0, could be different bank
         ldy dirsearch_temp_var_zp
         lda ($35), y  ; at libefs_config::libefs_area::bank
-;        jsr efs_generic_command
         jsr efs_setstartbank_ext
         sta efs_readef_bank
-
-;        ; set read ef code
-;        jsr efs_init_readef_bank
 
         inc dirsearch_temp_var_zp
         ldy dirsearch_temp_var_zp
@@ -3146,12 +2610,6 @@
 
 
     rom_dirsearch_find:
-;        lda filename_address
-;        sta dirsearch_name_pointer_zp
-;        lda filename_address + 1
-;        sta dirsearch_name_pointer_zp + 1
-;        jsr rom_dirsearch_begin_search
-
         lda filename_length
         bne @repeat
         lda #ERROR_MISSING_FILENAME  ; no filename: status=0, error=8, C
@@ -3433,4 +2891,371 @@
       @error:
         ; c flag set according to writeflash result
         sta error_byte
+        rts*/
+
+;.scope efs_readef
+
+/*
+.export efs_init_readef
+.export efs_readef
+.export efs_readef_low
+.export efs_readef_high
+.export efs_readef_read_and_inc
+.export efs_readef_pointer_inc
+.export efs_readef_pointer_dec
+.export efs_readef_pointer_advance
+.export efs_readef_pointer_reverse
+.export efs_readef_pointer_setall
+.export efs_readef_pointer_set
+
+    efs_init_readef:
+        ldy #<(@codeend - @code - 1)
+      : lda @code, y
+        sta efs_generic_command, y
+        dey
+        bpl :-
+        clc
+        rts
+
+      @code: ; 12 bytes
+        jsr EAPIGetBank
+        sta EASYFLASH_BANK
+        lda $8000  ; read from banked memory; byte 7, 8
+        jmp efs_enter_pha
+      @codeend:
+      .if (@codeend - @code) > GENERIC_COMMAND_SIZE
+      .error "dynamic code readef to large"
+      .endif
+
+    efs_readef = efs_generic_command
+    efs_readef_low = efs_generic_command + 7
+    efs_readef_high = efs_generic_command + 8
+
+    efs_readef_read_and_inc:
+        jsr efs_readef
+        pha
+        jsr efs_readef_pointer_inc
+        pla  ; to have the correct cpu states
+        rts
+
+    efs_readef_pointer_set:
+        ; X/Y
+        stx efs_readef_low
+        sty efs_readef_high
+        rts
+
+    efs_readef_pointer_inc:
+        inc efs_readef_low
+        bne :+
+        inc efs_readef_high
+      : rts
+
+    efs_readef_pointer_dec:
+        lda efs_readef_low
+        bne :+
+        dec efs_readef_high
+      : dec efs_readef_low
+        rts
+
+    efs_readef_pointer_advance:
+        clc
+        adc efs_readef_low
+        sta efs_readef_low
+        bcc :+
+        inc efs_readef_high
+      : rts
+
+    efs_readef_pointer_reverse:
+        tax
+        lda efs_readef_low
+        stx efs_readef_low
+        sec
+        sbc efs_readef_low
+        sta efs_readef_low
+        bcs :+
+        dec efs_readef_high
+      : rts
+
+    efs_readef_pointer_setall:
+        pha  ; save a
+        txa
+        pha  ; save x
+        tya
+        pha  ; save y
+
+;;        jsr efs_init_setstartbank
+        tsx
+        lda $0103, x  ; a register
+;;        jsr efs_generic_command
+        jsr efs_setstartbank_ext
+
+        ; set read ef code
+        jsr efs_init_readef
+
+        pla
+        sta efs_readef_high
+        pla
+        sta efs_readef_low
+        pla
+        rts
+*/
+
+/*    rom_config_activearea:
+        ; .C set if error
+        ; config must be initialized
+        jsr efs_init_readef
+
+        lda #libefs_config::area_1
+        jsr rom_config_checkarea
+        bcc :+  ; check area 2
+        ; in area 1
+        lda #$01
+        bne @check
+
+      : lda #libefs_config::area_2
+        jsr rom_config_checkarea
+        bcc :+
+        ; in area 2
+        lda #$02
+        bne @check
+      : lda #$01  ; both empty, area 1
+      @check:
+        pha
+        jsr rom_config_get_areastart
+        jsr rom_config_set_activearea
+        pla
+        rts*/
+
+/*    rom_config_get_areastart:
+        ; the value to get to area x
+        ; only values 0, 1, 2 are allowed
+        cmp #$00
+        beq @area0
+        cmp #$01
+        beq @area1
+        cmp #$02
+        beq @area2   
+
+      @area0:
+        lda #libefs_config::area_0
+        rts
+
+      @area1:
+        lda #libefs_config::area_1
+        rts
+
+      @area2:
+        lda #libefs_config::area_2
+        rts
+
+;        tay
+;        lda #libefs_config::area_0
+;      : clc
+;        adc #.sizeof(libefs_area)
+;        dey
+;        bne :-
+;        rts*/
+
+
+/*    rom_config_set_activearea:
+        ; sets the config pointer to the area start
+        ; area distance value in a
+        ;jsr rom_config_get_areastart
+        clc
+        adc zp_pointer_configuration
+        sta zp_pointer_configuration
+        bcc :+
+        inc zp_pointer_configuration + 1
+      : rts*/
+
+
+/*      @compare: ; N1: file size(3b/3c/3d); N2: available size(38/39/3a)
+        lda zp_var_xf  ; N1+1
+	eor zp_var_xc  ; N2+1
+	bmi @differentSigns
+ 
+      @sameSigns:
+	lda zp_var_xe  ; N1
+	cmp zp_var_xb  ; N2
+	lda zp_var_xf  ; N1+1
+	sbc zp_var_xc  ; N2+1
+	eor zp_var_xf  ; N1+1
+	bmi @num1IsBigger
+	jmp @num2IsBigger
+ 
+      @differentSigns:
+	clc
+	lda zp_var_xe  ; N1
+	adc zp_var_xb  ; N2
+	lda zp_var_xf  ; N1+1
+	adc zp_var_xc  ; N2+1
+	eor zp_var_xf  ; N1+1
+	bmi @num1IsBigger
+ 
+      @num2IsBigger:
+        clc
+        rts
+ 
+      @num1IsBigger:
+        sec
+        rts*/
+
+/*    rom_filesave_freeblocks:  ; ### ???
+        ; config must be set to either area 1 or 2
+        ; returns free blocks in X/Y (x=low)
+        ; one chip contains 32 pages
+        lda #libefs_area::size
+        jsr rom_config_get_value
+        tax
+        dex      ; reduce by one for directory chip
+        txa      ; calculate highbyte
+        lsr
+        lsr
+        lsr
+        tay
+        txa      ; calulate lowbyte
+        asl
+        asl
+        asl
+        asl
+        asl
+        tax
+        rts*/
+
+
+/*    rom_filesave_freedirentries:  ; ### ???
+        ; config must be set to either area 1 or 2
+        ; directory is set properly
+        ; returns free directory entries in a
+        ; the last entry does not count
+        lda efs_readef_low
+        pha
+        lda efs_readef_high
+        pha
+        
+        ldx #$00
+        lda #16
+        jsr efs_readef_pointer_advance
+
+      : dex
+        jsr efs_readef
+        cmp #$ff
+        beq :+
+        lda #24
+        jsr efs_readef_pointer_advance
+        jmp :-
+
+        ; reset directory
+      : pla 
+        sta efs_readef_high
+        pla
+        sta efs_readef_low
+
+        txa
+        rts*/
+
+
+/*    rom_filesave_usedspace:  ; ### ???
+        ; space by real active files
+        ; config must be set to either area 1 or 2
+        ; directory is set properly
+        ; returns free space in
+        ; 3b/3c/3d (low/mid/high)
+        lda efs_readef_low
+        pha
+        lda efs_readef_high
+        pha
+        
+        ldx #$00
+        lda #16
+        jsr efs_readef_pointer_advance
+        lda #$00
+        sta zp_var_xb
+        sta zp_var_xc
+        sta zp_var_xd
+
+      @loop:
+        ; ### check overflow
+        jsr efs_readef
+        cmp #$ff
+        beq @leave
+        and #$1f
+        beq @skip
+        lda #5  ; move to size
+        jsr efs_readef_pointer_advance
+        clc
+        jsr efs_readef_read_and_inc
+        adc zp_var_xb
+        sta zp_var_xb
+        jsr efs_readef_read_and_inc
+        adc zp_var_xc
+        sta zp_var_xc
+        jsr efs_readef
+        adc zp_var_xd
+        sta zp_var_xd
+        lda #17
+        jsr efs_readef_pointer_advance
+        jmp @loop
+      @skip:
+        lda #24
+        jsr efs_readef_pointer_advance
+        jmp @loop
+
+        ; reset directory
+      @leave:
+        pla 
+        sta efs_readef_high
+        pla
+        sta efs_readef_low
+
+        rts*/
+
+
+/*    rom_filesave_blockedspace:  ; ### ???
+        ; space blocked by real and deleted files
+        ; config must be set to either area 1 or 2
+        ; directory is set properly
+        ; returns free space in
+        ; 3b/3c/fd (low/mid/high)
+        lda efs_readef_low
+        pha
+        lda efs_readef_high
+        pha
+
+        ldx #$00
+        lda #16
+        jsr efs_readef_pointer_advance
+        lda #$00
+        sta zp_var_xb
+        sta zp_var_xc
+        sta zp_var_xd
+
+      @loop:
+        ; ### check overflow
+        jsr efs_readef
+        cmp #$ff
+        beq :+  ; leave
+        lda #5  ; move to size
+        jsr efs_readef_pointer_advance
+        clc
+        jsr efs_readef_read_and_inc
+        adc zp_var_xb
+        sta zp_var_xb
+        jsr efs_readef_read_and_inc
+        adc zp_var_xc
+        sta zp_var_xc
+        jsr efs_readef
+        adc zp_var_xd
+        sta zp_var_xd
+        lda #17
+        jsr efs_readef_pointer_advance
+
+        jmp @loop
+
+        ; reset directory
+      : pla
+        sta efs_readef_high
+        pla
+        sta efs_readef_low
+
         rts*/
