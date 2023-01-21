@@ -140,7 +140,7 @@ EAPIGetSlot       = $df9b
     area_2 .tag libefs_area
     dfcall .byte
     dfwarning .addr 
-    dfclearall .addr
+    dfallclear .addr
 
 .endstruct
 

@@ -287,7 +287,7 @@ void longtest()
     // after a run, the file must still be correct
     uint8_t retval, status;
     char* address = (char*)(ADDRESS);
-    uint16_t size = 2816;
+    uint16_t size = 2687; // 2816;
     uint16_t i;
     char c;
     uint32_t counter = 0;
@@ -310,15 +310,9 @@ void longtest()
         gotoxy(0, CONSOLE_START_Y);
         cprintf("test run: %lu (errors: %lu)\n\r", counter, errors);
 
-//        counter++;
-//        createpattern((char*)0xc000, size, counter);
-//        EFS_setnam_wrapper("myfile", 6);
-//        EFS_setlfs_wrapper(1, 0);  // no secondary
-//        retval = EFS_save_wrapper((char*)(0xc000), address + size);
-//        if (retval != 0) errors++;
-        
 //        for (i=0; i<4; i++) {
-            EFS_setnam_wrapper(filename, strlen(filename));
+
+/*            EFS_setnam_wrapper(filename, strlen(filename));
             EFS_setlfs_wrapper(1, 0);
             retval = EFS_load_wrapper(address, 0); // load
             if (retval != 0) errors++;
@@ -332,7 +326,7 @@ void longtest()
             
             verify = atol(address);
             if (verify != counter) errors++;
-            
+*/           
             counter++;
             sprintf(address, "%lu", counter);
             EFS_setnam_wrapper(filename, strlen(filename));

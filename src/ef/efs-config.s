@@ -51,6 +51,10 @@
 
     efs_defragment_warning:
     efs_defragment_warning_offset = * - ef_name
+        lda $d020
+        clc
+        adc #$01
+        sta $d020
         rts
 
     efs_defragment_warning_size = * - efs_defragment_warning
@@ -58,6 +62,8 @@
 
     efs_defragment_allclear:
     efs_defragment_allclear_offset = * - ef_name
+        lda #$00
+        sta $d020
         rts
 
     efs_defragment_allclear_size = * - efs_defragment_allclear

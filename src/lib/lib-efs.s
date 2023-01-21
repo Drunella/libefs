@@ -948,6 +948,90 @@
         rts
 
 
+    rom_config_call_defragment_warning:
+        lda #libefs_config::dfcall
+        jsr rom_config_get_value
+        beq @done
+
+        lda zp_pointer_configuration
+        pha
+        lda zp_pointer_configuration + 1
+        pha
+
+        ; copy warning call address
+        lda #libefs_config::dfwarning
+        jsr rom_config_get_value
+        tax
+        lda #libefs_config::dfwarning + 1
+        jsr rom_config_get_value
+        sta zp_pointer_configuration + 1
+        txa
+        sta zp_pointer_configuration
+
+        ; prepare return address
+        tsx
+        lda #>(@return - 1)
+        sta $0100, x
+        dex
+        lda #<(@return - 1)
+        sta $0100, x
+        dex
+        txs
+
+        jmp (zp_pointer_configuration)
+      @return:
+
+        pla
+        sta zp_pointer_configuration + 1
+        pla 
+        sta zp_pointer_configuration
+
+      @done:
+        rts
+
+
+    rom_config_call_defragment_allclear:
+        lda #libefs_config::dfcall
+        jsr rom_config_get_value
+        beq @done
+
+        lda zp_pointer_configuration
+        pha
+        lda zp_pointer_configuration + 1
+        pha
+
+        ; copy warning call address
+        lda #libefs_config::dfallclear
+        jsr rom_config_get_value
+        tax
+        lda #libefs_config::dfallclear + 1
+        jsr rom_config_get_value
+        sta zp_pointer_configuration + 1
+        txa
+        sta zp_pointer_configuration
+
+        ; prepare return address
+        tsx
+        lda #>(@return - 1)
+        sta $0100, x
+        dex
+        lda #<(@return - 1)
+        sta $0100, x
+        dex
+        txs
+
+        jmp (zp_pointer_configuration)
+      @return:
+
+        pla
+        sta zp_pointer_configuration + 1
+        pla
+        sta zp_pointer_configuration
+
+      @done:
+        rts
+
+
     rom_config_rw_available:
         ; rw areas available?
         lda #libefs_config::areas
@@ -1373,8 +1457,9 @@
         jsr efs_readef
         sta zp_var_xd
 
+        jsr rom_config_call_defragment_warning  ; defragment warning
+
         ; copy directory
-        ; ### call defragment warning
         jsr rom_defragment_copy_dir
         jsr rom_defragment_copy_data
         jmp @loop
@@ -1385,7 +1470,7 @@
         jmp @loop
 
       @leave:
-        ; ### call defragment clearall
+        jsr rom_config_call_defragment_allclear  ; defragment finished
         jsr efs_finish_tempvars
         rts
 
@@ -1472,8 +1557,8 @@
         bcc @loop
 
         ; save dest file address
-        jsr EAPIGetBank
-        sta zp_var_x8  ; ### redundant ?
+        ;jsr EAPIGetBank
+        ;sta zp_var_x8  ; ### redundant ?
 
         jsr efs_readef_swap
         lda efs_temp_var2  ; has the destination directory bank
@@ -1486,23 +1571,24 @@
     rom_defragment_copy_data_destinc:
         ; increases dest file address according to mode ($37)
         ; inc to next position
-        inc zp_var_x9
+        inc zp_var_x9  ; addr low
         bne @noinc
 
+        jsr rom_config_call_defragment_warning  ; defragment warning
+
         ; inc page
-        inc zp_var_xa
-        lda zp_var_x7
+        inc zp_var_xa  ; addr high
+        lda zp_var_x7  ; mode
         and #$e0
-        cmp zp_var_xa
+        cmp zp_var_xa  ; addr high
         bne @noinc
         ; inc bank
-        lda zp_var_x7
+        lda zp_var_x7  ; mode
         asl
         asl
         asl
-        sta zp_var_x8
-        inc efs_temp_var2
-        ; ### call defragment warning
+        sta zp_var_xa  ; addr high
+        inc zp_var_x8  ; bank
       @noinc:
         rts
 
@@ -1510,22 +1596,22 @@
     rom_defragment_copy_data_sourceinc:
         ; increases source file address according to mode (efs_temp_var1)
         ; inc to next position
-        inc efs_readef_low
+        inc efs_readef_low  ; addr low
         bne @noinc
 
         ; inc page
-        inc efs_readef_high
-        lda efs_temp_var1
+        inc efs_readef_high  ; addr high
+        lda efs_temp_var1    ; mode
         and #$e0
-        cmp efs_readef_high
+        cmp efs_readef_high  ; addr high
         bne @noinc
         ; inc bank
-        lda efs_temp_var1
+        lda efs_temp_var1    ; mode
         asl
         asl
         asl
-        sta efs_readef_high
-        inc efs_readef_bank
+        sta efs_readef_high  ; addr high
+        inc efs_readef_bank  ; bank
       @noinc:
         rts
 
@@ -1553,12 +1639,7 @@
         bcs @error
 
         ; init read_ef
-        jsr rom_config_get_area_bank
-        sta efs_readef_bank
-        jsr rom_config_get_area_addr_low
-        sta efs_readef_low
-        jsr rom_config_get_area_addr_high
-        sta efs_readef_high
+        jsr rom_filesave_setdirstart
 
         ; check free space
         jsr rom_filesave_maxspace
@@ -1597,7 +1678,8 @@
 
         jsr rom_config_prepare_config  ; set new configuration
         jsr efs_init_readef
-        jsr efs_init_eapiwriteinc
+        jsr efs_init_eapireadinc
+        jsr rom_filesave_setdirstart   ; init readef
 
         ; check conditions again, this time error
         jsr rom_filesave_freedirentries  ; free disk entries
@@ -1609,11 +1691,22 @@
         jsr rom_filesave_checksize
         bcs @error
 
+        lda #$00
         clc
         rts
       @error:
         sec
         sta error_byte
+        rts
+
+    rom_filesave_setdirstart:
+        ; init read_ef
+        jsr rom_config_get_area_bank
+        sta efs_readef_bank
+        jsr rom_config_get_area_addr_low
+        sta efs_readef_low
+        jsr rom_config_get_area_addr_high
+        sta efs_readef_high
         rts
 
 
@@ -1666,7 +1759,8 @@
       sbc zp_var_xc
       lda zp_var_xa
       sbc zp_var_xd
-      bmi :+
+      ;bmi :+
+      bcc :+
       clc
       rts
     : sec
@@ -1677,7 +1771,7 @@
         ; fill size: io_end_address - io_start_address
         ; temp result in 3e/3f
         ; and add to 3b/3c/3d (low/mid/high)
-        sec
+        sec  ; calculate size
         lda io_end_address
         sbc io_start_address
         sta zp_var_xe
@@ -1685,13 +1779,24 @@
         sbc io_start_address + 1
         sta zp_var_xf
 
-        clc
+        clc  ; add load address
+        lda #$02
+        adc zp_var_xe
+        sta zp_var_xe
+        lda #$00
+        adc zp_var_xf
+        sta zp_var_xf
+
+        clc  ; add to used space
         lda zp_var_xe
         adc zp_var_xb
         sta zp_var_xb
         lda zp_var_xf
         adc zp_var_xc
         sta zp_var_xc
+        lda #$00
+        adc zp_var_xd
+        sta zp_var_xd
 
         rts
 
@@ -1754,18 +1859,18 @@
         lda #5  ; move to size
         jsr efs_readef_pointer_advance
 
-        clc
         jsr efs_readef_read_and_inc
+        clc
         adc zp_var_xb
         sta zp_var_xb
         jsr efs_readef_read_and_inc
         adc zp_var_xc
         sta zp_var_xc
-        jsr efs_readef
+        jsr efs_readef_read_and_inc
         adc zp_var_xd
         sta zp_var_xd
 
-        lda #17
+        lda #16
         jsr efs_readef_pointer_advance
         jmp @loop
       @skip:
@@ -1807,17 +1912,17 @@
         beq :+  ; leave
         lda #5  ; move to size
         jsr efs_readef_pointer_advance
-        clc
         jsr efs_readef_read_and_inc
+        clc
         adc zp_var_xb
         sta zp_var_xb
         jsr efs_readef_read_and_inc
         adc zp_var_xc
         sta zp_var_xc
-        jsr efs_readef
+        jsr efs_readef_read_and_inc
         adc zp_var_xd
         sta zp_var_xd
-        lda #17
+        lda #16
         jsr efs_readef_pointer_advance
 
         jmp @loop
@@ -1952,7 +2057,8 @@
         tax
         lda efs_readef_high
         tay
-        lda #$d0   ; ### bank mode from config
+        jsr rom_config_get_area_mode
+;        lda #$d0   ; ### bank mode from config
         jsr EAPISetPtr        
 
 ;        ldx #24
@@ -2026,7 +2132,8 @@
         adc #$80   ; ### memory offset from config
         tay
         ldx zp_var_x9
-        lda #$d0   ; ### bank mode from config
+;        lda #$d0   ; ### bank mode from config
+        jsr rom_config_get_area_mode
         jsr EAPISetPtr
 
         lda io_start_address
@@ -2142,7 +2249,8 @@
         clc
         adc #$80
         tay
-        lda #$d0  ; eapi bank mode ### from config
+;        lda #$d0  ; eapi bank mode ### from config
+        jsr rom_config_get_area_mode
         jsr EAPISetPtr
 
         ldx $3b  ; efs_directory_entry + efs_directory::size_low
@@ -2335,12 +2443,15 @@
         lda zp_var_x8
 
         cmp #$53    ; 'S'
-        bne @nomatch
+        bne @next1
         ; scratch
         jsr efs_directory_search
         bcs @notfound     ; not found
         jsr rom_scratch_process
         rts  ; error and .C set in rom_scratch_process
+
+      @next1:
+        jmp @nomatch
 
       @notfound:
         lda #ERROR_FILE_NOT_FOUND
@@ -2356,6 +2467,7 @@
 
     rom_scratch_process:
         ; configuration is at the correct area
+        ; efs_readef must be at the correct position
         jsr efs_init_eapiwriteinc  ; prepare dynamic code
 
         ; filedata are set
@@ -2380,10 +2492,10 @@
         ldy efs_readef_high
         jsr EAPISetPtr
 
-        ldx #$01
-        lda #$00
-        tay
-        jsr EAPISetLen
+;        ldx #$01
+;        lda #$00
+;        tay
+;        jsr EAPISetLen
 
         lda #$60
         sec  ; set to check for minieapi failures
@@ -2401,6 +2513,7 @@
 
 ; --------------------------------------------------------------------
 ; directory search functions
+; configuration has been set correctly
 ; usage:
 ;   35/36: pointer to configuration
 ;   37: name check result
@@ -2410,6 +2523,7 @@
 ;   39/3a: offset in bank (with $8000 added)
 ;   3b/3c/3d: size
 ;   read_ef: pointer is at begin of directory entry
+;   changed configuration settings
 
     dirsearch_temp_var_zp := $38
     dirsearch_name_pointer_zp := $3e
