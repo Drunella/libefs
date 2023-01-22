@@ -1,10 +1,12 @@
 ToDo
 ====
 
-- changes: only one banking mode necessary?
-- changes: only one size field necessary?
-- fixed functions to get area 1 and 2 data
-- only use one readef method with several initializations
+- changes: only one banking mode necessary? -> no, two
+- changes: only one size field necessary? -> possible
+- (ok) fixed functions to get area 1 and 2 data
+- (ok) only use one readef method with several initializations
+- different banking schemas
+- dirlist: blocks free
 
 - rw efs
   + alternate between two equally sized areas (ll and lh of same banks
@@ -14,7 +16,7 @@ ToDo
     copy all files to other location and erase previous location
   + calculate free size of used area by subtracting the active files
   
-- calculate size of rw area
+- (ok) calculate size of rw area
 
 - readst must indicate eof(eoi) before the last byte will be read
   (is this really a practical problem? readst is mostly done afte reading
@@ -49,12 +51,12 @@ ToDo
 
 - save
   + (ok) commands: scratch, 
-  + validate (defragment)
-  + additional errors: 
+  + (ok) validate (defragment)
+  + (ok) additional errors: 
     26:write protected
     72:disk full
-    63:file exists
-- ef can have several file systems
+    63:file exists -> scratch before write
+- (ok) ef can have several file systems
   + basic read-only file system: dir in 00:1:0000 - 00:1:17ff
   + two freely positioned file systems for read/write, must be of same size
   + these must always span full eraseable blocks

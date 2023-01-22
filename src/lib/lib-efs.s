@@ -969,14 +969,20 @@
         sta zp_pointer_configuration
 
         ; prepare return address
-        tsx
         lda #>(@return - 1)
-        sta $0100, x
-        dex
+        pha
         lda #<(@return - 1)
-        sta $0100, x
-        dex
-        txs
+        pha
+
+;        tsx
+;        lda #>(@return - 1)
+;        sta $0100, x
+;        dex
+;        lda #<(@return - 1)
+;        sta $0100, x
+;        dex
+;        txs
+;        cli
 
         jmp (zp_pointer_configuration)
       @return:
@@ -1011,14 +1017,18 @@
         sta zp_pointer_configuration
 
         ; prepare return address
-        tsx
         lda #>(@return - 1)
-        sta $0100, x
-        dex
+        pha
         lda #<(@return - 1)
-        sta $0100, x
-        dex
-        txs
+        pha
+;        tsx
+;        lda #>(@return - 1)
+;        sta $0100, x
+;        dex
+;        lda #<(@return - 1)
+;        sta $0100, x
+;        dex
+;        txs
 
         jmp (zp_pointer_configuration)
       @return:
@@ -1126,6 +1136,8 @@
     rom_config_get_value:
         ; config is stored in 35/36
         ; config address parameter in a
+        php  ; save status
+        sei
         pha  ; save a
         txa
         pha  ; save x
@@ -1143,6 +1155,7 @@
         pla
         tax
         pla  ; it will pop the result
+        plp  ; restores interrupt flag
         rts
 
 
@@ -1326,6 +1339,11 @@
         ; ### 
         ; ll, hh, lh mode
         lda zp_var_x8
+        
+        cmp #$00
+        bne :+
+        .byte $02  ; jam opcode to stop the emulator
+      :
         ldy zp_var_xa
         jsr efs_io_byte
 
@@ -1472,6 +1490,7 @@
       @leave:
         jsr rom_config_call_defragment_allclear  ; defragment finished
         jsr efs_finish_tempvars
+        clc
         rts
 
 
@@ -1752,19 +1771,41 @@
     rom_filesave_checksize:
         ; checks used file in 3b/3c/3d 
         ; against available size in 38/39/3a
-      sec
-      lda zp_var_x8
-      sbc zp_var_xb
-      lda zp_var_x9
-      sbc zp_var_xc
-      lda zp_var_xa
-      sbc zp_var_xd
-      ;bmi :+
-      bcc :+
-      clc
-      rts
-    : sec
-      rts
+        ; val1 >= Val2
+        ; 3b/3c/3d >= 38/39/3a
+        lda zp_var_xd  ; Val1 +2    ; high bytes
+        cmp zp_var_xa  ; Val2 +2
+        bcc @LsThan    ; hiVal1 < hiVal2 --> Val1 < Val2
+        bne @GrtEqu    ; hiVal1 != hiVal2 --> Val1 > Val2
+        lda zp_var_xc  ; Val1 +1    ; high bytes
+        cmp zp_var_x9  ; Val2 +1
+        bcc @LsThan    ; hiVal1 < hiVal2 --> Val1 < Val2
+        bne @GrtEqu    ; hiVal1 != hiVal2 --> Val1 > Val2
+        lda zp_var_xb  ; Val1       ; low bytes
+        cmp zp_var_x8  ; Val2
+        ;beq @Equal     ; Val1 = Val2
+        bcs @GrtEqu     ; loVal1 >= loVal2 --> Val1 >= Val2
+      @LsThan:
+        clc
+        rts
+
+      @GrtEqu:
+        sec
+        rts
+
+/*        lda 
+        sec
+        lda zp_var_x8
+        sbc zp_var_xb
+        lda zp_var_x9
+        sbc zp_var_xc
+        lda zp_var_xa
+        sbc zp_var_xd
+        bcc :+
+        clc
+        rts
+      : sec
+        rts*/
 
 
     rom_filesave_addsize:

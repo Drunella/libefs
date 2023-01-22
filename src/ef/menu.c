@@ -310,34 +310,30 @@ void longtest()
         gotoxy(0, CONSOLE_START_Y);
         cprintf("test run: %lu (errors: %lu)\n\r", counter, errors);
 
-//        for (i=0; i<4; i++) {
-
-/*            EFS_setnam_wrapper(filename, strlen(filename));
-            EFS_setlfs_wrapper(1, 0);
-            retval = EFS_load_wrapper(address, 0); // load
-            if (retval != 0) errors++;
+        EFS_setnam_wrapper(filename, strlen(filename));
+        EFS_setlfs_wrapper(1, 0);
+        retval = EFS_load_wrapper(address, 0); // load
+        if (retval != 0) errors++;
             
-            EFS_setnam_wrapper(filename, strlen(filename));
-            EFS_setlfs_wrapper(1, 0);
-            retval = EFS_load_wrapper(address, 1); // verify
-            if (retval != 0) errors++;
-            status = EFS_readst_wrapper();
-            if (status != 0x40) errors++;
+        EFS_setnam_wrapper(filename, strlen(filename));
+        EFS_setlfs_wrapper(1, 0);
+        retval = EFS_load_wrapper(address, 1); // verify
+        if (retval != 0) errors++;
+        status = EFS_readst_wrapper();
+        if (status != 0x40) errors++;
             
-            verify = atol(address);
-            if (verify != counter) errors++;
-*/           
-            counter++;
-            sprintf(address, "%lu", counter);
-            EFS_setnam_wrapper(filename, strlen(filename));
-            EFS_setlfs_wrapper(1, 0);
-            retval = EFS_save_wrapper(address, address + size);
-            if (retval != 0) errors++;
-            status = EFS_readst_wrapper();
-            if (status != 0x00) errors++;
+        verify = atol(address);
+        if (verify != counter) errors++;
+          
+        counter++;
+        sprintf(address, "%lu", counter);
+        EFS_setnam_wrapper(filename, strlen(filename));
+        EFS_setlfs_wrapper(1, 0);
+        retval = EFS_save_wrapper(address, address + size);
+        if (retval != 0) errors++;
+        status = EFS_readst_wrapper();
+        if (status != 0x00) errors++;
             
-//        }
-        
     }
 
     menu_clear(CONSOLE_START_Y, 24);

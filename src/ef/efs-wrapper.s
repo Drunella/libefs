@@ -62,7 +62,9 @@
         lda #$00   ; EFSLIB_ROM_BANK
         sta $de00
 
+;        sei
         jsr EFS_defragment
+;        cli
         pha
 
         lda #$36
@@ -84,7 +86,9 @@
         lda #$00   ; EFSLIB_ROM_BANK
         sta $de00
 
+;        sei
         jsr EFS_format
+;        cli
         pha
 
         lda #$36
@@ -151,7 +155,9 @@
 
     ; uint8_t __fastcall__ EFS_open_wrapper();
     _EFS_open_wrapper:
+;        sei
         jsr EFS_open
+;        cli
 
         bcc :+
         cmp #$00
@@ -163,7 +169,9 @@
 
     ; uint8_t __fastcall__ EFS_close_wrapper();
     _EFS_close_wrapper:
+;        sei
         jsr EFS_close
+;        cli
 
         bcc :+
         cmp #$00
@@ -178,7 +186,10 @@
         sta <sreg
         stx <sreg+1
 
+;        sei
         jsr EFS_chrin
+;        cli
+
         bcs :+
         ldy #$00
         sta (<sreg), y
@@ -193,7 +204,9 @@
 
     ; uint8_t __fastcall__ EFS_chrout_wrapper(uint8_t data);
     _EFS_chrout_wrapper:
+;        sei
         jsr EFS_chrout
+;        cli
         bcc :+
         ;cmp #$00
         ;bne :+
@@ -222,7 +235,9 @@
         ;    X: end address low
         ;    Y: end address high
         ;    .C: 1 if error
+;        sei
         jsr EFS_load
+;        cli
 
         stx end_address
         sty end_address + 1
@@ -251,7 +266,9 @@
         tax
 
         lda #$40
+;        sei
         jsr EFS_save
+;        cli
 
         bcc :+
         cmp #$00
