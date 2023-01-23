@@ -636,7 +636,7 @@
         jmp @leave
 
       @savecheck:
-        lda #%1100000  ; file save processing
+        lda #%11000000  ; file save processing
         sta internal_state
         jsr rom_filesave_chrin_prepare
 

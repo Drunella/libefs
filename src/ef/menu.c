@@ -25,7 +25,7 @@
 
 #define MENU_START_Y 2
 #define OUTPUT_START_Y 11
-#define CONSOLE_START_Y 15
+#define CONSOLE_START_Y 16
 #define ADDRESS 0x3000
 
 
@@ -126,7 +126,7 @@ void savefile(char* filename, char* address, uint16_t size)
 }
 
 
-void openfile(char* filename, uint8_t secondary)
+void openfile(char* filename, uint8_t secondary, uint8_t mode)
 {
     uint8_t retval, status;
 
@@ -134,7 +134,7 @@ void openfile(char* filename, uint8_t secondary)
     gotoxy(0, CONSOLE_START_Y);
     EFS_setnam_wrapper(filename, strlen(filename));
     EFS_setlfs_wrapper(1, secondary);
-    retval = EFS_open_wrapper();
+    retval = EFS_open_wrapper(mode);
     status = EFS_readst_wrapper();
     cprintf("open: sc=%d, rt=%d, st=$%02x\n\r", secondary, retval, status);
   
@@ -166,6 +166,31 @@ void readfile(void)
     cprintf("chrin: rt=%d, st=$%02x chksum=%u\n\r", retval, status, checksum);
     
 }
+
+void writefile(uint16_t size)
+{
+    uint8_t retval, status;
+    uint16_t i = 0;
+    char* address = (char*)(ADDRESS);
+
+    menu_clear(CONSOLE_START_Y, 24);
+    gotoxy(0, CONSOLE_START_Y);
+
+    EFS_chrout_wrapper((uint8_t)(address) & 0xff);
+    EFS_chrout_wrapper((uint8_t)((uint16_t)address >> 8) & 0xff);
+
+    i = 0;
+    while (i < size) {
+        retval = EFS_chrout_wrapper(address[i]);
+        if (retval != 0) break;
+        i++;
+    }
+
+    status = EFS_readst_wrapper();
+    cprintf("chrout: rt=%d, st=$%02x size=%d\n\r", retval, status, i);
+
+}
+
 
 void closefile(void)
 {
@@ -213,7 +238,7 @@ void scratchfile(char* cmdname)
 
     EFS_setnam_wrapper(cmdname, strlen(cmdname));
     EFS_setlfs_wrapper(15, 0); // command channel, do not relocate
-    retval = EFS_open_wrapper();
+    retval = EFS_open_wrapper(0);
     status = EFS_readst_wrapper();
     EFS_close_wrapper();
     cprintf("scratch: st=$%02x, rt=%d\n\r", status, retval);
@@ -289,7 +314,7 @@ void longtest()
     char* address = (char*)(ADDRESS);
     uint16_t size = 2687; // 2816;
 //    uint16_t size = 26;
-    uint16_t i;
+//    uint16_t i;
     char c;
     uint32_t counter = 0;
     uint32_t errors = 0;
@@ -341,8 +366,6 @@ void longtest()
     gotoxy(0, CONSOLE_START_Y);
     cprintf("result: %lu runs, %lu errors\n\r", counter, errors);
 
-    
-    
 }
 
 
@@ -350,7 +373,7 @@ void main(void)
 {
     bool repaint;
     static char filename_data[20];
-    uint8_t secondary;
+    uint8_t secondary, mode;
     char* filename;
     char* commandname;
     char* address;
@@ -365,6 +388,7 @@ void main(void)
     draw_startmenu();
     sprintf(filename, "delme384");
     secondary = 0;
+    mode = 0;
     memset((char*)ADDRESS, 0, 0x6000);
     cleartoggle = 0;
     
@@ -392,13 +416,14 @@ void main(void)
             menu_option(20, wherey(), '0', "Defragment");
             menu_option(20, wherey(), '3', "Open file");
             menu_option(20, wherey(), '4', "Close file");
-            menu_option(20, wherey(), '5', "Read file");
+            menu_option(20, wherey(), '5', "R/W file");
             menu_option(20, wherey(), '6', "Directory");
             menu_option(20, wherey(), '8', "Save file");
             gotoxy(0, OUTPUT_START_Y);
             //cprintf("%x (4a:60,9 a6:60,1 51:50,9 c0:50,1)\n\r", sysident);
             draw_system(sysident);
             cprintf("filename: '%s'\n\r", filename);
+            cprintf("mode: %d\n\r", mode);
             cprintf("secondary: %d\n\r", secondary);
             draw_version();
             gotoxy(0, CONSOLE_START_Y);
@@ -442,6 +467,11 @@ void main(void)
             repaint = 1;
             break;
 
+        case 'm':
+            if (mode == 0) mode = 1; else mode = 0;
+            repaint = 1;
+            break;
+
         case 't':
             longtest();
             repaint = 1;
@@ -464,7 +494,7 @@ void main(void)
             break;
 
         case '3':
-            openfile(filename, secondary);
+            openfile(filename, secondary, mode);
             repaint = true;
             break;
 
@@ -474,7 +504,11 @@ void main(void)
             break;
 
         case '5':
-            readfile();
+            if (mode == 0) {
+                readfile();
+            } else {
+                writefile(512);
+            }
             repaint = true;
             break;
 

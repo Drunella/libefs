@@ -214,7 +214,12 @@
       @next3:
         jsr EAPIGetBank  ; check overflow
         cmp io_end_address + 1
-        bne @done
+        beq @overflow
+        lda #$00
+        clc
+        beq @done
+
+      @overflow:
         lda #ERROR_DISK_FULL
         sta error_byte
         lda #STATUS_EOF
@@ -333,7 +338,6 @@
       @savefile:
         lda #$00
         sta error_byte
-        jsr rom_filesave_begin
 
         ; prepare filesize
         jsr rom_filesave_begin
@@ -1322,23 +1326,25 @@
 
         ; get bank for overflow checking
         jsr rom_config_get_area_bank
-        sta filename_length + 1
+        sta io_end_address + 1
         jsr rom_config_get_area_mode
         cmp #$d0
-        bne @lhlh
+        beq @lhlh
 
         jsr rom_config_get_area_size
         clc
-        adc filename_length + 1
-        sta filename_length + 1
+        adc io_end_address + 1
+        and #%00111111  ; max bank
+        sta io_end_address + 1
         jmp @continue
 
       @lhlh:
         jsr rom_config_get_area_size
         lsr a
         clc
-        adc filename_length + 1
-        sta filename_length + 1
+        adc io_end_address + 1
+        and #%00111111  ; max bank
+        sta io_end_address + 1
 
       @continue:
         lda zp_var_x8
@@ -1357,7 +1363,7 @@
         sta io_start_address
         sta io_start_address + 1
         sta io_end_address
-        sta io_end_address + 1
+        ;sta io_end_address + 1
 
         rts
 

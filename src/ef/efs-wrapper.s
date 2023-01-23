@@ -153,7 +153,7 @@
         rts
 
 
-    ; uint8_t __fastcall__ EFS_open_wrapper();
+    ; uint8_t __fastcall__ EFS_open_wrapper(uint8_t mode);
     _EFS_open_wrapper:
 ;        sei
         jsr EFS_open
@@ -208,8 +208,8 @@
         jsr EFS_chrout
 ;        cli
         bcc :+
-        ;cmp #$00
-        ;bne :+
+        cmp #$00
+        bne :+
         lda #$ff  ; no error value?
     :   ldx #$00
         rts

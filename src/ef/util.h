@@ -41,7 +41,7 @@ uint8_t __fastcall__ EFS_readst_wrapper(void);
 void __fastcall__ EFS_setnam_wrapper(char* name, uint8_t length);
 void __fastcall__ EFS_setlfs_wrapper(uint8_t logicalchannel, uint8_t secondary);
 uint8_t __fastcall__ EFS_load_wrapper(char* address, uint8_t mode);
-uint8_t __fastcall__ EFS_open_wrapper(void);
+uint8_t __fastcall__ EFS_open_wrapper(uint8_t mode);
 uint8_t __fastcall__ EFS_close_wrapper(void);
 uint8_t __fastcall__ EFS_chrin_wrapper(uint8_t* data);
 uint8_t __fastcall__ EFS_chrout_wrapper(uint8_t data);
