@@ -59,6 +59,7 @@
 .export rom_chrout_body
 .export rom_defragment_body
 .export rom_format_body
+.export rom_filesave_chrin_prepare
 
 .export rom_command_process
 .export rom_command_begin
@@ -173,17 +174,59 @@
 
     rom_chrout_body:
         ; character in a
-        ; ### no zeropage usage
+        ; no zeropage usage
+        tax
+        lda internal_state
+        bne @next
+        sec
+        lda #ERROR_FILE_NOT_OPEN
+        sta error_byte
+        bne @done
+
+      @next:
+        bit internal_state  ; we check for bit 7/6 == 1/1
+        bpl @error  ; branch if bit 7 is clear
+        bvc @error  ; branch if bit 6 is clear
+
+        txa
+        jsr efs_io_byte  ; write file
+        ; size field pointer in filename_address and filename_length(bank)
+        ; size in io_start_address, io_end_address low
+        bcs @writeerror
+        clc
+        lda #$00
+        inc io_start_address
+        bne @done
+        inc io_start_address + 1
+        bne @done
+        inc io_end_address
+        beq @done
+
+      @writeerror:
+        sec
+        lda #ERROR_WRITE_ERROR
+        sta error_byte
+        bne @done
+
+      @error:
+        sec
+        lda #ERROR_NO_OUTPUT_FILE
+        sta error_byte
+        ;bne @done
+
+      @done:
+        jmp efs_bankout  ; ends with rts
+
         ; check if character may be written (file not open: $03, not output file: $07)
         ; write character
         ;jsr efs_write_byte
-        sec
-        lda #ERROR_DEVICE_NOT_PRESENT
-        sta error_byte
+;        sec
+;        lda #ERROR_DEVICE_NOT_PRESENT
+;        sta error_byte
         ; ### check if writing succeeded or failed
         ; .C set if error
         ; status set to $40 if device full
-        jmp efs_bankout  ; ends with rts
+;        jmp efs_bankout  ; ends with rts
 
 
     rom_save_body:
@@ -970,6 +1013,14 @@
 ;   io_end_address
 ;   filename_address
 ;   filename_length
+
+    rom_filesave_chrin_prepare:
+        ; size field pointer in filename_address and filename_length(bank)
+        ; size in io_start_address, io_end_address low
+        lda #$05
+        sec
+        rts
+
 
     rom_filesave_begin:
         ; prepare variables for save

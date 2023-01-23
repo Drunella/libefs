@@ -29,26 +29,7 @@
 .export rom_defragment_body
 .export rom_format_body
 .export rom_save_body
-
-;.import __LOADER_LOAD__
-;.import __LOADER_RUN__
-;.import __LOADER_SIZE__
-
-;.import __IO_WRAPPER_LOAD__
-;.import __IO_WRAPPER_RUN__
-;.import __IO_WRAPPER_SIZE__
-
-;.import __EAPI_START__
-
-
-;.import _load_eapi
-;.import _wrapper_setnam
-;.import _wrapper_load
-;.import _wrapper_save
-
-
-;.export _init_loader
-;.export _init_loader_blank
+.export rom_filesave_chrin_prepare
 
 
 .segment "CODE"
@@ -107,6 +88,7 @@
     rom_defragment_body:
     rom_format_body:
     rom_save_body:
+    rom_filesave_chrin_prepare:
         lda #$05
         sta error_byte
         sec

@@ -63,6 +63,7 @@
 .import rom_defragment_body
 .import rom_chrout_body
 .import rom_save_body
+.import rom_filesave_chrin_prepare
 .export rom_chrin_body
 .export rom_close_body
 .export rom_open_body
@@ -73,7 +74,6 @@
 .export restore_zeropage
 .export backup_zeropage
 
-;.export efs_init_setstartbank
 .export efs_setstartbank_ext
 
 .export rom_config_get_value
@@ -583,7 +583,9 @@
 
 
     rom_open_body:
-        ; no parameters, returns A, .C
+        ; parameters: A: 0: read; 1: write
+        ; returns A, .C
+        pha  ; save read/write
         jsr backup_zeropage
 
         lda #$00         ; reset state and error
@@ -591,11 +593,17 @@
         sta error_byte
 
         lda internal_state  ; check if file open
-        beq @commandcheck
+        beq @loadsavecheck
+        pla
         lda #ERROR_FILE_OPEN
         sta error_byte
         sec
         bne @leave
+
+      @loadsavecheck:
+        pla
+        beq @commandcheck
+        jmp @savecheck
 
       @commandcheck:
         lda efs_flags
@@ -624,6 +632,12 @@
         sta internal_state
         jsr rom_fileload_begin
         clc
+        jmp @leave
+
+      @savecheck:
+        lda #%1100000  ; file save processing
+        sta internal_state
+        jsr rom_filesave_chrin_prepare
 
       @leave:
         php  ; save carry
