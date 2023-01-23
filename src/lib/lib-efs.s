@@ -879,13 +879,30 @@
         rts
 
 
+    efs_readef_dirboundary:
+        ; check if directory cursor is out of bounds
+        ; .C set if out of bounds
+        ; base address in a
+        clc
+        adc #>DIRECTORY_SIZE
+;        lda efs_readef_high
+;        cmp #$b8  ; directory boundary
+        cmp efs_readef_high
+        beq @out
+        bcc @out
+        clc
+        rts
+      @out:
+        sec
+        rts
+
+
 
 ; --------------------------------------------------------------------
 ; efs config functions
 ; 35/36 temporary variable
 
     zp_pointer_configuration = $35 ; $36
-
 
     rom_flags_set_area:
         ; area is in a
@@ -1338,12 +1355,7 @@
       @loop:
         ; ### 
         ; ll, hh, lh mode
-        lda zp_var_x8
-        
-        cmp #$00
-        bne :+
-        .byte $02  ; jam opcode to stop the emulator
-      :
+        lda zp_var_x8        
         ldy zp_var_xa
         jsr efs_io_byte
 
@@ -1433,7 +1445,7 @@
         jsr rom_config_get_area_addr_high_invert
         sta zp_var_xf  ; dir pointer
         clc
-        adc #$18  ; ### offset for files start, from config?
+        adc #>DIRECTORY_SIZE  ; offset for files start
         sta zp_var_xa  ; file pointer
 
         jsr rom_config_get_area_mode_invert
@@ -1441,7 +1453,10 @@
 
         ; start iterating through source directory
       @loop:
-        ; ### check overflow of directory
+        jsr rom_config_get_area_addr_high
+        jsr efs_readef_dirboundary
+        bcs @leave  ; directory out of bounds
+
         ldy #16  ; offset for flag
         jsr efs_readef
         cmp #$ff  ; we are finished
@@ -1461,9 +1476,11 @@
         sta efs_readef_storedaddr_low
         iny      ; offset high
         jsr efs_readef
-        clc
-        adc #$80  ; ### correct value from config
         sta efs_readef_storedaddr_high
+        jsr rom_config_get_area_addr_high
+        clc
+        adc efs_readef_storedaddr_high
+        sta efs_readef_storedaddr_high 
 
         iny      ; size low
         jsr efs_readef
@@ -1739,31 +1756,35 @@
         lda efs_readef_high
         pha
 
-        ldx #$00
+        ldx #$ff  ; 255 free entries
         lda #16
         jsr efs_readef_pointer_advance
 
-      : dex
+      @loop:
+        dex
+        beq @leave
         jsr efs_readef
         cmp #$ff
-        beq :+
+        beq @leave
         lda #24
         jsr efs_readef_pointer_advance
-        jmp :-
+        jmp @loop
 
         ; reset directory
-      : pla
+      @leave:
+        pla
         sta efs_readef_high
         pla
         sta efs_readef_low
 
         txa
-        bne :+
+        bne @error
 
         lda #ERROR_DISK_FULL
         sec
         rts
-      : lda #$00
+      @error:
+        lda #$00
         clc
         rts
 
@@ -1792,20 +1813,6 @@
       @GrtEqu:
         sec
         rts
-
-/*        lda 
-        sec
-        lda zp_var_x8
-        sbc zp_var_xb
-        lda zp_var_x9
-        sbc zp_var_xc
-        lda zp_var_xa
-        sbc zp_var_xd
-        bcc :+
-        clc
-        rts
-      : sec
-        rts*/
 
 
     rom_filesave_addsize:
@@ -1864,7 +1871,7 @@
 
         sec       ; reduce by dirctory
         lda zp_var_x9
-        sbc #$18  ; ### value from config
+        sbc #>DIRECTORY_SIZE
         sta zp_var_x9
         bcs :+
         dec zp_var_xa
@@ -1891,7 +1898,9 @@
         ;sta zp_var_xd
 
       @loop:
-        ; ### check overflow
+        jsr rom_config_get_area_addr_high
+        jsr efs_readef_dirboundary
+        bcs @leave  ; directory out of bounds
         jsr efs_readef
         cmp #$ff
         beq @leave
@@ -1947,10 +1956,12 @@
         sta zp_var_xd
 
       @loop:
-        ; ### check overflow
+        jsr rom_config_get_area_addr_high
+        jsr efs_readef_dirboundary
+        bcs @leave  ; directory out of bounds
         jsr efs_readef
         cmp #$ff
-        beq :+  ; leave
+        beq @leave  ; leave
         lda #5  ; move to size
         jsr efs_readef_pointer_advance
         jsr efs_readef_read_and_inc
@@ -1969,7 +1980,8 @@
         jmp @loop
 
         ; reset directory
-      : pla
+      @leave:
+        pla
         sta efs_readef_high
         pla
         sta efs_readef_low
@@ -2023,9 +2035,10 @@
         sta efs_readef_high
 
         ; set file offset
-        lda #$00      ; ### get from config
+        ;lda #<DIRECTORY_SIZE
+        lda #$00
         sta zp_var_x9
-        lda #$18      ; ### get from config, relative offset
+        lda #>DIRECTORY_SIZE
         sta zp_var_xa
 
         jsr rom_filesave_nextentry
@@ -2099,13 +2112,7 @@
         lda efs_readef_high
         tay
         jsr rom_config_get_area_mode
-;        lda #$d0   ; ### bank mode from config
         jsr EAPISetPtr        
-
-;        ldx #24
-;        ldy #$00
-;        lda #$00
-;        jsr EAPISetLen
 
         lda filename_address
         sta zp_var_xe
@@ -2168,12 +2175,11 @@
 
         jsr efs_init_readmem
         
-        lda zp_var_xa
+        jsr rom_config_get_area_addr_high
         clc
-        adc #$80   ; ### memory offset from config
+        adc zp_var_xa
         tay
         ldx zp_var_x9
-;        lda #$d0   ; ### bank mode from config
         jsr rom_config_get_area_mode
         jsr EAPISetPtr
 
@@ -2194,7 +2200,7 @@
         jsr efs_readmem
         jsr efs_io_byte
         bcs @error
-        inc zp_var_xe  ; ### change to iny
+        inc zp_var_xe
         bne :+
         inc zp_var_xf
       : jsr rom_filesave_decrease_size
@@ -2234,6 +2240,7 @@
     rom_filesave_nextentry:
         ; config must be set properly
         ; directory must be set properly
+        ; no out of bounds check, has been done in confitions check
         ; result of last file
         ;   38: bank
         ;   39/3a: offset in bank (without $8000 added)
@@ -2242,9 +2249,14 @@
         jsr efs_readef_pointer_advance
 
       @loop:
+;        jsr rom_config_get_area_addr_high
+;        clc
+;        adc #24  ; last entry must stay empty
+;        jsr efs_readef_dirboundary
+;        bcs @error16  ; directory out of bounds
         jsr efs_readef_read_and_inc
         cmp #$ff
-        beq @leave
+        beq @leave17
         jsr efs_readef_read_and_inc  ; reads bank
         sta zp_var_x8
         jsr efs_readef_pointer_inc   ; reserved
@@ -2263,9 +2275,15 @@
         jsr efs_readef_pointer_advance
         jmp @loop
 
-      @leave:
-        lda #17    ; to directory begin
+;      @error16:
+;        lda #16    ; to directory begin
+;        jsr efs_readef_pointer_reverse
+;        sec
+;        rts
+      @leave17:
+        lda #17    ; to directory entry begin
         jsr efs_readef_pointer_reverse
+        clc
         rts
 
 
@@ -2281,25 +2299,25 @@
 ;   3e/3f: pointer to data
 ; 
     rom_fileload_begin:
-        ; ### load config
+        jsr rom_config_prepare_config
         jsr efs_init_eapireadinc  ; repair dynamic code
 
         ; directory entry
-        ldx $39  ; efs_directory_entry + efs_directory::offset_low
-        lda $3a  ; efs_directory_entry + efs_directory::offset_high
+        ldx zp_var_x9  ; efs_directory_entry + efs_directory::offset_low
+        jsr rom_config_get_area_addr_high
         clc
-        adc #$80
+        adc zp_var_xa  ; efs_directory_entry + efs_directory::offset_high
+        sta zp_var_xa
         tay
-;        lda #$d0  ; eapi bank mode ### from config
         jsr rom_config_get_area_mode
         jsr EAPISetPtr
 
-        ldx $3b  ; efs_directory_entry + efs_directory::size_low
-        ldy $3c  ; efs_directory_entry + efs_directory::size_high
-        lda $3d  ; efs_directory_entry + efs_directory::size_upper
+        ldx zp_var_xb  ; efs_directory_entry + efs_directory::size_low
+        ldy zp_var_xc  ; efs_directory_entry + efs_directory::size_high
+        lda zp_var_xd  ; efs_directory_entry + efs_directory::size_upper
         jsr EAPISetLen
 
-        lda $38  ; efs_directory_entry + efs_directory::bank
+        lda zp_var_x8  ; efs_directory_entry + efs_directory::bank
         jsr efs_setstartbank_ext
 
         rts
@@ -2307,22 +2325,22 @@
 
     rom_fileload_address:
         jsr efs_io_byte ; load address
-        sta $3e
+        sta zp_var_xe
         jsr efs_io_byte
-        sta $3f
+        sta zp_var_xf
         ;lda efs_secondary  ; 0=load to X/Y, 1=load to prg address
         lda #LIBEFS_FLAGS_RELOCATE
         bit efs_flags
         bne :+              ; set: load to X/Y, clear: no relocate
         jmp :++
       : lda io_start_address  ; load to relocation address (X/Y)
-        sta $3e
+        sta zp_var_xe
         lda io_start_address + 1
-        sta $3f
+        sta zp_var_xf
 
-      : lda $3e
+      : lda zp_var_xe
         sta io_start_address
-        lda $3f
+        lda zp_var_xf
         sta io_start_address + 1
 
         rts
@@ -2334,30 +2352,30 @@
         jsr efs_io_byte
         bcs @eof
         ldy #$00
-        sta ($3e), y
-        inc $3e
+        sta (zp_var_xe), y
+        inc zp_var_xe
         bne @loop
-        inc $3f
+        inc zp_var_xf
         jmp @loop
 
       @eof:
         clc
         tya
-        adc $3e
-        sta $3e
+        adc zp_var_xe
+        sta zp_var_xe
         bcc :+
-        inc $3f
-      : lda $3e
+        inc zp_var_xf
+      : lda zp_var_xe
         bne :+
-        dec $3f
-      : dec $3e
+        dec zp_var_xf
+      : dec zp_var_xe
      
         lda #$40
         sta status_byte
 
-        lda $3e
+        lda zp_var_xe
         sta io_end_address
-        lda $3f
+        lda zp_var_xf
         sta io_end_address + 1
 
         clc
@@ -2374,18 +2392,18 @@
         jsr efs_generic_command
         cmp zp_var_x7
         bne @mismatch
-        inc $3e
+        inc zp_var_xe
         bne @loop
-        inc $3f
+        inc zp_var_xf
         jmp @loop
 
       @eof:
         lda #$40
         sta status_byte
-        lda $3e  ; verify successful, reduce address by one
+        lda zp_var_xe  ; verify successful, reduce address by one
         bne :+
-        dec $3f
-      : dec $3e
+        dec zp_var_xf
+      : dec zp_var_xe
         jmp @leave
 
       @mismatch:
@@ -2395,14 +2413,14 @@
       @leave:
         clc
         tya
-        adc $3e
-        sta $3e
+        adc zp_var_xe
+        sta zp_var_xe
         bcc :+
-        inc $3f
+        inc zp_var_xf
 
-      : lda $3e
+      : lda zp_var_xe
         sta io_end_address
-        lda $3f
+        lda zp_var_xf
         sta io_end_address + 1
 
         lda status_byte
@@ -2627,10 +2645,10 @@
         rts
 
 
-    efs_directory_empty:
+/*    efs_directory_empty:
         ; find next empty directory entry
         ; ###
-        rts
+        rts*/
 
 
     rom_dirsearch_filedata:
@@ -2742,12 +2760,12 @@
         rts
 
 
-    rom_dirsearch_checkboundary:
+/*    rom_dirsearch_checkboundary:
         ; check if directory cursor is out of bounds
         ; .C set if out of bounds
         lda efs_readef_high
         cmp #$b8        
-        rts
+        rts*/
 
     rom_dirsearch_is_terminator:
         ; A: value
@@ -2780,7 +2798,10 @@
         bcs @error4    ; terminator, file not found
         cmp #$00       ; compare for invalid
         beq @nomatch   ; file not valid
-        jsr rom_dirsearch_checkboundary
+        jsr rom_config_get_area_addr_high
+        jsr efs_readef_dirboundary
+;        bcs @leave  ; directory out of bounds
+;        jsr rom_dirsearch_checkboundary
         bcs @error4    ; over bounds, file not found
         jmp @next
       @error4:

@@ -20,6 +20,10 @@ ZEROPAGE_SIZE .set 11
 ZEROPAGE_BACKUP_END = $3f
 GENERIC_COMMAND_SIZE .set 14
 
+; must be page aligned
+DIRECTORY_SIZE = $1800
+
+
 zp_var_xf := ZEROPAGE_BACKUP_END
 zp_var_xe := ZEROPAGE_BACKUP_END - 1
 zp_var_xd := ZEROPAGE_BACKUP_END - 2
