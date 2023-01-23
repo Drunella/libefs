@@ -287,8 +287,8 @@ void longtest()
     // after a run, the file must still be correct
     uint8_t retval, status;
     char* address = (char*)(ADDRESS);
-//    uint16_t size = 2687; // 2816;
-    uint16_t size = 26;
+    uint16_t size = 2687; // 2816;
+//    uint16_t size = 26;
     uint16_t i;
     char c;
     uint32_t counter = 0;
