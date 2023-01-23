@@ -60,6 +60,7 @@
 .export rom_defragment_body
 .export rom_format_body
 .export rom_filesave_chrin_prepare
+.export rom_filesave_chrin_close
 
 .export rom_command_process
 .export rom_command_begin
@@ -177,13 +178,21 @@
         ; no zeropage usage
         tax
         lda internal_state
-        bne @next
+        bne @next1
         sec
         lda #ERROR_FILE_NOT_OPEN
         sta error_byte
         bne @done
 
-      @next:
+      @next1:
+        lda status_byte    ; previous eof -> disk full
+        beq @next2
+        lda #ERROR_DISK_FULL
+        sta error_byte
+        sec
+        beq @done
+
+      @next2:
         bit internal_state  ; we check for bit 7/6 == 1/1
         bpl @error  ; branch if bit 7 is clear
         bvc @error  ; branch if bit 6 is clear
@@ -193,14 +202,24 @@
         ; size field pointer in filename_address and filename_length(bank)
         ; size in io_start_address, io_end_address low
         bcs @writeerror
-        clc
+
+        clc ; increase size
         lda #$00
         inc io_start_address
-        bne @done
+        bne @next3
         inc io_start_address + 1
-        bne @done
+        bne @next3
         inc io_end_address
-        beq @done
+        beq @next3
+      @next3:
+        jsr EAPIGetBank  ; check overflow
+        cmp io_end_address + 1
+        bne @done
+        lda #ERROR_DISK_FULL
+        sta error_byte
+        lda #STATUS_EOF
+        sta status_byte
+        bne @done
 
       @writeerror:
         sec
@@ -216,17 +235,6 @@
 
       @done:
         jmp efs_bankout  ; ends with rts
-
-        ; check if character may be written (file not open: $03, not output file: $07)
-        ; write character
-        ;jsr efs_write_byte
-;        sec
-;        lda #ERROR_DEVICE_NOT_PRESENT
-;        sta error_byte
-        ; ### check if writing succeeded or failed
-        ; .C set if error
-        ; status set to $40 if device full
-;        jmp efs_bankout  ; ends with rts
 
 
     rom_save_body:
@@ -278,6 +286,7 @@
         jsr rom_filesave_begin
         bcs @leave
         jsr rom_filesave_transfer_dir
+        jsr rom_filesave_transfer_dir_size
         jsr rom_filesave_transfer_data
         
       @leave:
@@ -288,6 +297,61 @@
         plp
         lda error_byte
         jmp efs_bankout  ; ends with rts
+
+
+    rom_filesave_chrin_prepare:
+        ; size field pointer in filename_address and filename_length(bank)
+        ; size in io_start_address, io_end_address low
+
+        jsr rom_dirload_isrequested
+        bcc @checkname
+        lda #ERROR_MISSING_FILENAME
+        sta error_byte
+        sec
+        bne @leave
+
+      @checkname:
+        ; assume certain filesize
+        lda #$00
+        sta io_start_address
+        sta io_start_address + 1
+        sta io_end_address
+        lda #$20  ; ### assume ?
+        sta io_end_address + 1
+
+        jsr rom_filesave_conditions
+        bcs @leave
+        jsr efs_directory_search
+        bcs @savefile ; not found
+        jsr rom_scratch_process
+        bcs @leave
+;        lda #ERROR_FILE_EXISTS  ; ### delete instead?
+;        sta error_byte
+;        sec
+;        bne @leave
+
+      @savefile:
+        lda #$00
+        sta error_byte
+        jsr rom_filesave_begin
+
+        ; prepare filesize
+        jsr rom_filesave_begin
+        bcs @leave
+        jsr rom_filesave_transfer_dir
+        jsr rom_filesave_transfer_data_prepare
+
+      @leave:
+        rts
+
+
+    rom_filesave_chrin_close:
+        jsr rom_config_prepare_config  ; first call to config
+
+        jsr rom_filesave_transfer_dir_finish
+
+        clc
+        rts
 
 
 
@@ -1014,14 +1078,6 @@
 ;   filename_address
 ;   filename_length
 
-    rom_filesave_chrin_prepare:
-        ; size field pointer in filename_address and filename_length(bank)
-        ; size in io_start_address, io_end_address low
-        lda #$05
-        sec
-        rts
-
-
     rom_filesave_begin:
         ; prepare variables for save
         ; usage:
@@ -1213,6 +1269,10 @@
         lda zp_var_xa
         jsr efs_io_byte
 
+        clc
+        rts
+
+    rom_filesave_transfer_dir_size:
         lda zp_var_xb
         jsr efs_io_byte
         lda zp_var_xc
@@ -1221,6 +1281,84 @@
         jsr efs_io_byte
 
         clc
+        rts
+
+
+    rom_filesave_transfer_dir_finish:
+        jsr efs_init_eapiwriteinc  ; repair dynamic code
+
+        lda filename_length
+        jsr efs_setstartbank_ext
+        
+        ldx filename_address
+        ldy filename_address + 1
+        jsr rom_config_get_area_mode
+        jsr EAPISetPtr
+
+        lda io_start_address
+        jsr efs_io_byte
+        lda io_start_address + 1
+        jsr efs_io_byte
+        lda io_end_address
+        jsr efs_io_byte
+
+        clc
+        rts
+
+
+    rom_filesave_transfer_data_prepare:
+        ; usage:
+        ;   38: bank
+        ;   39/3a: offset in bank (with $8000 added)
+        clc
+        lda efs_readef_low
+        adc #21
+        sta filename_address
+        lda efs_readef_high
+        adc #$00  ; add carry
+        sta filename_address + 1
+        jsr EAPIGetBank  
+        sta filename_length
+
+        ; get bank for overflow checking
+        jsr rom_config_get_area_bank
+        sta filename_length + 1
+        jsr rom_config_get_area_mode
+        cmp #$d0
+        bne @lhlh
+
+        jsr rom_config_get_area_size
+        clc
+        adc filename_length + 1
+        sta filename_length + 1
+        jmp @continue
+
+      @lhlh:
+        jsr rom_config_get_area_size
+        lsr a
+        clc
+        adc filename_length + 1
+        sta filename_length + 1
+
+      @continue:
+        lda zp_var_x8
+        jsr efs_setstartbank_ext
+
+        jsr rom_config_get_area_addr_high
+        clc
+        adc zp_var_xa
+        tay
+        ldx zp_var_x9
+        jsr rom_config_get_area_mode
+        jsr EAPISetPtr
+
+        ; prepare vars for filesize
+        lda #$00
+        sta io_start_address
+        sta io_start_address + 1
+        sta io_end_address
+        sta io_end_address + 1
+
         rts
 
 

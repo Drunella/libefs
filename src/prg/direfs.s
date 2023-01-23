@@ -30,7 +30,7 @@
 .export rom_format_body
 .export rom_save_body
 .export rom_filesave_chrin_prepare
-
+.export rom_filesave_chrin_close
 
 .segment "CODE"
 
@@ -89,6 +89,7 @@
     rom_format_body:
     rom_save_body:
     rom_filesave_chrin_prepare:
+    rom_filesave_chrin_close:
         lda #$05
         sta error_byte
         sec

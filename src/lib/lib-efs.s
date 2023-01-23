@@ -64,6 +64,7 @@
 .import rom_chrout_body
 .import rom_save_body
 .import rom_filesave_chrin_prepare
+.import rom_filesave_chrin_close
 .export rom_chrin_body
 .export rom_close_body
 .export rom_open_body
@@ -550,7 +551,7 @@
         beq @done
 
       @fileop:
-        bit internal_state  ; we check for bit 7/6 == 1/0
+        bit internal_state  ; we check for bit 7/6 == 0/1
         bpl @dirop  ; branch if bit 7 is clear
         bvs @dirop  ; branch if bit 6 is set
         jsr efs_io_byte  ; read file
@@ -655,12 +656,19 @@
         sta error_byte
 
         lda internal_state
-        bne :+
+        bne @close
         sec 
         lda #ERROR_FILE_NOT_OPEN
         sta error_byte
 
-      : lda #$00
+      @close:
+        bit internal_state  ; we check for bit 7/6 == 1/1
+        bpl @next  ; branch if bit 7 is clear
+        bvc @next  ; branch if bit 6 is clear
+        jsr rom_filesave_chrin_close
+
+      @next:
+        lda #$00
         sta internal_state
 
         lda error_byte
