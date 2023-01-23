@@ -21,6 +21,15 @@
 .include "../ef/easyflash.i"
 
 
+.import error_byte
+
+.export rom_chrout_body
+.export rom_command_begin
+.export rom_command_process
+.export rom_defragment_body
+.export rom_format_body
+.export rom_save_body
+
 ;.import __LOADER_LOAD__
 ;.import __LOADER_RUN__
 ;.import __LOADER_SIZE__
@@ -90,3 +99,16 @@
         .byte "$"
     dir_name_length = * - dir_name
 
+
+    ; external
+    rom_chrout_body:
+    rom_command_begin:
+    rom_command_process:
+    rom_defragment_body:
+    rom_format_body:
+    rom_save_body:
+        lda #$05
+        sta error_byte
+        sec
+        rts
+    

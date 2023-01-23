@@ -176,7 +176,7 @@
 
 ;        jsr efs_init_setstartbank
         ldy dirload_temp_var_zp
-        lda ($35), y  ; at libefs_config::libefs_area::bank
+        lda (zp_var_x5), y  ; at libefs_config::libefs_area::bank
 ;        jsr efs_generic_command
         jsr efs_setstartbank_ext
         sta efs_readef_bank
@@ -186,12 +186,12 @@
 
         inc dirload_temp_var_zp
         ldy dirload_temp_var_zp
-        lda ($35), y  ; at libefs_config::libefs_area::addr low
+        lda (zp_var_x5), y  ; at libefs_config::libefs_area::addr low
         sta efs_readef_low
 
         inc dirload_temp_var_zp
         ldy dirload_temp_var_zp
-        lda ($35), y  ; at libefs_config::libefs_area::addr high
+        lda (zp_var_x5), y  ; at libefs_config::libefs_area::addr high
         sta efs_readef_high
 
         ; banking mode and size is irrelevant in dirload
@@ -312,11 +312,11 @@
         asl
         tax
         lda rom_dirload_statemachine, x
-        sta $3c
+        sta zp_var_xc
         lda rom_dirload_statemachine + 1, x
-        sta $3d
+        sta zp_var_xd
         clc
-        jmp ($003c)
+        jmp ($0000 + zp_var_xc)
 
     rom_dirload_statemachine:
         .addr rom_dirload_sm_finish        ; 0
@@ -359,14 +359,15 @@
         .addr rom_dirload_sm_quotationmark ; 33
         .addr rom_dirload_sm_filename      ; 34
         .addr rom_dirload_sm_quotationmark ; 35
-        .addr rom_dirload_sm_type_begin    ; 36
-        .addr rom_dirload_sm_type_next     ; 37
+        .addr rom_dirload_sm_filenamefill  ; 36
+        .addr rom_dirload_sm_type_begin    ; 37
         .addr rom_dirload_sm_type_next     ; 38
         .addr rom_dirload_sm_type_next     ; 39
-        .addr rom_dirload_sm_writeprot     ; 40
-        .addr rom_dirload_sm_space         ; 41
+        .addr rom_dirload_sm_type_next     ; 40
+        .addr rom_dirload_sm_writeprot     ; 41
         .addr rom_dirload_sm_space         ; 42
-        .addr rom_dirload_sm_linenend      ; 43
+        .addr rom_dirload_sm_space         ; 43
+        .addr rom_dirload_sm_linenend      ; 44
 
 
     rom_dirload_diskname_text:
@@ -560,18 +561,39 @@
     rom_dirload_sm_filename:
         ; pointer is at the name
         ldx dirload_state_var
-        jsr efs_readef_read_and_inc
+        jsr efs_readef
         bne :+
-        lda #$20  ; space if 0 char
-      : inc dirload_state_var
+        jsr efs_readef_pointer_inc
+        inc dirload_state_var
         cpx #15
         bne :+
-        inc dirload_temp_state_zp
-        ldx #$00
-        stx dirload_state_var
+        clc
+        rts
+      : inc dirload_temp_state_zp
+        rts
+
+;        lda #$20  ; space if 0 char
+;      : inc dirload_state_var
+;        cpx #15
+;        bne :+
+;        inc dirload_temp_state_zp
+;        ldx #$00
+;        stx dirload_state_var
         
       : clc
         rts
+
+    rom_dirload_sm_filenamefill:
+        ldx dirload_state_var
+        jsr efs_readef_read_and_inc
+        inc dirload_state_var
+        cpx #15
+        bne :+
+        clc
+        rts
+      : inc dirload_temp_state_zp
+        rts
+
 
     rom_dirload_sm_sizelow:
         ; pointer is at flags
@@ -580,10 +602,10 @@
         jsr efs_readef_read_and_inc  ; size low
         beq :+
         lda #$01
-      : sta $38  ; a is 0 after branch
+      : sta zp_var_x8  ; a is 0 after branch
         jsr efs_readef  ; read mid
         clc
-        adc $38
+        adc zp_var_x8
         inc dirload_temp_state_zp
         rts
 
@@ -594,11 +616,11 @@
         ; val1(X/A) >= Val2(f8/f9) => C set
         ; https://codebase64.org/doku.php?id=base:16-bit_comparison
         ; a            ; Val1 high
-        cmp $39        ; Val2 high
+        cmp zp_var_x9        ; Val2 high
         bcc @LsThan    ; hiVal1 < hiVal2 --> Val1 < Val2
         bne @GrtEqu    ; hiVal1 != hiVal2 --> Val1 > Val2
         txa            ; Val1 low
-        cmp $38        ; Val2 low
+        cmp zp_var_x8        ; Val2 low
         ;beq Equal     ; Val1 = Val2
         bcs @GrtEqu    ; loVal1 >= loVal2 --> Val1 >= Val2
       @LsThan:
@@ -614,16 +636,16 @@
         jsr efs_readef_read_and_inc  ;low
         beq :+
         lda #$01
-      : sta $38  ; a is zero iafter branch
+      : sta zp_var_x8  ; a is zero iafter branch
         jsr efs_readef_read_and_inc  ;mid
         clc
-        adc $38
-        sta $38
+        adc zp_var_x8
+        sta zp_var_x8
         lda #$00
-        sta $39
+        sta zp_var_x9
         jsr efs_readef ; high
-        adc $39
-        sta $39
+        adc zp_var_x9
+        sta zp_var_x9
 
         inc dirload_temp_state_zp
         lda #23  ; reverse pointer to name
@@ -665,7 +687,7 @@
         ; https://codebase64.org/doku.php?id=base:16-bit_absolute_comparison
 
       @done:
-        lda $39
+        lda zp_var_x9
         clc
         rts
 

@@ -59,8 +59,10 @@
 .import rom_dirload_begin
 .import rom_dirload_chrin
 
-.export rom_chrout_body
-.export rom_save_body
+.import rom_format_body
+.import rom_defragment_body
+.import rom_chrout_body
+.import rom_save_body
 .export rom_chrin_body
 .export rom_close_body
 .export rom_open_body
@@ -76,6 +78,40 @@
 
 .export rom_config_get_value
 .export rom_config_prepare_config
+.export rom_flags_get_area
+.export rom_flags_set_area
+.export rom_flags_get_area_invert
+.export rom_config_rw_available
+.export rom_config_get_area_bank
+.export rom_config_get_area_mode_invert
+.export rom_config_get_area_addr_high_invert
+.export rom_config_get_area_addr_low_invert
+.export rom_config_get_area_bank_invert
+.export rom_config_get_area_addr_high
+.export rom_config_get_area_addr_low
+.export rom_config_get_area_size
+.export rom_config_get_area_mode
+
+.export efs_directory_search
+.export efs_finish_tempvars
+.export efs_temp_var1
+.export efs_temp_var2
+.export efs_init_eapierasesector
+.export efs_init_eapireadinc
+.export efs_init_eapiwriteinc
+.export efs_init_readmem
+.export efs_readef_dirboundary
+.export efs_readef_storedaddr_high
+.export efs_readef_storedaddr_low
+.export efs_readef_storedbank
+.export efs_readef_swap
+.export efs_readmem
+
+.import rom_command_process
+.import rom_command_begin
+
+.export rom_config_call_defragment_allclear
+.export rom_config_call_defragment_warning
 
 
 .segment "EFS_CALL"
@@ -104,11 +140,11 @@
 
     EFS_defragment: ; @ $8009
         ; validates (defragments) the rw area
-        jmp efs_defragment_body
+        jmp rom_defragment_body
 
     EFS_format: ; @ $800c
         ; initializes (erases) the rw area
-        jmp efs_format_body
+        jmp rom_format_body
 
         .byte $00
 
@@ -398,6 +434,8 @@
 ; efs body functions
 ; need to leave with 'jmp efs_bankout'
 ; zeropage usage only after zeropage backup
+/*
+.segment "EFS_ROM_RW"
 
     efs_defragment_body:
         jsr rom_config_prepare_config
@@ -443,7 +481,9 @@
         rts
       @error:
         rts
+*/
 
+.segment "EFS_ROM"
 
     rom_setlfs_body:
         pha  ; store logical number
@@ -473,6 +513,9 @@
         jmp efs_bankout  ; ends with rts
 
 
+/*
+.segment "EFS_ROM_RW"
+
     rom_chrout_body:
         ; character in a
         ; ### no zeropage usage
@@ -486,6 +529,7 @@
         ; .C set if error
         ; status set to $40 if device full
         jmp efs_bankout  ; ends with rts
+*/
 
 
     rom_chrin_body:
@@ -681,6 +725,8 @@
         jmp efs_bankout  ; ends with rts
 
 
+/*.segment "EFS_ROM_RW"
+
     rom_save_body:
         ; A: address of zero page with startaddress; X/Y: end address + 1
         stx io_end_address
@@ -740,7 +786,7 @@
         plp
         lda error_byte
         jmp efs_bankout  ; ends with rts
-
+*/
 
 
 ; --------------------------------------------------------------------
@@ -992,16 +1038,6 @@
         lda #<(@return - 1)
         pha
 
-;        tsx
-;        lda #>(@return - 1)
-;        sta $0100, x
-;        dex
-;        lda #<(@return - 1)
-;        sta $0100, x
-;        dex
-;        txs
-;        cli
-
         jmp (zp_var_x5)
       @return:
 
@@ -1039,14 +1075,6 @@
         pha
         lda #<(@return - 1)
         pha
-;        tsx
-;        lda #>(@return - 1)
-;        sta $0100, x
-;        dex
-;        lda #<(@return - 1)
-;        sta $0100, x
-;        dex
-;        txs
 
         jmp (zp_var_x5)
       @return:
@@ -1315,6 +1343,8 @@
 ;   $D0: 00:0:1FFF=>00:1:0000, 00:1:1FFF=>01:0:1FFF (lhlh...)
 ;   $B0: 00:0:1FFF=>01:0:0000 (llll...)
 ;   $D4: 00:1:1FFF=>01:1:0000 (hhhh...)
+
+/*.segment "EFS_ROM_RW"
 
     rom_defragment_erasearea:
         ; area to erase in a
@@ -2353,7 +2383,7 @@
         jsr efs_readef_pointer_reverse
         clc
         rts
-
+*/
 
 
 ; --------------------------------------------------------------------
@@ -2365,7 +2395,7 @@
 ; using
 ;   37: temporary
 ;   3e/3f: pointer to data
-; 
+
     rom_fileload_begin:
         jsr rom_config_prepare_config
         jsr efs_init_eapireadinc  ; repair dynamic code
@@ -2534,6 +2564,8 @@
 ;  3e/3f: pointer to name
 ; return:
 
+/*.segment "EFS_ROM_RW"
+
     rom_command_begin:
         lda filename_address
         sta zp_var_xe
@@ -2660,7 +2692,7 @@
         ; c flag set according to writeflash result
         sta error_byte
         rts
-
+*/
 
 
 ; --------------------------------------------------------------------
@@ -2677,15 +2709,15 @@
 ;   read_ef: pointer is at begin of directory entry
 ;   changed configuration settings
 
-    dirsearch_temp_var_zp := $38
-    dirsearch_name_pointer_zp := $3e
-    dirsearch_entry_zp := $3b
+;    dirsearch_temp_var_zp := $38
+;    dirsearch_name_pointer_zp := $3e
+;    dirsearch_entry_zp := $3b
 
     efs_directory_search:
         lda filename_address
-        sta dirsearch_name_pointer_zp
+        sta zp_var_xe
         lda filename_address + 1
-        sta dirsearch_name_pointer_zp + 1
+        sta zp_var_xe + 1
 
         jsr rom_config_prepare_config
         lda #libefs_config::areas  ; ###
@@ -2771,23 +2803,23 @@
     rom_dirsearch_begin:
         ; set pointer and length of directory
         ; a offset in configuration
-        sta dirsearch_temp_var_zp
+        sta zp_var_x8
 
         ; set read ef code
         jsr efs_init_readef
 
-        ldy dirsearch_temp_var_zp
+        ldy zp_var_x8
         lda (zp_var_x5), y  ; at libefs_config::libefs_area::bank
         jsr efs_setstartbank_ext
         sta efs_readef_bank
 
-        inc dirsearch_temp_var_zp
-        ldy dirsearch_temp_var_zp
+        inc zp_var_x8
+        ldy zp_var_x8
         lda (zp_var_x5), y  ; at libefs_config::libefs_area::addr low
         sta efs_readef_low
 
-        inc dirsearch_temp_var_zp
-        ldy dirsearch_temp_var_zp
+        inc zp_var_x8
+        ldy zp_var_x8
         lda (zp_var_x5), y  ; at libefs_config::libefs_area::addr high
         sta efs_readef_high
 
@@ -2802,17 +2834,17 @@
         ldx #$00
       @loop:
         jsr efs_readef_read_and_inc  ; load next char
-        sta dirsearch_entry_zp
+        sta zp_var_xb
         inx
         
         lda #$2a             ; '*'
-        cmp (dirsearch_name_pointer_zp), y  ; character in name is '*', we have a match
+        cmp (zp_var_xe), y   ; character in name is '*', we have a match
         beq @match
         lda #$3f             ; '?'
-        cmp (dirsearch_name_pointer_zp), y  ; character in name is '?', the char fits
+        cmp (zp_var_xe), y   ; character in name is '?', the char fits
         beq @fit
-        lda (dirsearch_name_pointer_zp), y  ; compare character with character in entry
-        cmp dirsearch_entry_zp  ; if not equal nextname
+        lda (zp_var_xe), y   ; compare character with character in entry
+        cmp zp_var_xb        ; if not equal nextname
         bne @next
       @fit:
         iny
@@ -2821,9 +2853,9 @@
         cpy #$10             ; full name length reached
         beq @match           ;   -> match
         jsr efs_readef_read_and_inc  ; load next char
-        sta dirsearch_entry_zp
+        sta zp_var_xb
         inx
-        lda dirsearch_entry_zp  ; if == \0
+        lda zp_var_xb        ; if == \0
         beq @match           ;   -> match
                              ; length check failed
       @next:
@@ -2833,7 +2865,7 @@
         inx
         bne @next
       : lda #$00
-        sta dirsearch_temp_var_zp
+        sta zp_var_x8
         rts
 
       @match:
@@ -2843,7 +2875,7 @@
         inx
         bne @match
       : lda #$01
-        sta dirsearch_temp_var_zp
+        sta zp_var_x8
         rts
 
 
@@ -2895,7 +2927,7 @@
         ; no test if hidden
 ;        and #%00011111  ; mask out hidden and reserved flag fields
 ;        beq :+          ; file invalid
-        lda dirsearch_temp_var_zp
+        lda zp_var_x8
         bne @match
       @nomatch:
         lda #$07
@@ -3063,26 +3095,26 @@
 /*    rom_dirsearch_address:
         ; set pointer and length of directory
         ; a offset in configuration
-        sta dirsearch_temp_var_zp
+        sta zp_var_x8
 
         jsr rom_config_prepare_config
 
         jsr efs_init_set startbank
         ;lda #$00  ; ### 0, could be different bank
-        ldy dirsearch_temp_var_zp
+        ldy zp_var_x8
         lda ($35), y  ; at libefs_config::libefs_area::bank
         jsr efs_generic_command
 
         ; set read ef code
         jsr efs_init_readef
 
-        inc dirsearch_temp_var_zp
-        ldy dirsearch_temp_var_zp
+        inc zp_var_x8
+        ldy zp_var_x8
         lda ($35), y  ; at libefs_config::libefs_area::addr low
         sta efs_read ef_low
 
-        inc dirsearch_temp_var_zp
-        ldy dirsearch_temp_var_zp
+        inc zp_var_x8
+        ldy zp_var_x8
         lda ($35), y  ; at libefs_config::libefs_area::addr high
         sta efs_read ef_high
 

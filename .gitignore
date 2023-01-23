@@ -1,2 +1,7 @@
 *~
-build/*
+build/ef/*
+build/lib/*
+build/files/*
+build/prg/*
+build/test-libefs.crt
+build/test-efs.d64

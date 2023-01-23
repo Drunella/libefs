@@ -79,7 +79,7 @@ mrproper:
 
 # ------------------------------------------------------------------------
 # lib-efs.prg
-LIB_EFS_FILES=build/lib/lib-efs.o build/lib/lib-efs-ram.o build/lib/lib-efs-minieapi.o build/lib/lib-efs-dirlist.o
+LIB_EFS_FILES=build/lib/lib-efs.o build/lib/lib-efs-ram.o build/lib/lib-efs-minieapi.o build/lib/lib-efs-dirlist.o build/lib/lib-efs-rw.o
 
 # lib-efs.prg
 build/lib-efs.prg: src/lib/lib-efs.cfg $(LIB_EFS_FILES)
