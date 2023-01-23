@@ -528,8 +528,8 @@
         rts
 
     rom_dirload_sm_quotationmark:
-        lda #$00
-        sta dirload_state_var
+        ;lda #$00
+        ;sta dirload_state_var
         lda #$22
         inc dirload_temp_state_zp
         rts
@@ -562,14 +562,17 @@
         ; pointer is at the name
         ldx dirload_state_var
         jsr efs_readef
-        bne :+
+        beq @nullchar
         jsr efs_readef_pointer_inc
         inc dirload_state_var
         cpx #15
-        bne :+
         clc
+        beq @finish
         rts
-      : inc dirload_temp_state_zp
+      @nullchar:
+        sec
+      @finish:
+        inc dirload_temp_state_zp ; name finished
         rts
 
 ;        lda #$20  ; space if 0 char
@@ -585,13 +588,17 @@
 
     rom_dirload_sm_filenamefill:
         ldx dirload_state_var
+        cpx #16
+        beq @finish
         jsr efs_readef_read_and_inc
         inc dirload_state_var
-        cpx #15
-        bne :+
+        lda #$20  ; (space)
         clc
         rts
-      : inc dirload_temp_state_zp
+      @finish:
+        inc dirload_temp_state_zp
+        lda #$20  ; (space)
+        sec
         rts
 
 
