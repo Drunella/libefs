@@ -114,7 +114,7 @@
         rts
 
 
-    ; void __fastcall__ EFS_setnam_wrapper(char* name, uint8_t length);
+    ; uint8_t __fastcall__ EFS_setnam_wrapper(char* name, uint8_t length);
     _EFS_setnam_wrapper:
         pha        ; length in A
         jsr popax  ; name in A/X
@@ -131,25 +131,34 @@
         ;    Y: name address high
         ; return: none
         jsr EFS_setnam
-
+        bcc :+
+        lda #$ff
+        ldx #$00
+        rts
+      : lda #$00
+        ldx #$00
         rts
 
 
-    ; void __fastcall__ EFS_setlfs_wrapper(uint8_t logicalchannel, uint8_t secondary);
+    ; uint8_t __fastcall__ EFS_setlfs_wrapper(uint8_t secondary);
     _EFS_setlfs_wrapper:
-        pha
-        jsr popa
-        tax
-        pla
+        ;pha
+        ;jsr popa
         tay
-        txa
+        ;pla
+        ;tay
+        ;txa
 
         ; parameter:
-        ;    A: logical channel
         ;    Y: secondary address(0=load, ~0=verify)
         ; return: none
         jsr EFS_setlfs
-
+        bcc :+
+        lda #$ff
+        ldx #$00
+        rts
+      : lda #$00
+        ldx #$00
         rts
 
 

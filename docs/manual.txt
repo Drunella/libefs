@@ -112,7 +112,7 @@ Supported commands:
 
 EFS_open ($df12)
 Parameter:
-  none
+  A: 0=read 1=write
 Return:
   A: error code
   .C: set if error
@@ -123,7 +123,7 @@ Error:
   $05: device not present (not implemented)
   $08: missing filename
   $1a: write protected
-Supported commands (command channel):
+Supported commands:
   "$0:[filename]" will load the directory
   "S0:[filename]" will delete a file
   
@@ -199,8 +199,6 @@ Allowed commands
 ----------------
 
 Not all acommands are allowed to be usesd in load, open and save.
-When using open you must set the command channel, otherwise the 
-command will be treated as an (illegal) filename.
 
 S: scratch: open
 $: directory: open, load

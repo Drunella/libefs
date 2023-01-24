@@ -1620,19 +1620,18 @@
         ; .C clear: no error and continue
         ; error_byte: error code
         ; commands in save can continue
-;        lda zp_var_x8
-;        cmp #$24    ; '$', dirload
-;        bne @next1
-;        jsr rom_dirload_begin
-;        jsr rom_dirload_address
-;        jsr rom_dirload_transfer
-;        lda #$00    ; no error
-;        sta error_byte
-;        sec         ; finish after
-;        rts
+        lda zp_var_x8
+        cmp #$40    ; '@', overwrite
+        bne @next1
+        jsr efs_directory_search
+        bcs :+      ; not found, ignore
+        jsr rom_scratch_process
+      : lda #$00    ; no error
+        sta error_byte
+        clc         ; continue after
+        rts
 
-; '@' command ###
-
+      @next1:
         lda #ERROR_SYNTAX_ERROR_31
         sta error_byte
         sec

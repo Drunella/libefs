@@ -86,7 +86,7 @@ void loadverify(char* filename, uint8_t verify, uint8_t secondary)
     menu_clear(CONSOLE_START_Y, 24);
     gotoxy(0, CONSOLE_START_Y);
     EFS_setnam_wrapper(filename, strlen(filename));
-    EFS_setlfs_wrapper(1, secondary);
+    EFS_setlfs_wrapper(secondary);
     cprintf("start\n\r");
     TIMER_reset();
     retval = EFS_load_wrapper((char*)(ADDRESS), verify);
@@ -113,7 +113,7 @@ void savefile(char* filename, char* address, uint16_t size)
     menu_clear(CONSOLE_START_Y, 24);
     gotoxy(0, CONSOLE_START_Y);
     EFS_setnam_wrapper(filename, strlen(filename));
-    EFS_setlfs_wrapper(1, 0);  // no secondary
+    EFS_setlfs_wrapper(0);  // no secondary
     cprintf("start\n\r");
     TIMER_reset();
     retval = EFS_save_wrapper(address, endaddress);
@@ -133,7 +133,7 @@ void openfile(char* filename, uint8_t secondary, uint8_t mode)
     menu_clear(CONSOLE_START_Y, 24);
     gotoxy(0, CONSOLE_START_Y);
     EFS_setnam_wrapper(filename, strlen(filename));
-    EFS_setlfs_wrapper(1, secondary);
+    EFS_setlfs_wrapper(secondary);
     retval = EFS_open_wrapper(mode);
     status = EFS_readst_wrapper();
     cprintf("open: sc=%d, rt=%d, st=$%02x\n\r", secondary, retval, status);
@@ -215,7 +215,7 @@ void readdir()
     gotoxy(0, CONSOLE_START_Y);
 
     EFS_setnam_wrapper("$", 1);
-    EFS_setlfs_wrapper(1, 0); // do not relocate
+    EFS_setlfs_wrapper(0); // do not relocate
     retval = EFS_load_wrapper((char*)(ADDRESS), 0);
     address = EFS_get_endadress();
     status = EFS_readst_wrapper();
@@ -237,7 +237,7 @@ void scratchfile(char* cmdname)
     gotoxy(0, CONSOLE_START_Y);
 
     EFS_setnam_wrapper(cmdname, strlen(cmdname));
-    EFS_setlfs_wrapper(15, 0); // command channel, do not relocate
+    EFS_setlfs_wrapper(0); // do not relocate
     retval = EFS_open_wrapper(0);
     status = EFS_readst_wrapper();
     EFS_close_wrapper();
@@ -319,12 +319,12 @@ void longtest()
     uint32_t counter = 0;
     uint32_t errors = 0;
     uint32_t verify;
-    char cmdname[] = "s0:myfile";
+    char cmdname[] = "@0:myfile";
     char *filename = &cmdname[3];
 
     createpattern((char*)0xc000, size, counter);
     EFS_setnam_wrapper(filename, strlen(filename));
-    EFS_setlfs_wrapper(1, 0);  // no secondary
+    EFS_setlfs_wrapper(0);  // no secondary
     retval = EFS_save_wrapper((char*)(0xc000), (char*)(0xc000) + size);
     if (retval != 0) errors++;
 
@@ -338,12 +338,12 @@ void longtest()
         cprintf("test run: %lu (errors: %lu)\n\r", counter, errors);
 
         EFS_setnam_wrapper(filename, strlen(filename));
-        EFS_setlfs_wrapper(1, 0);
+        EFS_setlfs_wrapper(0);
         retval = EFS_load_wrapper(address, 0); // load
         if (retval != 0) errors++;
             
         EFS_setnam_wrapper(filename, strlen(filename));
-        EFS_setlfs_wrapper(1, 0);
+        EFS_setlfs_wrapper(0);
         retval = EFS_load_wrapper(address, 1); // verify
         if (retval != 0) errors++;
         status = EFS_readst_wrapper();
@@ -352,16 +352,16 @@ void longtest()
         verify = atol(address);
         if (verify != counter) errors++;
 
-        EFS_setnam_wrapper(cmdname, strlen(cmdname));
-        EFS_setlfs_wrapper(15, 0); // do not relocate
+/*        EFS_setnam_wrapper(cmdname, strlen(cmdname));
+        EFS_setlfs_wrapper(0); // do not relocate
         retval = EFS_open_wrapper(0);
         if (retval != 1) errors++;
-        EFS_close_wrapper();
+        EFS_close_wrapper();*/
           
         counter++;
         sprintf(address, "%lu", counter);
-        EFS_setnam_wrapper(filename, strlen(filename));
-        EFS_setlfs_wrapper(1, 0);
+        EFS_setnam_wrapper(cmdname, strlen(cmdname));
+        EFS_setlfs_wrapper(0);
         retval = EFS_save_wrapper(address, address + size);
         if (retval != 0) errors++;
         status = EFS_readst_wrapper();

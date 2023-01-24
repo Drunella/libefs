@@ -1447,8 +1447,22 @@
         jmp @stop  ; error_byte is set to 1, due to scratch
 
       @next2:
+        lda zp_var_x8
+        cmp #$40    ; '@', overwrite
+        bne @next1
+        lda internal_state
+        and #%11000000
+        cmp #%11000000
+        bne @next3  ; only for save
+        jsr efs_directory_search
+        bcs :+      ; not found, ignore
+        jsr rom_scratch_process
+      : lda #$00    ; no error
+        sta error_byte
+        clc         ; continue after
+        rts
 
-; ### '@' on save
+      @next3:
 
         lda #ERROR_SYNTAX_ERROR_31
         sta error_byte
