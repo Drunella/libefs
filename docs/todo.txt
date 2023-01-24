@@ -7,6 +7,9 @@ ToDo
 - (ok) only use one readef method with several initializations
 - different banking schemas
 - dirlist: blocks free
+- check for corrupt files (size of 0xffffff)
+  -> delete file and defragment
+- pattern matchng for directories: eg "$0:Z*"
 
 - rw efs
   + alternate between two equally sized areas (ll and lh of same banks

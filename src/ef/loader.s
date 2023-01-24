@@ -75,10 +75,6 @@
         cpx #loader_text_len
         bne :-
 
-        ; load eapi
-;        lda #>__EAPI_START__
-;        jsr _load_eapi
-
         ; load efs
         lda #$37
         sta $01
@@ -86,14 +82,10 @@
         sta $de02
         lda #$00   ; EFSLIB_ROM_BANK
         sta $de00
-;        lda #$03        ; verify, write
-;        ldx #$00        ; load to $0100
-;        ldy #$01
         jsr EFS_init
-
         ; bcs error ###
 
-        ; minieapi
+        ; eapi / minieapi
 ;        jsr EFS_init_minieapi
         lda #$cd
         jsr EFS_init_eapi

@@ -45,6 +45,7 @@
 
 .export backup_zeropage_data
 .export backup_memory_config
+.export memory_byte
 .export status_byte
 .export error_byte
 .export efs_flags
@@ -174,6 +175,7 @@
         pha
         lda $01  ; save memory config
         sta backup_memory_config
+    memory_byte := * + 1
         lda #$37  ; bank to rom area
         sta $01
         bne efs_enter
@@ -257,69 +259,3 @@
     io_end_address:
         .word $0000
 
-;    efs_unused1:
-;        .byte $00
-
-;    efs_unused2:
-;        .byte $00
-
-
-;.segment "EFS_REL"
-
-    ; 15 byte: read and verify
-/*
-    rel_verify_byte_offset = rel_verify_byte - __EFS_REL_RUN__
-    rel_verify_byte:
-        ; 15 bytes
-        jsr efs_bankout
-        lda ($fe), y  ; read from memory
-        ldx #$37
-        stx $01
-        jmp efs_enter_pha
-        nop
-        nop
-        nop
-*/       
-
-/*
-    rel_verify_byte_offset = rel_verify_byte - __EFS_REL_RUN__
-    rel_verify_byte:
-        ; 25 bytes
-        pha
-        lda backup_memory_config  ; restore memory config
-        sta $01
-        lda #EASYFLASH_KILL
-        sta EASYFLASH_CONTROL
-        pla
-        
-        cmp ($fe), y  ; ### jump to additional verify routine
-
-        php        
-        lda #$37
-        sta $01
-        lda #EASYFLASH_LED | EASYFLASH_16K
-        sta EASYFLASH_CONTROL
-        plp
-
-        rts
-
-
-    rel_write_byte_offset = ~rel_write_byte - __EFS_REL_RUN__
-    rel_write_byte:
-        ; 25 bytes
-        lda backup_memory_config  ; restore memory config
-        sta $01
-        lda #EASYFLASH_KILL
-        sta EASYFLASH_CONTROL
-
-        jsr EAPIWriteFlashInc
-
-        pha
-        lda #$37
-        sta $01
-        lda #EASYFLASH_LED | EASYFLASH_16K
-        sta EASYFLASH_CONTROL
-        pla
-
-        rts
-*/

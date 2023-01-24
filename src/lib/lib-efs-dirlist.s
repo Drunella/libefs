@@ -61,8 +61,8 @@
 .import rom_config_get_value
 .import rom_config_prepare_config
 
-.export rom_dirload_isrequested
-.export rom_dirload_verify
+;.export rom_dirload_isrequested
+;.export rom_dirload_verify
 .export rom_dirload_transfer
 .export rom_dirload_address
 .export rom_dirload_begin
@@ -89,7 +89,7 @@
     dirload_temp_var_zp := zp_var_xa
     dirload_temp_state_zp := zp_var_x7
 
-    rom_dirload_isrequested:
+/*    rom_dirload_isrequested:
         lda filename_address
         sta zp_var_xe
         lda filename_address + 1
@@ -103,7 +103,7 @@
         sec
         rts
       : clc
-        rts
+        rts*/
 
 
     rom_dirload_begin:
@@ -296,7 +296,7 @@
         rts
 
 
-    rom_dirload_verify:
+/*    rom_dirload_verify:
         ; dirload verify not supported -> device not present error
         lda #ERROR_DEVICE_NOT_PRESENT
         sta error_byte
@@ -304,7 +304,7 @@
         sta io_end_address
         sta io_end_address + 1
         sec
-        rts
+        rts*/
 
 
     rom_dirload_next_byte:

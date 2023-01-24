@@ -319,7 +319,8 @@ void longtest()
     uint32_t counter = 0;
     uint32_t errors = 0;
     uint32_t verify;
-    char filename[] = "myfile";
+    char cmdname[] = "s0:myfile";
+    char *filename = &cmdname[3];
 
     createpattern((char*)0xc000, size, counter);
     EFS_setnam_wrapper(filename, strlen(filename));
@@ -350,6 +351,12 @@ void longtest()
             
         verify = atol(address);
         if (verify != counter) errors++;
+
+        EFS_setnam_wrapper(cmdname, strlen(cmdname));
+        EFS_setlfs_wrapper(15, 0); // do not relocate
+        retval = EFS_open_wrapper(0);
+        if (retval != 1) errors++;
+        EFS_close_wrapper();
           
         counter++;
         sprintf(address, "%lu", counter);

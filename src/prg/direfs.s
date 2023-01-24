@@ -24,13 +24,14 @@
 .import error_byte
 
 .export rom_chrout_body
-.export rom_command_begin
-.export rom_command_process
 .export rom_defragment_body
 .export rom_format_body
 .export rom_save_body
 .export rom_filesave_chrin_prepare
 .export rom_filesave_chrin_close
+.export rom_scratch_process
+.export rom_command_save_process
+
 
 .segment "CODE"
 
@@ -83,13 +84,13 @@
 
     ; external
     rom_chrout_body:
-    rom_command_begin:
-    rom_command_process:
     rom_defragment_body:
     rom_format_body:
     rom_save_body:
     rom_filesave_chrin_prepare:
     rom_filesave_chrin_close:
+    rom_command_save_process:
+    rom_scratch_process:
         lda #$05
         sta error_byte
         sec

@@ -62,8 +62,10 @@
 .export rom_filesave_chrin_prepare
 .export rom_filesave_chrin_close
 
-.export rom_command_process
-.export rom_command_begin
+.export rom_command_save_process
+;.import rom_command_process
+.import rom_command_begin
+.export rom_scratch_process
 
 .import restore_zeropage
 .import backup_zeropage
@@ -185,9 +187,9 @@
         bne @done
 
       @next1:
-        lda status_byte    ; previous eof -> disk full
+        lda status_byte    ; previous eof -> error
         beq @next2
-        lda #ERROR_DISK_FULL
+        lda #ERROR_WRITE_ERROR
         sta error_byte
         sec
         beq @done
@@ -259,31 +261,51 @@
         sta error_byte
 
         lda internal_state
-        beq @dircheck
+        beq @checkconditions
         lda #ERROR_FILE_OPEN
         sta error_byte
         sec
         bne @leave
 
-      @dircheck:
+      @checkconditions:
+        jsr rom_filesave_conditions
+        bcs @leave
+
+      @commandcheck:
+        jsr rom_command_begin
+        bcs @filesearch
+        jsr rom_command_save_process
+        bcc @filesearch  ; .C clear: no error and continue
+        bne :+
+        clc              ; .C set and no error
+      : jmp @leave       ; leave
+
+
+/*      @dircheck:
         jsr rom_dirload_isrequested
         bcc @checkname
         lda #ERROR_MISSING_FILENAME
         sta error_byte
         sec
-        bne @leave
+        bne @leave*/
 
-      @checkname:
+/*      @checkname:
         jsr rom_filesave_conditions
         bcs @leave
+        jsr rom_command_begin
+        bcs @fileload
+        jsr rom_command_save_process
+        bcs @leave*/
+
+      @filesearch:
         jsr efs_directory_search
         bcs @savefile ; not found
-        jsr rom_scratch_process
-        bcs @leave
-;        lda #ERROR_FILE_EXISTS  ; ### delete instead?
-;        sta error_byte
-;        sec
-;        bne @leave
+;        jsr rom_scratch_process
+;        bcs @leave
+        lda #ERROR_FILE_EXISTS
+        sta error_byte
+        sec
+        bne @leave
 
       @savefile:
         lda #$00
@@ -308,12 +330,12 @@
         ; size field pointer in filename_address and filename_length(bank)
         ; size in io_start_address, io_end_address low
 
-        jsr rom_dirload_isrequested
+/*        jsr rom_dirload_isrequested
         bcc @checkname
         lda #ERROR_MISSING_FILENAME
         sta error_byte
         sec
-        bne @leave
+        bne @leave*/
 
       @checkname:
         ; assume certain filesize
@@ -659,7 +681,7 @@
 
 
     rom_defragment_copy_data_destinc:
-        ; increases dest file address according to mode ($37)
+        ; increases dest file address according to mode (x7)
         ; inc to next position
         inc zp_var_x9  ; addr low
         bne @noinc
@@ -1098,10 +1120,13 @@
         jsr rom_config_prepare_config
         jsr efs_init_readef
 
-;        jsr rom_config_activearea
-;        jsr rom_flags_set_area
+        lda filename_length
+        bne @next1
+        lda #ERROR_MISSING_FILENAME
+        jmp @error
  
         ; init read_ef
+      @next1:
         jsr rom_config_get_area_bank
         sta efs_readef_bank
         sta zp_var_x8
@@ -1502,7 +1527,7 @@
 ;  3e/3f: pointer to name
 ; return:
 
-    rom_command_begin:
+/*    rom_command_begin:
         lda filename_address
         sta zp_var_xe
         lda filename_address + 1
@@ -1579,6 +1604,35 @@
         rts
         
       @nomatch:
+        lda #ERROR_SYNTAX_ERROR_31
+        sta error_byte
+        sec
+        rts
+
+
+    rom_command_load_process:
+
+        rts*/
+
+
+    rom_command_save_process:
+        ; .C set: error (.Z set) or stop processing (.Z clear)
+        ; .C clear: no error and continue
+        ; error_byte: error code
+        ; commands in save can continue
+;        lda zp_var_x8
+;        cmp #$24    ; '$', dirload
+;        bne @next1
+;        jsr rom_dirload_begin
+;        jsr rom_dirload_address
+;        jsr rom_dirload_transfer
+;        lda #$00    ; no error
+;        sta error_byte
+;        sec         ; finish after
+;        rts
+
+; '@' command ###
+
         lda #ERROR_SYNTAX_ERROR_31
         sta error_byte
         sec

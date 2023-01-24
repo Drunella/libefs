@@ -106,6 +106,8 @@ Errors:
   $04: file not found
   $05: device not present (?)
   $08: missing filename
+Supported commands:
+  "$0:[filename]" will load the directory
 
 
 EFS_open ($df12)
@@ -121,8 +123,8 @@ Error:
   $05: device not present (not implemented)
   $08: missing filename
   $1a: write protected
-Supported commands:
-  "$" will load the directory
+Supported commands (command channel):
+  "$0:[filename]" will load the directory
   "S0:[filename]" will delete a file
   
 
@@ -155,6 +157,8 @@ Parameter:
 Peturn:
   A: error code
   .C: set if error
+Supported commands:
+  "@0:[filename]" will overwrite the file
 
 
 EFS_chrout ($df2a)
@@ -189,4 +193,16 @@ efs functions.
 libefs uses $37 (BASIC and KERNAL banked in) as memory configuration. If
 this collides with your interrupt usage you need to turn interrupts off
 before calling libefs functions.
+
+
+Allowed commands
+----------------
+
+Not all acommands are allowed to be usesd in load, open and save.
+When using open you must set the command channel, otherwise the 
+command will be treated as an (illegal) filename.
+
+S: scratch: open
+$: directory: open, load
+@: overwrite: save
 
