@@ -45,9 +45,9 @@ overwrite a previous initialized minieapi.
 EFS_init_minieapi ($8006):
 Parameter: none
 Returns: none
-Initalizes minieapi in te io2 area ($df80 - $dfff). You can overwrite a
+Initalizes minieapi in the io2 area ($df80 - $dfff). You can overwrite a
 previously initialized eapi. With minieapi calls to the write and erase
-functions will lead to a crash.
+functions will do nothing.
 
 
 You can use the following code to bank in before calling an init function:
@@ -63,8 +63,8 @@ You can use the following code to bank in before calling an init function:
 Minieapi
 ========
 
-Minieapi provides the eapi functions EAPIGetBank, EAPISetBank, EAPISetPtr,
-EAPISetLen and EAPIReadFlashInc. EAPISetSlot and EAPIGetSlot is not available. 
+Minieapi provides the EAPI functions EAPIGetBank, EAPISetBank, EAPISetPtr,
+EAPISetLen and EAPIReadFlashInc. 
 See the EasyFlash Programmer Reference for more information.
 
 Calling EAPIWriteFlash, EAPIEraseSector and EAPIGetSlot in minieapi will do

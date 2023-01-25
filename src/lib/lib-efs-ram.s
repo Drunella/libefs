@@ -68,7 +68,7 @@
 
     EFS_setlfs:  ; @ $DF00
         ; parameter:
-        ;    A: logical channel (15 for commands)
+        ;    A: logical channel (will be ignored)
         ;    X: device number (will be ignored)
         ;    Y: secondary address (0: relocate)
         ; return: none

@@ -136,10 +136,10 @@
         ;    A: high address to put EAPI to
         ; return: 
         ;    .C set if eapi not present
-        jmp efs_init_minieapi_body
+        jmp efs_init_eapi_body
 
     EFS_init_mini_eapi: ; @ $8006
-        jmp efs_init_eapi_body
+        jmp efs_init_minieapi_body
 
     EFS_defragment: ; @ $8009
         ; validates (defragments) the rw area

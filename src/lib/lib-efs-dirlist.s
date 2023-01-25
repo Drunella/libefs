@@ -24,6 +24,7 @@
 .import error_byte
 .import status_byte
 .import filename_address
+.import filename_length
 .import io_start_address
 .import io_end_address
 .import efs_flags
@@ -78,7 +79,7 @@
 ;   37: temporary state machine state
 ;   38/39: temporary file size
 ;   3a: temporary variable
-;   3b: 
+;   3b: temporary variable
 ;   3c/3d: address to state maching processing function
 ;   3e/3f: pointer to destination / pointer to filename
 ;   io_end_address: state machine variable
@@ -443,10 +444,13 @@
         bcs @areadone   ; directory terminates
         jsr efs_readef  ; read flag
         sta dirload_temp_var_zp
+        lda #16
+        jsr efs_readef_pointer_reverse  ; go back to begin of entry
+        lda dirload_temp_var_zp
         and #%00011111  ; mask out hidden and reserved flag fields
         bne @notinvalid  ; is file invalid -> no
       @invalid:
-        lda #8  ; -> yes, invalid
+        lda #24  ; -> yes, invalid
         jsr efs_readef_pointer_advance
         jmp rom_dirload_sm_linenend
 
@@ -455,6 +459,8 @@
         beq @areadone  ; terminator -> area done
         bit dirload_temp_var_zp
         bmi @invalid   ; hidden -> invalid
+        jsr rom_dirload_checkname  ; check name
+        bcs @invalid ;
         jmp @nextfile  ; nextfile
       @areadone:  ; directory area is done, check next
         jsr efs_dirload_nextarea
@@ -471,6 +477,93 @@
         lda #$00
         clc
         rts
+
+
+    rom_dirload_checkname:
+        ; compare filename
+        ; name is filename_address and filename_length
+        ; use zp_var_x8/zp_var_x9 as temporary pointer
+        lda filename_length
+        bne @start
+        clc  ; empty filename is here automatic match
+        rts
+
+      @start:
+        lda filename_address
+        sta zp_var_x8
+        lda filename_address + 1
+        sta zp_var_x9
+        ldy #$00
+        ldx #$00
+      @loop:
+        jsr efs_readef_read_and_inc  ; load next char
+        sta zp_var_xb
+        inx
+
+        lda #$2a             ; '*'
+        cmp (zp_var_x8), y   ; character in name is '*', we have a match
+        beq @match
+        lda #$3f             ; '?'
+        cmp (zp_var_x8), y   ; character in name is '?', the char fits
+        beq @fit
+        lda (zp_var_x8), y   ; compare character with character in entry
+        cmp zp_var_xb        ; if not equal nextname
+        bne @nomatch
+      @fit:
+        iny
+        cpy filename_length  ; name length check
+        bne @loop            ; more characters
+        cpy #$10             ; full name length reached
+        beq @match           ;   -> match
+        jsr efs_readef_read_and_inc  ; load next char
+        sta zp_var_xb
+        inx
+        lda zp_var_xb        ; if == \0
+        beq @match           ;   -> match
+                             ; length check failed
+      @nomatch:
+        ;cpx #$10
+        txa
+        jsr efs_readef_pointer_reverse
+;        beq :+
+;        jsr efs_readef_read_and_inc  ; load next char
+;        dex
+;        bne @next
+        sec
+        rts
+
+      @match:
+        txa
+        jsr efs_readef_pointer_reverse
+;        cpx #$10
+;        beq :+
+;        jsr efs_readef_read_and_inc  ; load next char
+;        inx
+;        bne @match
+        clc
+        rts
+
+
+/*    rom_dirload_sm_filefilter:
+        ; return sec if filter does not match
+        ; pointer is at beginning of name
+
+        jsr rom_dirload_checkname
+        bcs @skip
+        lda #$10
+        efs_readef_pointer_reverse
+
+      @skip:
+        lda #$06  ; advancve pointer to next name
+        efs_readef_pointer_advance
+        sec
+        rts
+
+rom_dirsearch_checkname
+
+rom_dirsearch_checkname
+efs_filename*/
+
 
 /*    rom_dirload_sm_devlow:
         lda efs_device
@@ -583,8 +676,8 @@
 ;        ldx #$00
 ;        stx dirload_state_var
         
-      : clc
-        rts
+;      : clc
+;        rts
 
     rom_dirload_sm_filenamefill:
         ldx dirload_state_var
@@ -603,8 +696,8 @@
 
 
     rom_dirload_sm_sizelow:
-        ; pointer is at flags
-        lda #5  ; advance to size low
+        ; pointer is at start of entry
+        lda #21  ; advance to size low
         jsr efs_readef_pointer_advance
         jsr efs_readef_read_and_inc  ; size low
         beq :+
