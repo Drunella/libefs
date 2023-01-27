@@ -61,6 +61,7 @@
 .export rom_format_body
 .export rom_filesave_chrin_prepare
 .export rom_filesave_chrin_close
+;.export rom_filesave_blocksfree
 
 .export rom_command_save_process
 ;.import rom_command_process
@@ -119,6 +120,11 @@
 .import rom_config_call_defragment_warning
 
 .import efs_directory_search
+
+.import rom_space_setdirstart
+.import rom_space_subtractsize_blocks
+.import rom_space_maxspace
+.import rom_space_usedspace
 
 
 .segment "EFS_ROM_RW"
@@ -200,7 +206,7 @@
         bvc @error  ; branch if bit 6 is clear
 
         txa
-        jsr efs_io_byte  ; write file
+        jsr efs_io_byte  ; write byte
         ; size field pointer in filename_address and filename_length(bank)
         ; size in io_start_address, io_end_address low
         bcs @writeerror
@@ -751,11 +757,11 @@
         bcs @error
 
         ; init read_ef
-        jsr rom_filesave_setdirstart
+        jsr rom_space_setdirstart
 
         ; check free space
-        jsr rom_filesave_maxspace
-        jsr rom_filesave_usedspace
+        jsr rom_space_maxspace
+        jsr rom_space_usedspace
         jsr rom_filesave_addsize
         jsr rom_filesave_checksize
         bcc @check1
@@ -772,7 +778,7 @@
         jsr rom_filesave_freedirentries  ; free disk entries
         bcs @defragment
 
-        jsr rom_filesave_maxspace
+        jsr rom_space_maxspace
         jsr rom_filesave_blockedspace  ; free space
         jsr rom_filesave_addsize
         jsr rom_filesave_checksize
@@ -793,14 +799,14 @@
         jsr rom_config_prepare_config  ; set new configuration
         jsr efs_init_readef
         jsr efs_init_eapireadinc
-        jsr rom_filesave_setdirstart   ; init readef
+        jsr rom_space_setdirstart   ; init readef
 
         ; check conditions again, this time error
         jsr rom_filesave_freedirentries  ; free disk entries
         lda #ERROR_DIRECTORY_ERROR
         bcs @error
 
-        jsr rom_filesave_maxspace
+        jsr rom_space_maxspace
         jsr rom_filesave_blockedspace  ; free space
         jsr rom_filesave_addsize
         jsr rom_filesave_checksize
@@ -815,7 +821,7 @@
         rts
 
 
-    rom_filesave_setdirstart:
+/*    rom_filesave_setdirstart:
         ; init read_ef
         jsr rom_config_get_area_bank
         sta efs_readef_bank
@@ -823,7 +829,7 @@
         sta efs_readef_low
         jsr rom_config_get_area_addr_high
         sta efs_readef_high
-        rts
+        rts*/
 
 
     rom_filesave_freedirentries:
@@ -867,6 +873,35 @@
         lda #$00
         clc
         rts
+
+
+/*    rom_filesave_subtractsize_blocks:
+        ; checks used file in 3b/3c/3d
+        ; against available size in 38/39/3a
+        ; 38/39/3a - 3b/3c/3d -> 3b/3c/3d
+        sec
+        lda zp_var_x8
+        sbc zp_var_xb
+        sta zp_var_xb
+        lda zp_var_x9
+        sbc zp_var_xc
+        sta zp_var_xc
+        lda zp_var_xa
+        sbc zp_var_xd
+        sta zp_var_xd
+
+        lda #$00
+        sta zp_var_xb
+        sec ; round down
+        lda zp_var_xc
+        sbc #$01
+        sta zp_var_xc
+        lda zp_var_xd
+        sbc #$00
+        sta zp_var_xd
+        
+        clc
+        rts*/
 
 
     rom_filesave_checksize:
@@ -949,7 +984,7 @@
         rts
 
 
-    rom_filesave_maxspace:
+/*    rom_filesave_maxspace:
         ; config must be set
         ; returns max blocks in 38/39/3a (low/mid/high)
         ; one chip contains 32 pages
@@ -976,10 +1011,10 @@
         bcs :+
         dec zp_var_xa
 
-      : rts
+      : rts*/
 
 
-    rom_filesave_usedspace:
+/*    rom_filesave_usedspace:
         ; space by real active files
         ; config must be set correct
         ; directory is set properly
@@ -992,10 +1027,10 @@
         ldx #$00
         lda #16
         jsr efs_readef_pointer_advance
-        ;lda #$00
-        ;sta zp_var_xb
-        ;sta zp_var_xc
-        ;sta zp_var_xd
+        lda #$00
+        sta zp_var_xb
+        sta zp_var_xc
+        sta zp_var_xd
 
       @loop:
         jsr rom_config_get_area_addr_high
@@ -1035,7 +1070,7 @@
         pla
         sta efs_readef_low
 
-        rts
+        rts*/
 
 
     rom_filesave_blockedspace:

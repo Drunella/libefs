@@ -185,6 +185,8 @@
         ldx #ZEROPAGE_SIZE - 1  ; backup zp
     :   lda ZEROPAGE_BACKUP_END - ZEROPAGE_SIZE + 1, x
         sta backup_zeropage_data, x
+        lda #$00                ; init zp
+        sta ZEROPAGE_BACKUP_END - ZEROPAGE_SIZE + 1, x
         dex
         bpl :-
         rts

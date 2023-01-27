@@ -48,22 +48,17 @@
 .import efs_readef_pointer_setall
 .import efs_readef_pointer_set
 
-;.import efs_init_readef
-;.import efs_readef_pointer_reverse
-;.import efs_readef_pointer_dec
-;.import efs_readef_read_and_inc
-;.import efs_readef_pointer_advance
-;.import efs_readef
-;.import efs_readef_high
-;.import efs_readef_low
-
 .import efs_setstartbank_ext
 
 .import rom_config_get_value
 .import rom_config_prepare_config
 
-;.export rom_dirload_isrequested
-;.export rom_dirload_verify
+.import rom_space_setdirstart
+.import rom_space_subtractsize_blocks
+.import rom_space_maxspace
+.import rom_space_usedspace
+
+
 .export rom_dirload_transfer
 .export rom_dirload_address
 .export rom_dirload_begin
@@ -833,18 +828,27 @@ efs_filename*/
 
     rom_dirload_sm_freelow:
         ; calculate the free blocks
-        ; ### other area  
-        ; in area 0 nothing free
-        ; ### calculate free blocks in current area
-        lda #$00
+        ; use calculation functions from save
+        ; blocks in 3c/3d
+        jsr rom_space_setdirstart  ; init read_ef
+        jsr rom_space_maxspace
+        jsr rom_space_usedspace
+        jsr rom_space_subtractsize_blocks
+
+        lda zp_var_xd
         sta dirload_state_var
         inc dirload_temp_state_zp
+        lda zp_var_xc
         clc
         rts
 
     rom_dirload_sm_freehigh:
-        lda dirload_state_var
         inc dirload_temp_state_zp
+        lda dirload_state_var
+        sta zp_var_xd
+        lda #$00
+        sta dirload_state_var
+        lda zp_var_xd
         clc
         rts
 
