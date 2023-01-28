@@ -465,7 +465,7 @@
 .segment "EFS_ROM"
 
     rom_setlfs_body:
-;        pha  ; store logical number
+        ; Y: secondary address (relocation)
         lda internal_state
         bne @exit
 
@@ -475,13 +475,6 @@
         lda #LIBEFS_FLAGS_RELOCATE
       : sta efs_flags
 
-;        pla  ; logical number
-;        cmp #$0f  ; command channel
-;        bne :+
-;        lda #LIBEFS_FLAGS_COMMAND
-;        ora efs_flags
-;        sta efs_flags
-;      : 
         jmp efs_bankout  ; ends with rts
 
       @exit:
