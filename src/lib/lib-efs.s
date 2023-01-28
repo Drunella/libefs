@@ -212,6 +212,12 @@
 
 
     efs_init_minieapi_body:
+        pha
+        txa
+        pha
+        tya
+        pha
+
         ; copy code to df80
         ldx #<__EFS_MINIEAPI_SIZE__ - 1
     :   lda __EFS_MINIEAPI_LOAD__,x
@@ -219,11 +225,23 @@
         dex
         bpl :-
         clc
+
+        pla
+        tay
+        pla
+        tax
+        pla
         rts
 
 
     efs_init_eapi_body:
-        tax
+        sta backup_memory_config
+        pha
+        txa
+        pha
+        tya
+        pha
+        ldx backup_memory_config
 
         lda #$65
         cmp $b800
@@ -277,13 +295,19 @@
         sta efs_generic_command + @dest - 2
         lda #$14  ; low
         sta efs_generic_command + @dest - 1
-        jmp efs_generic_command  ; init eapi
+        jsr efs_generic_command  ; init eapi
         clc
+      @leave:
+        pla
+        tay
+        pla
+        tax
+        pla
         rts
 
       @error:
         sec
-        rts
+        bcs @leave
 
       @code:
         jsr efs_bankout
