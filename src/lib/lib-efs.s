@@ -670,7 +670,7 @@
         ; no zeropage
         clc
         lda #$00
-        sta status_byte
+        ;sta status_byte  ; don'k kill the status on close
         sta error_byte
 
         lda internal_state

@@ -312,7 +312,7 @@
         lda rom_dirload_statemachine + 1, x
         sta zp_var_xd
         clc
-        jmp ($0000 + zp_var_xc)
+        jmp (zp_var_xc)
 
     rom_dirload_statemachine:
         .addr rom_dirload_sm_finish        ; 0
@@ -830,6 +830,7 @@ efs_filename*/
         ; calculate the free blocks
         ; use calculation functions from save
         ; blocks in 3c/3d
+        jsr rom_config_prepare_config
         jsr rom_space_setdirstart  ; init read_ef
         jsr rom_space_maxspace
         jsr rom_space_usedspace

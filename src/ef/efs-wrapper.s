@@ -20,7 +20,7 @@
 
 .import popa 
 .import popax
-.import sreg
+.importzp sreg
 
 .import _cputc
 
@@ -192,8 +192,8 @@
 
     ; uint8_t __fastcall__ EFS_chrin_wrapper(uint8_t* data);
     _EFS_chrin_wrapper:
-        sta <sreg
-        stx <sreg+1
+        sta sreg
+        stx sreg+1
 
 ;        sei
         jsr EFS_chrin
@@ -201,7 +201,7 @@
 
         bcs :+
         ldy #$00
-        sta (<sreg), y
+        sta (sreg), y
         tya
         tax
         rts
