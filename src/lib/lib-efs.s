@@ -1468,7 +1468,7 @@
       @next2:
         lda zp_var_x8
         cmp #$40    ; '@', overwrite
-        bne @next1
+        bne @next3
         lda internal_state
         and #%11000000
         cmp #%11000000

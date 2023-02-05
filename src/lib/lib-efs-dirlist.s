@@ -325,50 +325,52 @@
         .addr rom_dirload_sm_reverseon     ; 7
         .addr rom_dirload_sm_quotationmark ; 8
         .addr rom_dirload_sm_diskname      ; 9
-        .addr rom_dirload_sm_quotationmark ; 10
-        .addr rom_dirload_sm_space         ; 11
+        .addr rom_dirload_sm_diskfill      ; 10
+        .addr rom_dirload_sm_quotationmark ; 11
         .addr rom_dirload_sm_space         ; 12
         .addr rom_dirload_sm_space         ; 13
         .addr rom_dirload_sm_space         ; 14
         .addr rom_dirload_sm_space         ; 15
         .addr rom_dirload_sm_space         ; 16
         .addr rom_dirload_sm_space         ; 17
-        .addr rom_dirload_sm_linenend      ; 18
+        .addr rom_dirload_sm_space         ; 18
+        .addr rom_dirload_sm_linenend      ; 19
 
-        sm_finish = 19
-        .addr rom_dirload_sm_addrdummy     ; 19
+        sm_finish = 20
         .addr rom_dirload_sm_addrdummy     ; 20
-        .addr rom_dirload_sm_freelow       ; 21
-        .addr rom_dirload_sm_freehigh      ; 22
-        .addr rom_dirload_sm_blocksfree    ; 23
-        .addr rom_dirload_sm_zero          ; 24
+        .addr rom_dirload_sm_addrdummy     ; 21
+        .addr rom_dirload_sm_freelow       ; 22
+        .addr rom_dirload_sm_freehigh      ; 23
+        .addr rom_dirload_sm_blocksfree    ; 24
         .addr rom_dirload_sm_zero          ; 25
         .addr rom_dirload_sm_zero          ; 26
-        .addr rom_dirload_sm_finish        ; 27
+        .addr rom_dirload_sm_zero          ; 27
+        .addr rom_dirload_sm_finish        ; 28
 
-        sm_nextfile = 28
-        .addr rom_dirload_sm_addrdummy     ; 28
+        sm_nextfile = 29
         .addr rom_dirload_sm_addrdummy     ; 29
-        .addr rom_dirload_sm_sizelow       ; 30
-        .addr rom_dirload_sm_sizehigh      ; 31
-        .addr rom_dirload_sm_sizeskip      ; 32
-        .addr rom_dirload_sm_quotationmark ; 33
-        .addr rom_dirload_sm_filename      ; 34
-        .addr rom_dirload_sm_quotationmark ; 35
-        .addr rom_dirload_sm_filenamefill  ; 36
-        .addr rom_dirload_sm_type_begin    ; 37
-        .addr rom_dirload_sm_type_next     ; 38
+        .addr rom_dirload_sm_addrdummy     ; 30
+        .addr rom_dirload_sm_sizelow       ; 31
+        .addr rom_dirload_sm_sizehigh      ; 32
+        .addr rom_dirload_sm_sizeskip      ; 33
+        .addr rom_dirload_sm_quotationmark ; 34
+        .addr rom_dirload_sm_filename      ; 35
+        .addr rom_dirload_sm_quotationmark ; 36
+        .addr rom_dirload_sm_filenamefill  ; 37
+        .addr rom_dirload_sm_type_begin    ; 38
         .addr rom_dirload_sm_type_next     ; 39
         .addr rom_dirload_sm_type_next     ; 40
-        .addr rom_dirload_sm_writeprot     ; 41
-        .addr rom_dirload_sm_space         ; 42
+        .addr rom_dirload_sm_type_next     ; 41
+        .addr rom_dirload_sm_writeprot     ; 42
         .addr rom_dirload_sm_space         ; 43
-        .addr rom_dirload_sm_linenend      ; 44
+        .addr rom_dirload_sm_space         ; 44
+        .addr rom_dirload_sm_linenend      ; 45
 
 
-    rom_dirload_diskname_text:
-        .byte "easyflash fs    "  ; length 16
-        rom_dirload_diskname_textlen = * - rom_dirload_diskname_text - 1
+    rom_dirload_diskname_text := EF_NAME  ; position of easyflash cart name
+    rom_dirload_diskname_textlen = 16     ; max length
+;        .byte "easyflash fs    "  ; length 16
+;        rom_dirload_diskname_textlen = * - rom_dirload_diskname_text - 1
 
     rom_dirload_blocksfree_text:
         .byte "blocks free.             "
@@ -517,75 +519,16 @@
         beq @match           ;   -> match
                              ; length check failed
       @nomatch:
-        ;cpx #$10
         txa
         jsr efs_readef_pointer_reverse
-;        beq :+
-;        jsr efs_readef_read_and_inc  ; load next char
-;        dex
-;        bne @next
         sec
         rts
 
       @match:
         txa
         jsr efs_readef_pointer_reverse
-;        cpx #$10
-;        beq :+
-;        jsr efs_readef_read_and_inc  ; load next char
-;        inx
-;        bne @match
         clc
         rts
-
-
-/*    rom_dirload_sm_filefilter:
-        ; return sec if filter does not match
-        ; pointer is at beginning of name
-
-        jsr rom_dirload_checkname
-        bcs @skip
-        lda #$10
-        efs_readef_pointer_reverse
-
-      @skip:
-        lda #$06  ; advancve pointer to next name
-        efs_readef_pointer_advance
-        sec
-        rts
-
-rom_dirsearch_checkname
-
-rom_dirsearch_checkname
-efs_filename*/
-
-
-/*    rom_dirload_sm_devlow:
-        lda efs_device
-        and #$0f
-        clc
-        adc #$30 
-        cmp #$3a
-        bmi :+    ; if > 9 
-        clc
-        adc #$07  ; add 7 for a-f
-      : inc dirload_temp_state_zp
-        rts
-
-    rom_dirload_sm_devhigh:
-        lda efs_device
-        lsr
-        lsr
-        lsr
-        lsr
-        clc
-        adc #$30
-        cmp #$3a
-        bmi :+    ; if > 9
-        clc
-        adc #$07  ; add 7 for a-f
-      : inc dirload_temp_state_zp
-        rts*/
 
 
     rom_dirload_sm_addresslow:
@@ -623,7 +566,7 @@ efs_filename*/
         rts
 
     rom_dirload_sm_diskname:
-        ldx dirload_state_var
+/*        ldx dirload_state_var
         lda rom_dirload_diskname_text, x
         inc dirload_state_var
         cpx #rom_dirload_diskname_textlen
@@ -632,6 +575,33 @@ efs_filename*/
         ldx #$00
         stx dirload_state_var
       : clc
+        rts*/
+        ldx dirload_state_var
+        lda rom_dirload_diskname_text, x
+        beq @nullchar
+        inc dirload_state_var
+        cpx #rom_dirload_diskname_textlen - 1
+        clc
+        beq @finish
+        rts
+      @nullchar:
+        sec
+      @finish:
+        inc dirload_temp_state_zp ; name finished
+        rts
+
+    rom_dirload_sm_diskfill:
+        ldx dirload_state_var
+        cpx #rom_dirload_diskname_textlen
+        beq @finish
+        inc dirload_state_var
+        lda #$20  ; (space)
+        clc
+        rts
+      @finish:
+        inc dirload_temp_state_zp
+        lda #$20  ; (space)
+        sec
         rts
 
     rom_dirload_sm_blocksfree:

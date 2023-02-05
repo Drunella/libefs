@@ -66,6 +66,7 @@ EFSLIB_ROM_START = $8000
 EFSLIB_ROM_BANK  = 0
 
 ; configuration
+EF_NAME = $bb08
 LIBEFS_CONFIG_START = $bb18
 
 ; flags
