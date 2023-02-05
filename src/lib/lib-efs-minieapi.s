@@ -47,7 +47,7 @@ EASYFLASH_IO_BANK = $de00
 
 .segment "EFS_MINIEAPI"
 
-    EAPIWriteFlash:          ;  $df80
+    EAPIWriteFlash:  ;  $df80
         rts
 
 
@@ -58,7 +58,7 @@ EASYFLASH_IO_BANK = $de00
         .byte $00
 
 
-    EAPIEraseSector:         ;  $df83
+    EAPIEraseSector:  ;  $df83
         rts
 
 
@@ -68,8 +68,8 @@ EASYFLASH_IO_BANK = $de00
     EAPI_LENGTH_HI:
         .byte $00
 
-
-        jmp EAPISetBank      ;  $df86
+    EAPISetBank:  ;  $df86
+        jmp EAPISetBank_body
 
 
 
@@ -93,14 +93,19 @@ EASYFLASH_IO_BANK = $de00
 ;       Z,N <- bank
 ;
 ; =============================================================================
-    EAPIGetBank:             ;  $df89
+    EAPIGetBank:  ; $df89
     EAPI_SHADOW_BANK = * + 1
         lda #$00  ; storage of EAPI_SHADOW_BANK
         rts
 
-        jmp EAPISetPtr       ;  $df8c
-        jmp EAPISetLen       ;  $df8f
-        jmp EAPIReadFlashInc ;  $df92
+    EAPISetPtr:  ; $df8c
+        jmp EAPISetPtr_body
+
+    EAPISetLen:  ; $df8f
+        jmp EAPISetLen_body
+
+    EAPIReadFlashInc:  ; df92
+        jmp EAPIReadFlashInc_body
 
 
 
@@ -123,7 +128,7 @@ EASYFLASH_IO_BANK = $de00
 ;       -
 ;
 ; =============================================================================
-EAPISetBank:
+EAPISetBank_body:
         sta EAPI_SHADOW_BANK    ; EAPIWriteFlashInc will go here, no immediate negative effect
         sta EASYFLASH_IO_BANK   ; EAPISetSlot will go here, no immediate negative effect
         rts                     ; EAPIGetSlot will go herer, no negative effect
@@ -152,7 +157,7 @@ EAPISetBank:
 ;       -
 ;
 ; =============================================================================
-EAPISetPtr:
+EAPISetPtr_body:
         sta EAPI_INC_TYPE
         stx EAPI_INC_ADDR_LO
         sty EAPI_INC_ADDR_HI
@@ -177,7 +182,7 @@ EAPISetPtr:
 ;       -
 ;
 ; =============================================================================
-EAPISetLen:
+EAPISetLen_body:
         stx EAPI_LENGTH_LO
         sty EAPI_LENGTH_MED
         sta EAPI_LENGTH_HI
@@ -210,7 +215,7 @@ EAPISetLen:
 ;       Z,N <- value
 ;
 ; =============================================================================
-EAPIReadFlashInc:
+EAPIReadFlashInc_body:
         ; now we have to activate the right bank
         lda EAPI_SHADOW_BANK
         sta EASYFLASH_IO_BANK

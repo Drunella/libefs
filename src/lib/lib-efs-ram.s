@@ -45,6 +45,7 @@
 
 .export backup_zeropage_data
 .export backup_memory_config
+.export temporary_variable
 .export memory_byte
 .export status_byte
 .export error_byte
@@ -185,7 +186,8 @@
         ; does not work with disabled io area
         ; 13 bytes
         pha
-        lda backup_memory_config  ; restore memory config
+    backup_memory_config := * + 1  ; exclusive usage
+        lda #$37  ; restore memory config
         sta $01
         lda #EASYFLASH_KILL
         sta EASYFLASH_CONTROL
@@ -232,8 +234,8 @@
         .byte $00
         .endrepeat
 
-    backup_memory_config: ; exclusive usage
-        .byte $00
+;    backup_memory_config: ; exclusive usage
+;        .byte $00
 
     error_byte:  ; exclusive usage
         .byte $00
@@ -259,3 +261,5 @@
     io_end_address:
         .word $0000
 
+    temporary_variable:
+        .byte $00

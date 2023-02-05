@@ -278,7 +278,7 @@
         dec zp_var_xf
       : dec zp_var_xe
 
-        lda #$40
+        lda #STATUS_EOF
         sta status_byte
         lda #$00
         sta internal_state  ; must be reset here

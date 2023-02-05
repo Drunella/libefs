@@ -30,7 +30,6 @@
 ;.import __EFS_MINIEAPI_SIZE__
 
 .import backup_zeropage_data
-.import backup_memory_config
 .import status_byte
 .import error_byte
 .import efs_flags
@@ -1562,94 +1561,6 @@
 ;  3e/3f: pointer to name
 ; return:
 
-/*    rom_command_begin:
-        lda filename_address
-        sta zp_var_xe
-        lda filename_address + 1
-        sta zp_var_xf
-
-        ldy #$00
-        lda (zp_var_xe), y
-        sta zp_var_x8
-
-        ; check for ':'
-        iny
-        lda #$3a    ; ':'
-        cmp (zp_var_xe), y
-        beq @match
-
-        ; check for a number: 0 < n <= x <= m < $ff
-        lda (zp_var_xe), y    ; no fit
-        clc
-        adc #$ff - $30        ; lower bound $30
-        adc #$39 - $30 + $01  ; upper bound $39
-        bcc @nomatch          ; .C clear -> not in range
-
-        ; check for ':'
-        iny
-        lda #$3a    ; ':'
-        cmp (zp_var_xe), y
-        beq @match
-
-      @nomatch:
-        lda #ERROR_SYNTAX_ERROR_30
-        sta error_byte
-        sec
-        rts
-
-      @match:
-        ; advance filename pointer by y + 1
-        sec  ; +1
-        tya
-        adc zp_var_xe
-        sta zp_var_xe
-        bne :+
-        inc zp_var_xf
-      : lda zp_var_xe
-        sta filename_address
-        lda zp_var_xf
-        sta filename_address + 1
-
-        iny ; decrease length by y + 1
-      : dec filename_length
-        dey
-        bne :-
-
-        clc
-        rts
-
-
-    rom_command_process:
-        lda zp_var_x8
-
-        cmp #$53    ; 'S'
-        bne @next1
-        ; scratch
-        jsr efs_directory_search
-        bcs @notfound     ; not found
-        jsr rom_scratch_process
-        rts  ; error and .C set in rom_scratch_process
-
-      @next1:
-        jmp @nomatch
-
-      @notfound:
-        lda #ERROR_FILE_NOT_FOUND
-        sta error_byte
-        rts
-        
-      @nomatch:
-        lda #ERROR_SYNTAX_ERROR_31
-        sta error_byte
-        sec
-        rts
-
-
-    rom_command_load_process:
-
-        rts*/
-
-
     rom_command_save_process:
         ; .C set: error (.Z set) or stop processing (.Z clear)
         ; .C clear: no error and continue
@@ -1667,7 +1578,7 @@
         rts
 
       @next1:
-        lda #ERROR_SYNTAX_ERROR_31
+        lda #ERROR_SYNTAX_ERROR_30
         sta error_byte
         sec
         rts
@@ -1699,11 +1610,6 @@
         ldx efs_readef_low
         ldy efs_readef_high
         jsr EAPISetPtr
-
-;        ldx #$01
-;        lda #$00
-;        tay
-;        jsr EAPISetLen
 
         lda #$60
         sec  ; set to check for minieapi failures

@@ -35,6 +35,7 @@
 .import __EFS_MINIEAPI_SIZE__
 
 .import backup_zeropage_data
+.import temporary_variable
 .import backup_memory_config
 .import memory_byte
 .import status_byte
@@ -235,13 +236,13 @@
 
 
     efs_init_eapi_body:
-        sta backup_memory_config
+        sta temporary_variable
         pha
         txa
         pha
         tya
         pha
-        ldx backup_memory_config
+        ldx temporary_variable
 
         lda #$65
         cmp $b800
@@ -585,11 +586,6 @@
         ;jmp @commandcheck
 
       @commandcheck:
-;        lda efs_flags
-;        and #LIBEFS_FLAGS_COMMAND  ; command channel
-;        beq @loadcheck
-;        lda #%00100000  ; no processing
-;        sta internal_state
         jsr rom_command_begin
         bcs @loadcheck
         jsr rom_command_process
@@ -600,37 +596,12 @@
 
 ;        jmp @leave  ; always finish after commands
 
-/*      @commanderror:
-        lda #ERROR_SYNTAX_ERROR_30
-        sta error_byte
-        jmp @leave*/
-
-/*      @loadsavecheck:
-        pla
-        beq @loadcheck
-        jmp @savecheck*/
-
-/*      @dircheck:
-        jsr rom_dirload_isrequested
-        bcc @dirfind
-        lda #%01000000  ; directory processing
-        sta internal_state
-        jsr rom_dirload_begin
-        clc
-        jmp @leave*/
-
       @loadcheck:
         lda internal_state
         and #%11000000
         cmp #%10000000
         bne @savecheck
-;        jsr efs_directory_search
-;        bcs @leave  ; not found
-;        lda #%10000000  ; file load processing
-;        sta internal_state
-;        jsr rom_fileload_begin
         jsr rom_fileload_chrout_prepare
-;        clc
         jmp @leave
 
       @savecheck:
@@ -1394,51 +1365,6 @@
         rts
 
 
-/*    rom_command_process:
-        ; .C set: error, command failed
-        ; .C clear: no error, command finished
-        ; error_byte: error code
-        lda zp_var_x8
-
-        cmp #$24    ; '$', dirload
-        bne @next1
-        lda #%01000000  ; directory processing
-        sta internal_state
-        jsr rom_dirload_begin
-        lda #$00
-        sta error_byte
-        clc
-        rts
-
-      @next1:
-        cmp #$53    ; 'S'
-        bne @next2
-        ; scratch
-        jsr efs_directory_search
-        bcs @notfound     ; not found
-        jsr rom_scratch_process
-        ; error and .C set in rom_scratch_process, may continue
-        lda error_byte
-        rts
-
-      @next2:
-
-        ; ### dirload
-        jmp @nomatch
-
-      @notfound:
-;        lda #ERROR_FILE_NOT_FOUND
-;        sta error_byte
-        sec
-        rts
-        
-      @nomatch:
-        lda #ERROR_SYNTAX_ERROR_31
-        sta error_byte
-        sec
-        rts*/
-
-
     rom_command_process:
         ; .C set: error (.Z set) or stop processing (.Z clear)
         ; .C clear: no error and continue
@@ -1449,9 +1375,6 @@
         bne @next1
         lda #%01000000  ; directory processing
         sta internal_state
-;        jsr rom_dirload_begin
-;        lda #$00
-;        sta error_byte
         jmp @continue
 
       @next1:
@@ -1483,7 +1406,7 @@
 
       @next3:
 
-        lda #ERROR_SYNTAX_ERROR_31
+        lda #ERROR_SYNTAX_ERROR_30
         sta error_byte
 
       @error:
@@ -1522,7 +1445,7 @@
       @next1:
         ; next command
 
-        lda #ERROR_SYNTAX_ERROR_31
+        lda #ERROR_SYNTAX_ERROR_30
         sta error_byte
         sec
         rts
@@ -1547,21 +1470,6 @@
         lda #%10000000  ; file load processing
         sta internal_state
 
-/*        jsr rom_command_begin
-        bcs @filesearch
-        jsr rom_command_load_process
-        bcc @filesearch  ; .C clear: no error and continue
-        bne :+
-        clc              ; .C set and no error
-        lda #STATUS_EOF
-        sta status_byte  ; disallow chrout calls
-        rts
-      : lda #$00
-        sta internal_state  ; auto close on error
-        sec
-        rts
-
-      @filesearch:*/
         jsr efs_directory_search
         bcc @found
         lda #$00
@@ -1672,7 +1580,7 @@
         dec zp_var_xf
       : dec zp_var_xe
      
-        lda #$40
+        lda #STATUS_EOF
         sta status_byte
 
         lda zp_var_xe
@@ -1700,7 +1608,7 @@
         jmp @loop
 
       @eof:
-        lda #$40
+        lda #STATUS_EOF
         sta status_byte
         lda zp_var_xe  ; verify successful, reduce address by one
         bne :+
@@ -1709,7 +1617,7 @@
         jmp @leave
 
       @mismatch:
-        lda #$10
+        lda #STATUS_MISMATCH
         sta status_byte
         
       @leave:
@@ -1726,7 +1634,7 @@
         sta io_end_address + 1
 
         lda status_byte
-        and #$10
+        and #STATUS_MISMATCH
         bne :+
         clc
         rts

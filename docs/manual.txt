@@ -16,13 +16,66 @@ the eapi jump table, code and variables there. No further ram space is
 needed.
 
 The efs library can be iedentified by the text LIBEFS (in PETSCII) at
-00:l:000f, followed by the version number in major.minor.patch.
+00:l:0010, followed by the version number in major.minor.patch.
+
+The configuration, which banks to use for the read/write part, resides
+right after the EasyFlash name at 0:1:1b18.
+
+The library alternates between two areas of equal size. If one area is used
+up (by deleting and re-creating files) all active files will be copied
+to the other area and the original area will be erased. The process for
+copying is called defragmentation. Defragmentation can take up to several
+minutes, depending on the used space.
+
+
+Configuration
+=============
+
+The configuration describes where the directories and the read/write area
+can be found. It also contains the vectors for defragmentation indicators.
+The defragmentation can take a long time and it is helpful to show some
+progress. In the example the border color flashes.
+
+00:1:1bxx:
+00-17:    [ef name]
+18-1d     LIBEFS ($4c, $49, $42)
+1e-1f     empty ($00, $00, $00)
+21:       1:only one area (default)
+          3:two additional read/write areas
+
+22        bank of area 0 directory (default 0)
+23,24:    address of area 0 directory (default $a000)
+25:       banking mode of area 0 ($d0=lhlh, $b0=llll, $d4=hhhh), see eapi
+          documentation (default $d0)
+26:       number of banks of area 0 (every 8k bank counts), can be zero for
+          area 0 (default $ff)
+
+27:       bank of area 1 directory
+28,29:    address of area 1 directory: bank, this must start at an 
+          eraseable bank
+2a:       banking mode of area 1 ($d0=lhlh, $b0=llll, $d4=hhhh)
+2b:       number of banks of area 1 used (must be divisible by 8)
+
+2c:       bank of area 2 directory (default: unused)
+2d,2e:    address of area 1 directory: bank, this must start at an
+          eraseable bank
+2f:       banking mode of area 1 ($d0=lhlh, $b0=llll, $d4=hhhh)
+30:       number of banks of area 2 used (must be divisible by 8)
+
+31:       call function on defragmentation (1: yes, 0: no)
+32,33:    vector to update defragmentation warning
+          must be callable while easyflash is banked in.
+34,35:    vector to the defragmentation all clear function
+          must be callable while easyflash is banked in.
+
+34-37:    unused
+
 
 
 Initialize
 ==========
 
-To initialize libefs, eapi or minieapi youi need to call the following
+To initialize libefs, eapi or minieapi you need to call the following
 functions while bank 0 must be banked in as 16k cartridge.
 
 EFS_init ($8000):
@@ -39,15 +92,15 @@ Return:
   .C: set if eapi is not on the cartridge
 Copies the epi code (768 bytes) to the memory location given as high byte 
 in the eaccumulator. A low address is not necessary as the eapi must be page
-aligned. C flag will be set if eapi is not on the cartrdidge. You can
+aligned. C flag will be set if eapi is not on the cartridge. You can
 overwrite a previous initialized minieapi.
 
 EFS_init_minieapi ($8006):
 Parameter: none
 Returns: none
 Initalizes minieapi in the io2 area ($df80 - $dfff). You can overwrite a
-previously initialized eapi. With minieapi calls to the write and erase
-functions will do nothing.
+previously initialized eapi. With minieapi calls to EAPIWriteFlash,  
+EAPIEraseSector and EAPIGetSlot will do nothing. 
 
 
 You can use the following code to bank in before calling an init function:
@@ -69,7 +122,9 @@ See the EasyFlash Programmer Reference for more information.
 
 Calling EAPIWriteFlash, EAPIEraseSector and EAPIGetSlot in minieapi will do
 nothing, they will immediately return. Calling EAPIWriteFlashInc is identical 
-to EAPISetBank. Calling EAPISetSlot will change the current bank, but not the slot.
+to EAPISetBank. Calling EAPISetSlot will change the current bank, but not the 
+shadow bank.
+
 
 
 libefs
@@ -77,7 +132,7 @@ libefs
 
 EFS_setlfs ($df00)
 Parameter:
-  Y: secondary address (0: relocate)
+  Y: secondary address (0: relocate, 1: load to loadaddress of file)
 Return: 
   none
 
@@ -89,23 +144,21 @@ Parameter:
   Y: name address high
 Peturn:
   none
+Restrictions:
+  The name must not be in memory areas where banking occurs: $8000 - $bfff 
+  and $e000 - $ffff, as well as the memory below io area ($d000 - $dfff)
 
 
 EFS_load ($df0c)
 Parameter:
   A: 0=load, 1-255=verify
-  X: load address low
-  Y: load address high
+  X: load address for relocation low
+  Y: load address for relocation high
 Return:
-  A: error code
+  A: error code or 0 (1 for file scratched)
   X: end address low
   Y: end address high
-  .C: 1 if error
-Errors:
-  $02: file open
-  $04: file not found
-  $05: device not present (?)
-  $08: missing filename
+  .C: set if error
 Supported commands:
   "$0:[filename]" will load the directory
 
@@ -116,13 +169,6 @@ Parameter:
 Return:
   A: error code
   .C: set if error
-Error:
-  $01: file scratched (not an error)
-  $02: file open
-  $04: file not found
-  $05: device not present (not implemented)
-  $08: missing filename
-  $1a: write protected
 Supported commands:
   "$0:[filename]" will load the directory
   "S0:[filename]" will delete a file
@@ -134,8 +180,6 @@ Parameter:
 Return:
   A: error code
   .C: set if error
-Error:
-  $02: file not open
 
 
 EFS_chrin ($df1e)
@@ -144,14 +188,11 @@ Parameter:
 Return:
   A: character or error code
   .C: set if error
-Error:
-  $03: file not open
-  $05: device not present (?)
 
 
 EFS_save ($df24)
 Parameter:
-  A: z-page to start address
+  A: z-page variable to start address
   X: end address low
   Y: end address high
 Peturn:
@@ -166,6 +207,7 @@ Parameter:
   A: character to output
 Return:
   .C: set if error
+Error
 
 
 EFS_readst ($df30)
@@ -176,7 +218,24 @@ Return:
 Status codes:
   $10: verify mismatch
   $40: EOF
-  $80: device not present (?)
+
+
+Error Codes:
+  $01: file scratched (no error)
+  $02: file open
+  $03: file not open
+  $04: file not found
+  $05: device not present
+  $06: no input file
+  $07: no output file
+  $08: missing filename
+  $19: write error
+  $1a: write protected
+  $1e: command syntax error
+  $ef: file exists
+  $47: directory error
+  $48: disk dull
+
 
 
 Usage
