@@ -59,6 +59,7 @@
 .export efs_generic_command
 .export efs_enter_pha
 .export efs_bankout
+.export efs_bankout_end
 .export efs_enter
 
 
@@ -193,6 +194,7 @@
         sta EASYFLASH_CONTROL
         pla
         rts
+    efs_bankout_end:
 
         ; variable code area
     efs_generic_command:
@@ -234,9 +236,6 @@
         .byte $00
         .endrepeat
 
-;    backup_memory_config: ; exclusive usage
-;        .byte $00
-
     error_byte:  ; exclusive usage
         .byte $00
 
@@ -262,4 +261,7 @@
         .word $0000
 
     temporary_variable:
+        .byte $00
+
+    unused:
         .byte $00

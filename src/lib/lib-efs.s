@@ -51,6 +51,7 @@
 .import efs_generic_command
 .import efs_bankin
 .import efs_bankout
+.import efs_bankout_end
 .import efs_enter_pha
 .import efs_enter
 
@@ -412,36 +413,38 @@
     efs_setstartbank_ext:
         ; jsr EAPISetBank  :  $20, <EAPISetBank, >EAPISetBank
         ; jmp efs_enter_pha : $4c, <efs_enter_pha, >efs_enter_pha
-        efs_bankout_source := __EFS_RAM_LOAD__ + (efs_bankout - __EFS_RAM_RUN__)
+        efs_bankout_source := __EFS_RAM_LOAD__ + (efs_bankout_end - __EFS_RAM_RUN__)
         pha
-        lda #$20
-        sta efs_bankout + 0
+        lda #$20  ; jsr
+        sta efs_bankout_end - 6
         lda #<EAPISetBank
-        sta efs_bankout + 1
+        sta efs_bankout_end - 5
         lda #>EAPISetBank
-        sta efs_bankout + 2
-        lda #$4c
-        sta efs_bankout + 3
+        sta efs_bankout_end - 4
+        lda #$4c  ; jmp
+        sta efs_bankout_end - 3
         lda #<efs_enter_pha
-        sta efs_bankout + 4
+        sta efs_bankout_end - 2
         lda #>efs_enter_pha
-        sta efs_bankout + 5
+        sta efs_bankout_end - 1
         pla
 
-        jsr efs_bankout
+        jsr efs_bankout_end - 6
+
+        ; repair changed code
         pha
-        lda efs_bankout_source + 0
-        sta efs_bankout + 0
-        lda efs_bankout_source + 1
-        sta efs_bankout + 1
-        lda efs_bankout_source + 2
-        sta efs_bankout + 2
-        lda efs_bankout_source + 3
-        sta efs_bankout + 3
-        lda efs_bankout_source + 4
-        sta efs_bankout + 4
-        lda efs_bankout_source + 5
-        sta efs_bankout + 5
+        lda efs_bankout_source - 6
+        sta efs_bankout_end - 6
+        lda efs_bankout_source - 5
+        sta efs_bankout_end - 5
+        lda efs_bankout_source - 4
+        sta efs_bankout_end - 4
+        lda efs_bankout_source - 3
+        sta efs_bankout_end - 3
+        lda efs_bankout_source - 2
+        sta efs_bankout_end - 2
+        lda efs_bankout_source - 1
+        sta efs_bankout_end - 1
         pla
         rts
 
