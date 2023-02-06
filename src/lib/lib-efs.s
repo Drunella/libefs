@@ -151,27 +151,36 @@
         ; initializes (erases) the rw area
         jmp rom_format_body
 
-        .byte $00
+    EFS_validate: ; @800f
+        ; parameter: none
+        ; return:
+        ;    .C set if problems occured (defragmentation necessary)
+        jmp rom_validate_body
 
-    efs_magic: ; @ $8010
+    ; unused
+        .byte $00, $00, $00, $00, $00, $00
+
+    efs_magic: ; @ $8018
     efs_default_config:
         .byte "libefs"
         .byte major_version, minor_version, patch_version
 
-        .byte $01
+        .byte $01                      ; one area
         .byte $00, $00, $a0, $d0, $ff  ; area 0: bank 0, $a000, mode lhlh, unlimited
         .byte $00, $00, $00, $00, $00  ; area 1: none
         .byte $00, $00, $00, $00, $00  ; area 2: none
         .byte $00, $00, $00            ; defragment: no
         .byte $00, $00, $00, $00  ; dummy
+        .byte $00, $00, $00, $00  ; dummy
+        .byte $00, $00, $00, $00  ; dummy
 
     efs_config_size = * - efs_default_config
-    .if efs_config_size <> 32
+    .if efs_config_size <> 40
     .error "efs config size mismatch"
     .endif
 
     efs_call_size = * - EFS_init
-    .if efs_call_size <> 48
+    .if efs_call_size <> 64
     .error "EFS_CALL size mismatch"
     .endif
 
@@ -320,6 +329,14 @@
       .if (@codeend - @code) > GENERIC_COMMAND_SIZE
       .error "dynamic code initeapi to large"
       .endif
+
+
+    rom_validate_body:
+        lda #ERROR_DEVICE_NOT_PRESENT
+        ; ### todo implement ###
+        ; return 0: everything is fine
+        ; return 1: deleted invalid files; defragmentation necessary
+        rts
 
 
     efs_init_readmem:

@@ -1,17 +1,20 @@
 ToDo
 ====
 
+- test different banking schemas
+- check for corrupt files (size of 0xffffff)
+  -> delete file and defragment
+
+
 - changes: only one banking mode necessary? -> no, two
 - changes: only one size field necessary? -> possible
 - (ok) fixed functions to get area 1 and 2 data
 - (ok) only use one readef method with several initializations
-- different banking schemas
-- dirlist: blocks free
-- check for corrupt files (size of 0xffffff)
-  -> delete file and defragment
-- pattern matchng for directories: eg "$0:Z*"
+- (ok) different banking schemas
+- (ok) dirlist: blocks free
+- (ok) pattern matchng for directories: eg "$0:Z*"
 
-- rw efs
+- (ok) rw efs
   + alternate between two equally sized areas (ll and lh of same banks
     or lh of different banks or mixed)
   + only one block will be used until full
@@ -21,17 +24,17 @@ ToDo
   
 - (ok) calculate size of rw area
 
-- readst must indicate eof(eoi) before the last byte will be read
+- (no) readst must indicate eof(eoi) before the last byte will be read
   (is this really a practical problem? readst is mostly done afte reading
 
 - (ok) reading of file w/o eapi
   small code in $DF80 with an optimized loop (well, not optimized)
 
-- different library variants
+- (no for now) different library variants
   + (no) read and open only, no write, no verify
     does not need extra space
     average performance
-  + better performance (?)
+  + (?) better performance (?)
     needs appr. 128 (half page) of non-bankable memory (no)
     ($0100-$7fff, $c000-$cfff)
   + (no) write and verify
@@ -52,7 +55,7 @@ ToDo
 - (ok) close implementation
 - (ok) chrin implementation
 
-- save
+- (ok) save
   + (ok) commands: scratch, 
   + (ok) validate (defragment)
   + (ok) additional errors: 

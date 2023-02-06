@@ -42,9 +42,11 @@
         .addr __EFS_CONFIG_RUN__ + efs_defragment_warning_offset
         .addr __EFS_CONFIG_RUN__ + efs_defragment_allclear_offset
         .byte $00, $00   ; empty
+        .byte $00, $00, $00, $00  ; dummy
+        .byte $00, $00, $00, $00  ; dummy
 
     efs_config_size = * - efs_config
-    .if efs_config_size <> 32
+    .if efs_config_size <> 40
     .error "efs_config size mismatch"
     .endif
 

@@ -68,7 +68,7 @@ progress. In the example the border color flashes.
 34,35:    vector to the defragmentation all clear function
           must be callable while easyflash is banked in.
 
-34-37:    unused
+34-3f:    unused
 
 
 
