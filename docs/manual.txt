@@ -7,7 +7,7 @@ kernal routines.
 The library uses the low rom space of the EasyFlash cartridge on bank
 (0:l:0000 - 0:l:1fff) and the 128 bytes in the io2 area (df00 - df7f). 
 No further ram is needed. All banking code and variables reside in the 
-io2 space.
+io2 space. Do not put any other code in the low rom bank 0.
 
 If you only need read access to the efs you can use minieapi which contains
 a subset of functions of eapi for reading. Of course there is no erase and
@@ -21,11 +21,14 @@ The efs library can be iedentified by the text LIBEFS (in PETSCII) at
 The configuration, which banks to use for the read/write part, resides
 right after the EasyFlash name at 0:1:1b18.
 
-The library alternates between two areas of equal size. If one area is used
+The library has a read only storage (the EasyFlash fs as described in the
+orgiginal documentation) and a writable area. For the writable part the 
+libray alternates between two areas of equal size. If one area is used
 up (by deleting and re-creating files) all active files will be copied
 to the other area and the original area will be erased. The process for
 copying is called defragmentation. Defragmentation can take up to several
 minutes, depending on the used space.
+
 
 
 Configuration
@@ -51,15 +54,15 @@ progress. In the example the border color flashes.
           area 0 (default $ff)
 
 27:       bank of area 1 directory
-28,29:    address of area 1 directory: bank, this must start at an 
-          eraseable bank
+28,29:    address of area 1 directory. Address and bank must start at 
+          an eraseable bank.
 2a:       banking mode of area 1 ($d0=lhlh, $b0=llll, $d4=hhhh)
 2b:       number of banks of area 1 used (must be divisible by 8)
 
-2c:       bank of area 2 directory (default: unused)
-2d,2e:    address of area 1 directory: bank, this must start at an
-          eraseable bank
-2f:       banking mode of area 1 ($d0=lhlh, $b0=llll, $d4=hhhh)
+2c:       bank of area 2 directory
+2d,2e:    address of area 1 directory. Address and bank must start at
+          an eraseable bank.
+2f:       banking mode of area 2 ($d0=lhlh, $b0=llll, $d4=hhhh)
 30:       number of banks of area 2 used (must be divisible by 8)
 
 31:       call function on defragmentation (1: yes, 0: no)
@@ -70,20 +73,23 @@ progress. In the example the border color flashes.
 
 34-3f:    unused
 
+See src/ef/efs-config.s as example.
+
 
 
 Initialize
 ==========
 
-To initialize libefs, eapi or minieapi you need to call the following
-functions while bank 0 must be banked in as 16k cartridge.
+To initialize libefs, eapi or minieapi you need to call the functions 
+EFS_init while bank 0 must be banked in as 16k cartridge.
 
 EFS_init ($8000):
 Parameter: none
 Returns: none
 Initializes the efs library, copies code and variables to the io2 area ($df00
 - $df7f). EFS_init can be called before or after EFS_init_eapi or
-EFS_initminieapi.
+EFS_initminieapi. Bank 0 must be banked in as 16k cartridge.
+
 
 EFS_init_eapi ($8003):
 Parameter:
@@ -93,14 +99,45 @@ Return:
 Copies the epi code (768 bytes) to the memory location given as high byte 
 in the eaccumulator. A low address is not necessary as the eapi must be page
 aligned. C flag will be set if eapi is not on the cartridge. You can
-overwrite a previous initialized minieapi.
+overwrite a previous initialized minieapi. Bank 0 must be banked in as 16k 
+cartridge.
+
 
 EFS_init_minieapi ($8006):
 Parameter: none
 Returns: none
 Initalizes minieapi in the io2 area ($df80 - $dfff). You can overwrite a
 previously initialized eapi. With minieapi calls to EAPIWriteFlash,  
-EAPIEraseSector and EAPIGetSlot will do nothing. 
+EAPIEraseSector and EAPIGetSlot will do nothing. Bank 0 must be banked in 
+as 16k cartridge.
+
+
+EFS_defragment ($8009):
+Parameter: none
+Returns:
+  A: error code or 0
+  .C: set if error occurs
+Defragments the writeable part of the efs. This process can take several
+minutes depending on size of writable part and used files. While
+defragmenting a progress function can be called to indicate the process.
+
+
+EFS_format ($800c):
+Parameter: none
+Returns:
+  A: error code or 0
+  .C: set if error occurs
+Formats the writeable part of the efs.
+
+
+EFS_validate ($800f):
+Parameter: none
+Returns:
+  .C: set if efs is corrupted
+Call this to check of there are any corruptions in the writeable part of the
+efs. The function returns .C set if any corruptions are found. The function
+will delete corrupted files. Call EFS_defragment to repair the remaining
+files.
 
 
 You can use the following code to bank in before calling an init function:

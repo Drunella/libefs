@@ -151,7 +151,7 @@
         ; initializes (erases) the rw area
         jmp rom_format_body
 
-    EFS_validate: ; @800f
+    EFS_validate: ; @ $800f
         ; parameter: none
         ; return:
         ;    .C set if problems occured (defragmentation necessary)

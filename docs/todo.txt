@@ -4,6 +4,7 @@ ToDo
 - test different banking schemas
 - check for corrupt files (size of 0xffffff)
   -> delete file and defragment
+- rename command
 
 
 - changes: only one banking mode necessary? -> no, two

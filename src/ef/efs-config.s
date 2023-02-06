@@ -36,14 +36,14 @@
         .byte $03
         ;    bank lo/hi addr mode size
         .byte $00, $00, $a0, $d0,   0  ; area 0: bank 0, $a000, mode lhlh, ignore size
-        .byte  32, $00, $80, $d0,  32  ; area 1: lower banks
-        .byte  48, $00, $80, $d0,  32  ; area 2: upper banks
+        .byte  32, $00, $80, $d0,  32  ; area 1: lower banks of 262144 bytes
+        .byte  48, $00, $80, $d0,  32  ; area 2: upper banks of 262144 bytes
         .byte $01                      ; defragment warning: yes
         .addr __EFS_CONFIG_RUN__ + efs_defragment_warning_offset
         .addr __EFS_CONFIG_RUN__ + efs_defragment_allclear_offset
-        .byte $00, $00   ; empty
-        .byte $00, $00, $00, $00  ; dummy
-        .byte $00, $00, $00, $00  ; dummy
+        .byte $00, $00, $00, $00  ; unused
+        .byte $00, $00, $00, $00  ; unused
+        .byte $00, $00            ; unused
 
     efs_config_size = * - efs_config
     .if efs_config_size <> 40
