@@ -60,14 +60,23 @@
 .import rom_config_get_value
 .import rom_config_prepare_config
 .import rom_config_get_area_bank
-.import rom_config_get_area_mode_invert
-.import rom_config_get_area_addr_high_invert
-.import rom_config_get_area_addr_low_invert
-.import rom_config_get_area_bank_invert
-.import rom_config_get_area_addr_high
-.import rom_config_get_area_addr_low
+;.import rom_config_get_area_mode_invert
+;.import rom_config_get_area_addr_high_invert
+;.import rom_config_get_area_addr_low_invert
+;.import rom_config_get_area_bank_invert
+;.import rom_config_get_area_addr_high
+;.import rom_config_get_area_addr_low
 .import rom_config_get_area_size
-.import rom_config_get_area_mode
+;.import rom_config_get_area_mode
+.import rom_config_get_area_dirbank
+.import rom_config_get_area_dirbank_invert
+.import rom_config_get_area_dirhigh
+.import rom_config_get_area_dirhigh_invert
+.import rom_config_get_area_filesbank
+.import rom_config_get_area_filesbank_invert
+.import rom_config_get_area_fileshigh
+.import rom_config_get_area_fileshigh_invert
+
 
 .import efs_init_readef
 .import efs_init_readef_rely
@@ -133,11 +142,12 @@
 
     rom_space_setdirstart:
         ; init read_ef
-        jsr rom_config_get_area_bank
+        jsr rom_config_get_area_dirbank
         sta efs_readef_bank
-        jsr rom_config_get_area_addr_low
+        ;jsr rom_config_get_area_addr_low
+        lda #$00
         sta efs_readef_low
-        jsr rom_config_get_area_addr_high
+        jsr rom_config_get_area_dirhigh
         sta efs_readef_high
         rts
 
@@ -220,7 +230,7 @@
         sta zp_var_xd
 
       @loop:
-        jsr rom_config_get_area_addr_high
+        jsr rom_config_get_area_dirhigh
         jsr efs_readef_dirboundary
         bcs @leave  ; directory out of bounds
         jsr efs_readef

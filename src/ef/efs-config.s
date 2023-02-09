@@ -34,10 +34,11 @@
         .byte 0, 0, 0
 
         .byte $03
-        ;    bank lo/hi addr mode size
-        .byte $00, $00, $a0, $d0,   0  ; area 0: bank 0, $a000, mode lhlh, ignore size
-        .byte  32, $00, $80, $d0,  32  ; area 1: lower banks of 262144 bytes
-        .byte  48, $00, $80, $d0,  32  ; area 2: upper banks of 262144 bytes
+        ;    bank  dir  bank files size
+        ;           hi        hi
+        .byte $00, $a0, $01, $80,   0  ; area 0: bank 0, $a000, mode lhlh, ignore size
+        .byte  32, $80,  32, $80,  32  ; area 1: lower banks of 262144 bytes
+        .byte  48, $80,  48, $80,  32  ; area 2: upper banks of 262144 bytes
         .byte $01                      ; defragment warning: yes
         .addr __EFS_CONFIG_RUN__ + efs_defragment_warning_offset
         .addr __EFS_CONFIG_RUN__ + efs_defragment_allclear_offset

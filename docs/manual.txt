@@ -41,28 +41,28 @@ progress. In the example the border color flashes.
 
 00:1:1bxx:
 00-17:    [ef name]
-18-1d     LIBEFS ($4c, $49, $42)
-1e-1f     empty ($00, $00, $00)
+18-1d:    LIBEFS ($4c, $49, $42)
+1e-1f:    empty ($00, $00, $00)
 21:       1:only one area (default)
           3:two additional read/write areas
 
-22        bank of area 0 directory (default 0)
-23,24:    address of area 0 directory (default $a000)
-25:       banking mode of area 0 ($d0=lhlh, $b0=llll, $d4=hhhh), see eapi
-          documentation (default $d0)
+22:       bank of area 0 directory (default 0)
+23:       high address of area 0 directory (default $a0)
+24:       bank of area 0 files (default 1)
+25:       high address of area 0 files (default $80)
 26:       number of banks of area 0 (every 8k bank counts), can be zero for
           area 0 (default $ff)
 
 27:       bank of area 1 directory
-28,29:    address of area 1 directory. Address and bank must start at 
-          an eraseable bank.
-2a:       banking mode of area 1 ($d0=lhlh, $b0=llll, $d4=hhhh)
+28:       high address of area 1 directory
+29:       bank of area 1 files
+2a:       high address of area 1 files
 2b:       number of banks of area 1 used (must be divisible by 8)
 
 2c:       bank of area 2 directory
-2d,2e:    address of area 1 directory. Address and bank must start at
-          an eraseable bank.
-2f:       banking mode of area 2 ($d0=lhlh, $b0=llll, $d4=hhhh)
+2d:       high address of area 2 directory
+2e:       bank of area 2 files
+2f:       high address of area 2 files
 30:       number of banks of area 2 used (must be divisible by 8)
 
 31:       call function on defragmentation (1: yes, 0: no)

@@ -22,6 +22,7 @@ GENERIC_COMMAND_SIZE .set 14
 
 ; must be page aligned
 DIRECTORY_SIZE = $1800
+BANKING_MODE = $d0
 
 
 zp_var_xf := ZEROPAGE_BACKUP_END
@@ -130,9 +131,10 @@ EAPIGetSlot       = $df9b
 
 ; lib efs config struct
 .struct libefs_area
-    bank .byte  ; must not change
-    addr .word  ; this ordering !!!
-    mode .byte
+    dir_bank .byte  ; must not change
+    dir_high .byte  ; this ordering !!!
+    files_bank .byte
+    files_high .byte
     size .byte
 .endstruct
 

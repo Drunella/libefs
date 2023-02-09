@@ -1,4 +1,4 @@
-; ----------------------------------------------------------------------------
+	; ----------------------------------------------------------------------------
 ; Copyright 2023 Drunella
 ;
 ; Licensed under the Apache License, Version 2.0 (the "License");
@@ -86,15 +86,23 @@
 .export rom_flags_set_area
 .export rom_flags_get_area_invert
 .export rom_config_rw_available
-.export rom_config_get_area_bank
-.export rom_config_get_area_mode_invert
-.export rom_config_get_area_addr_high_invert
-.export rom_config_get_area_addr_low_invert
-.export rom_config_get_area_bank_invert
-.export rom_config_get_area_addr_high
-.export rom_config_get_area_addr_low
+;.export rom_config_get_area_bank
+;.export rom_config_get_area_mode_invert
+;.export rom_config_get_area_addr_high_invert
+;.export rom_config_get_area_addr_low_invert
+;.export rom_config_get_area_bank_invert
+;.export rom_config_get_area_addr_high
+;.export rom_config_get_area_addr_low
 .export rom_config_get_area_size
-.export rom_config_get_area_mode
+;.export rom_config_get_area_mode
+.export rom_config_get_area_dirbank
+.export rom_config_get_area_dirbank_invert
+.export rom_config_get_area_dirhigh
+.export rom_config_get_area_dirhigh_invert
+.export rom_config_get_area_filesbank
+.export rom_config_get_area_filesbank_invert
+.export rom_config_get_area_fileshigh
+.export rom_config_get_area_fileshigh_invert
 
 .export efs_directory_search
 .export efs_finish_tempvars
@@ -165,8 +173,10 @@
         .byte "libefs"
         .byte major_version, minor_version, patch_version
 
+        ;    bank  dir  bank files size
+        ;           hi        hi
         .byte $01                      ; one area
-        .byte $00, $00, $a0, $d0, $ff  ; area 0: bank 0, $a000, mode lhlh, unlimited
+        .byte $00, $a0, $01, $80, $ff  ; area 0: bank 0, $a000, mode lhlh, unlimited
         .byte $00, $00, $00, $00, $00  ; area 1: none
         .byte $00, $00, $00, $00, $00  ; area 2: none
         .byte $00, $00, $00            ; defragment: no
@@ -1077,68 +1087,82 @@
       : clc
         rts
 
-    rom_config_get_area_bank:
+    rom_config_get_area_dirbank:
         jsr rom_flags_get_area
         jsr rom_config_areaoffset
         clc
-        adc #libefs_area::bank
+        adc #libefs_area::dir_bank
         jmp rom_config_get_value
 
-    rom_config_get_area_bank_invert:
+    rom_config_get_area_dirbank_invert:
         jsr rom_flags_get_area_invert
         jsr rom_config_areaoffset
         clc
-        adc #libefs_area::bank
+        adc #libefs_area::dir_bank
         jmp rom_config_get_value
 
-    rom_config_get_are_bank_zero:
-        lda #libefs_config::area_0 + libefs_area::bank
+    rom_config_get_area_dirbank_zero:
+        lda #libefs_config::area_0 + libefs_area::dir_bank
         jmp rom_config_get_value
 
-
-    rom_config_get_area_addr_low:
+    rom_config_get_area_filesbank:
         jsr rom_flags_get_area
         jsr rom_config_areaoffset
         clc
-        adc #libefs_area::addr
+        adc #libefs_area::files_bank
         jmp rom_config_get_value
 
-    rom_config_get_area_addr_low_invert:
+    rom_config_get_area_filesbank_invert:
         jsr rom_flags_get_area_invert
         jsr rom_config_areaoffset
         clc
-        adc #libefs_area::addr
+        adc #libefs_area::files_bank
         jmp rom_config_get_value
 
 
-    rom_config_get_area_addr_high:
+    rom_config_get_area_dirhigh:
         jsr rom_flags_get_area
         jsr rom_config_areaoffset
         clc
-        adc #libefs_area::addr + 1
+        adc #libefs_area::dir_high
         jmp rom_config_get_value
 
-    rom_config_get_area_addr_high_invert:
+    rom_config_get_area_dirhigh_invert:
         jsr rom_flags_get_area_invert
         jsr rom_config_areaoffset
         clc
-        adc #libefs_area::addr + 1
+        adc #libefs_area::dir_high
         jmp rom_config_get_value
 
 
-    rom_config_get_area_mode:
+    rom_config_get_area_fileshigh:
         jsr rom_flags_get_area
         jsr rom_config_areaoffset
         clc
-        adc #libefs_area::mode
+        adc #libefs_area::files_high
         jmp rom_config_get_value
 
-    rom_config_get_area_mode_invert:
+    rom_config_get_area_fileshigh_invert:
         jsr rom_flags_get_area_invert
         jsr rom_config_areaoffset
         clc
-        adc #libefs_area::mode
+        adc #libefs_area::files_high
         jmp rom_config_get_value
+
+
+;    rom_config_get_area_mode:
+;        jsr rom_flags_get_area
+;        jsr rom_config_areaoffset
+;        clc
+;        adc #libefs_area::mode
+;        jmp rom_config_get_value
+
+;    rom_config_get_area_mode_invert:
+;        jsr rom_flags_get_area_invert
+;        jsr rom_config_areaoffset
+;        clc
+;        adc #libefs_area::mode
+;        jmp rom_config_get_value
 
 
     rom_config_get_area_size:
@@ -1270,25 +1294,27 @@
     rom_config_checkarea:
         ; check which area is active
         ; returns .C set if area is in use
+        ; libefs_config
         tax
         txa
-        jsr rom_config_get_value
+        jsr rom_config_get_value  ; dir bank
         pha
 
         inx
         txa
-        jsr rom_config_get_value
+        jsr rom_config_get_value  ; dir files high
         pha
 
-        inx
-        txa
-        jsr rom_config_get_value
-        pha
+        ;inx
+        ;txa
+        ;jsr rom_config_get_value
+        ;pha
 
+        ;pla
+        ;tay
+        ldx #$00
         pla
         tay
-        pla
-        tax
         pla
         jsr efs_readef_pointer_setall
 
@@ -1509,12 +1535,13 @@
 
         ; directory entry
         ldx zp_var_x9  ; efs_directory_entry + efs_directory::offset_low
-        jsr rom_config_get_area_addr_high
+        jsr rom_config_get_area_fileshigh ; rom_config_get_area_addr_high
         clc
         adc zp_var_xa  ; efs_directory_entry + efs_directory::offset_high
         sta zp_var_xa
         tay
-        jsr rom_config_get_area_mode
+        ;jsr rom_config_get_area_mode
+        lda #BANKING_MODE
         jsr EAPISetPtr
 
         ldx zp_var_xb  ; efs_directory_entry + efs_directory::size_low
@@ -1767,25 +1794,28 @@
     rom_dirsearch_begin:
         ; set pointer and length of directory
         ; a offset in configuration
+        ; libefs_config
         sta zp_var_x8
 
         ; set read ef code
         jsr efs_init_readef
 
         ldy zp_var_x8
-        lda (zp_var_x5), y  ; at libefs_config::libefs_area::bank
+        lda (zp_var_x5), y  ; at libefs_config::libefs_area::dirbank
         jsr efs_setstartbank_ext
         sta efs_readef_bank
 
         inc zp_var_x8
         ldy zp_var_x8
-        lda (zp_var_x5), y  ; at libefs_config::libefs_area::addr low
+        lda (zp_var_x5), y  ; at libefs_config::libefs_area::dirhigh
+        sta efs_readef_high
+        lda #$00
         sta efs_readef_low
 
-        inc zp_var_x8
-        ldy zp_var_x8
-        lda (zp_var_x5), y  ; at libefs_config::libefs_area::addr high
-        sta efs_readef_high
+;        inc zp_var_x8
+;        ldy zp_var_x8
+;        lda (zp_var_x5), y  ; at libefs_config::libefs_area::addr high
+;        sta efs_readef_high
 
         ; banking mode and area size is irrelevant in dirsearch
         rts
@@ -1874,7 +1904,7 @@
         bcs @error4    ; terminator, file not found
         cmp #$00       ; compare for invalid
         beq @nomatch   ; file not valid
-        jsr rom_config_get_area_addr_high
+        jsr rom_config_get_area_dirhigh ; rom_config_get_area_addr_high
         jsr efs_readef_dirboundary
 ;        bcs @leave  ; directory out of bounds
 ;        jsr rom_dirsearch_checkboundary

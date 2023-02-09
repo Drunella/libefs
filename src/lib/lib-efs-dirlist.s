@@ -172,7 +172,7 @@
 
 ;        jsr efs_init_setstartbank
         ldy dirload_temp_var_zp
-        lda (zp_var_x5), y  ; at libefs_config::libefs_area::bank
+        lda (zp_var_x5), y  ; at libefs_config::libefs_area::bank_dir
 ;        jsr efs_generic_command
         jsr efs_setstartbank_ext
         sta efs_readef_bank
@@ -182,13 +182,14 @@
 
         inc dirload_temp_var_zp
         ldy dirload_temp_var_zp
-        lda (zp_var_x5), y  ; at libefs_config::libefs_area::addr low
-        sta efs_readef_low
-
-        inc dirload_temp_var_zp
-        ldy dirload_temp_var_zp
-        lda (zp_var_x5), y  ; at libefs_config::libefs_area::addr high
+        lda (zp_var_x5), y  ; at libefs_config::libefs_area::high_dir
         sta efs_readef_high
+
+;        inc dirload_temp_var_zp
+;        ldy dirload_temp_var_zp
+;        lda (zp_var_x5), y  ; at libefs_config::libefs_area::addr high
+        lda #$00
+        sta efs_readef_low
 
         ; banking mode and size is irrelevant in dirload
 ;        inc dirload_temp_var_zp

@@ -1,14 +1,15 @@
 ToDo
 ====
 
-- test different banking schemas
+- check defragment conditions, there seems to be an overflow in certain
+  conditions
 - check for corrupt files (size of 0xffffff)
   -> delete file and defragment
 - rename command
 
-
-- changes: only one banking mode necessary? -> no, two
-- changes: only one size field necessary? -> possible
+- (no) test different banking schemas
+- (ok) changes: only one banking mode necessary? -> yes, one
+- (ok) changes: only one size field necessary? -> other changes
 - (ok) fixed functions to get area 1 and 2 data
 - (ok) only use one readef method with several initializations
 - (ok) different banking schemas
