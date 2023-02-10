@@ -25,20 +25,6 @@ Find the prg of libefs in the build sub-directory:
 `build/lib-efs.prg`.
 
 
-## Bugs
-
-I did not test the library thoroughly. There are some tests to 
-validate the basic functions and a long running test thats reads, scratches
-and saves files repeatadly. But there are many cases that these simple tests
-do not cover. I consider the library "beta" quality. The features are there
-but largely untested. Use at your own risk.
-
-
-## License and Copyright
-
-The code is © 2023 Drunella, available under the MIT license.
-
-
 
 # Manual
 
@@ -107,56 +93,45 @@ See src/ef/efs-config.s as example.
 
 ## Initialize
 
-To initialize libefs, eapi or minieapi you need to call the functions 
-EFS_init while bank 0 must be banked in as 16k cartridge.
-```
-EFS_init ($8000):
+To initialize libefs, eapi or minieapi you need to call the functions init functions while bank 0 must be banked in as 16k cartridge.
+
+
+**EFS_init ($8000):**
 Parameter: none
 Returns: none
 Initializes the efs library, copies code and variables to the io2 area ($df00-$df7f). EFS_init can be called before or after EFS_init_eapi or EFS_initminieapi. Bank 0 must be banked in as 16k cartridge.
-```
 
-```
-EFS_init_eapi ($8003):
+**EFS_init_eapi ($8003):**
 Parameter:
   A: the high byte of the address where eapi will reside in c64 memory
 Return:
   .C: set if eapi is not on the cartridge
 Copies the epi code (768 bytes) to the memory location given as high byte in the eaccumulator. A low address is not necessary as the eapi must be page aligned. C flag will be set if eapi is not on the cartridge. You can overwrite a previous initialized minieapi. Bank 0 must be banked in as 16k cartridge.
-```
 
-```
-EFS_init_minieapi ($8006):
+**EFS_init_minieapi ($8006):**
 Parameter: none
 Returns: none
 Initalizes minieapi in the io2 area ($df80-$dfff). You can overwrite a previously initialized eapi. With minieapi calls to EAPIWriteFlash, EAPIEraseSector and EAPIGetSlot will do nothing. Bank 0 must be banked in as 16k cartridge.
-```
 
-```
-EFS_defragment ($8009):
+**EFS_defragment ($8009):**
 Parameter: none
 Returns:
   A: error code or 0
   .C: set if error occurs
 Defragments the writeable part of the efs. This process can take several minutes depending on size of writable part and used files. While defragmenting a progress function can be called to indicate the process.
-```
 
-```
-EFS_format ($800c):
+**EFS_format ($800c):**
 Parameter: none
 Returns:
   A: error code or 0
   .C: set if error occurs
 Formats the writeable part of the efs.
-```
 
-```
-EFS_validate ($800f):
+**EFS_validate ($800f):**
 Parameter: none
 Returns:
   .C: set if efs is corrupted
 Call this to check of there are any corruptions in the writeable part of the efs. The function returns .C set if any corruptions are found. The function will delete corrupted files. Call EFS_defragment to repair the remaining files.
-```
 
 
 You can use the following code to bank in before calling an init function:
@@ -180,16 +155,13 @@ Calling EAPIWriteFlash, EAPIEraseSector and EAPIGetSlot in minieapi will do noth
 
 ## libefs
 
-```
-EFS_setlfs ($df00)
+**EFS_setlfs ($df00)**
 Parameter:
   Y: secondary address (0: relocate, 1: load to loadaddress of file)
 Return: 
   none
-```
 
-```
-EFS_setnam ($df06)
+**EFS_setnam ($df06)**
 Parameter:
   A: name length
   X: name address low
@@ -198,10 +170,8 @@ Peturn:
   none
 Restrictions:
   The name must not be in memory areas where banking occurs: $8000 - $bfff and $e000 - $ffff, as well as the memory below io area ($d000 - $dfff)
-```
 
-```
-EFS_load ($df0c)
+**EFS_load ($df0c)**
 Parameter:
   A: 0=load, 1-255=verify
   X: load address for relocation low
@@ -213,10 +183,8 @@ Return:
   .C: set if error
 Supported commands:
   "$0:[filename]" will load the directory
-```
 
-```
-EFS_open ($df12)
+**EFS_open ($df12)**
 Parameter:
   A: 0=read 1=write
 Return:
@@ -225,28 +193,22 @@ Return:
 Supported commands:
   "$0:[filename]" will load the directory
   "S0:[filename]" will delete a file
-```  
 
-```
-EFS_close ($df18)
+**EFS_close ($df18)**
 Parameter: 
   none
 Return:
   A: error code
   .C: set if error
-```
 
-```
-EFS_chrin ($df1e)
+**EFS_chrin ($df1e)**
 Parameter: 
   none
 Return:
   A: character or error code
   .C: set if error
-```
 
-```
-EFS_save ($df24)
+**EFS_save ($df24)**
 Parameter:
   A: z-page variable to start address
   X: end address low
@@ -256,19 +218,15 @@ Peturn:
   .C: set if error
 Supported commands:
   "@0:[filename]" will overwrite the file
-```
 
-```
-EFS_chrout ($df2a)
+**EFS_chrout ($df2a)**
 Parameter:
   A: character to output
 Return:
   .C: set if error
 Error
-```
 
-```
-EFS_readst ($df30)
+**EFS_readst ($df30)**
 Parameter: 
   none
 Return:
@@ -276,10 +234,8 @@ Return:
 Status codes:
   $10: verify mismatch
   $40: EOF
-```
 
 Error Codes:
-```
   $01: file scratched (no error)
   $02: file open
   $03: file not open
@@ -294,7 +250,6 @@ Error Codes:
   $ef: file exists
   $47: directory error
   $48: disk dull
-```
 
 
 ## Usage
