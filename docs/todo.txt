@@ -6,6 +6,8 @@ ToDo
 - check for corrupt files (size of 0xffffff)
   -> delete file and defragment
 - rename command
+- support open with "command0:filaname,w,p" notation; support the w for
+  write, r for read; p only for prg type
 
 - (no) test different banking schemas
 - (ok) changes: only one banking mode necessary? -> yes, one
