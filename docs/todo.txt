@@ -1,13 +1,22 @@
 ToDo
 ====
 
-- check defragment conditions, there seems to be an overflow in certain
-  conditions
+- bug: saving in basic or kernal area ignores original memory config
+- implement EFS_validate
+- (ok) mark the first directory entry of the unused
+  area with 0xfe as the bank high (reserved)
 - check for corrupt files (size of 0xffffff)
   -> delete file and defragment
 - rename command
 - support open with "command0:filaname,w,p" notation; support the w for
   write, r for read; p only for prg type
+
+
+Done
+====
+
+- (ok) check defragment conditions, there seems to be an overflow in certain
+  conditions (config bug)
 
 - (no) test different banking schemas
 - (ok) changes: only one banking mode necessary? -> yes, one

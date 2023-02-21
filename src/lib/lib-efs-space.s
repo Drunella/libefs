@@ -34,7 +34,7 @@
 
 .import efs_io_byte
 .import efs_generic_command
-.import efs_bankin
+;.import efs_bankin
 .import efs_bankout
 .import efs_enter_pha
 .import efs_enter

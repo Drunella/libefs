@@ -49,7 +49,7 @@
 
 .import efs_io_byte
 .import efs_generic_command
-.import efs_bankin
+;.import efs_bankin
 .import efs_bankout
 .import efs_bankout_end
 .import efs_enter_pha
@@ -111,6 +111,7 @@
 .export efs_init_eapierasesector
 .export efs_init_eapireadinc
 .export efs_init_eapiwriteinc
+.export efs_init_eapiwrite
 .export efs_init_readmem
 .export efs_readef_dirboundary
 .export efs_readef_storedaddr_high

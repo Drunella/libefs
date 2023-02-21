@@ -41,7 +41,7 @@
 
 .import efs_io_byte
 .import efs_generic_command
-.import efs_bankin
+;.import efs_bankin
 .import efs_bankout
 .import efs_enter_pha
 .import efs_enter
@@ -55,7 +55,6 @@
 
 .export rom_chrout_body
 .export rom_save_body
-.export rom_chrout_body
 .export rom_defragment_body
 .export rom_format_body
 .export rom_filesave_chrin_prepare
@@ -121,6 +120,7 @@
 .import efs_init_eapierasesector
 .import efs_init_eapireadinc
 .import efs_init_eapiwriteinc
+.import efs_init_eapiwrite
 .import efs_finish_tempvars
 .import efs_temp_var1
 .import efs_temp_var2
@@ -477,6 +477,20 @@
       @loopend:
         dex
         bne @loop
+
+        ; mark the directory area
+        jsr efs_init_eapiwrite
+
+        jsr rom_config_get_area_dirbank
+        jsr efs_setstartbank_ext
+
+        lda #efs_directory::reserved
+        tax
+        jsr rom_config_get_area_dirhigh
+        tay
+        lda #$fe
+        jsr efs_io_byte
+
         lda #$00
         clc
         rts
