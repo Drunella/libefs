@@ -479,17 +479,17 @@
         bne @loop
 
         ; mark the directory area
-        jsr efs_init_eapiwrite
-
-        jsr rom_config_get_area_dirbank
-        jsr efs_setstartbank_ext
-
-        lda #efs_directory::reserved
-        tax
-        jsr rom_config_get_area_dirhigh
-        tay
-        lda #$fe
-        jsr efs_io_byte
+;        jsr efs_init_eapiwrite
+;
+;        jsr rom_config_get_area_dirbank
+;        jsr efs_setstartbank_ext
+;
+;        lda #efs_directory::reserved
+;        tax
+;        jsr rom_config_get_area_dirhigh
+;        tay
+;        lda #$fe
+;        jsr efs_io_byte
 
         lda #$00
         clc
