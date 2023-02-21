@@ -39,7 +39,7 @@ write. The minieapi sits in the upper io2 area (df80 - dfff) and replaces
 the eapi jump table, code and variables there. No further ram space is
 needed.
 
-The efs library can be iedentified by the text LIBEFS (in PETSCII) at
+The efs library can be identified by the text LIBEFS (in PETSCII) at
 00:l:0010, followed by the version number in major.minor.patch.
 
 The configuration, which banks to use for the read/write part, resides
@@ -49,9 +49,8 @@ The library has a read only storage (the EasyFlash fs as described in the
 orgiginal documentation) and a writable area. For the writable part the 
 libray alternates between two areas of equal size. If one area is used
 up (by deleting and re-creating files) all active files will be copied
-to the other area and the original area will be erased. The process for
-copying is called defragmentation. Defragmentation can take up to several
-minutes, depending on the used space.
+to the other area and the original area will be erased. This defragmentation
+process can take up to several minutes, depending on the used space.
 
 
 ## Configuration
@@ -63,7 +62,7 @@ progress. In the example the border color flashes.
 
 | 00:1:1bxx | Description |
 | --------- | ----------- |
-| 00-17     | EF-Name: name (16), see EasyFlash documentation |
+| 00-17     | EF-Name: name (8+16), see EasyFlash documentation |
 | 18-1d     | LIBEFS ($4c, $49, $42) |
 | 1e-1f     | empty ($00, $00, $00) |
 | 21        | 1:only one area (default); 3:two additional read/write areas |
@@ -71,16 +70,16 @@ progress. In the example the border color flashes.
 | 23        | high address of area 0 directory (default $a0) |
 | 24        | bank of area 0 files (default 1) |
 | 25        | high address of area 0 files (default $80) |
-| 26        | number of banks of area 0 (every 8k bank counts), can be zero for area 0 (default $ff) |
+| 26        | number of banks of area 0 (every 8k bank counts), can be anything (default $ff) |
 | 27        | bank of area 1 directory |
-| 28        | high address of area 1 directory |
-| 29        | bank of area 1 files |
-| 2a        | high address of area 1 files |
+| 28        | high address of area 1 directory, usually $00 |
+| 29        | bank of area 1 files (must be identical to directory) |
+| 2a        | high address of area 1 files, usually $18 |
 | 2b        | number of banks of area 1 used (must be divisible by 8) |
 | 2c        | bank of area 2 directory |
-| 2d        | high address of area 2 directory |
-| 2e        | bank of area 2 files |
-| 2f        | high address of area 2 files |
+| 2d        | high address of area 2 directory, usually $00 |
+| 2e        | bank of area 2 files (must be identical to directory) |
+| 2f        | high address of area 2 files, usually $18 |
 | 30        | number of banks of area 2 used (must be divisible by 8) |
 | 31        | call function on defragmentation (1: yes, 0: no) |
 | 32,33     | vector to update defragmentation warning; must be callable while easyflash is banked in. |
@@ -111,7 +110,7 @@ EFS_initminieapi. Bank 0 must be banked in as 16k cartridge.
 ```
 
 ```
-EFS_init_eapi ($8003)
+EFS_init_eapi ($8003):
 Parameter:
   A: the high byte of the address where eapi will reside in c64 memory
 Return:
@@ -124,7 +123,7 @@ cartridge.
 ```
 
 ```
-EFS_init_minieapi ($8006)
+EFS_init_minieapi ($8006):
 Parameter: 
   none
 Returns: 
@@ -136,7 +135,7 @@ as 16k cartridge.
 ```
 
 ```
-EFS_defragment ($8009)
+EFS_defragment ($8009):
 Parameter: 
   none
 Returns:
@@ -148,18 +147,17 @@ a progress function can be called to indicate the process.
 ```
 
 ```
-EFS_format ($800c)
+EFS_format ($800c):
 Parameter: 
   none
 Returns:
   A: error code or 0
   .C: set if error occurs
-```
 Formats the writeable part of the efs.
 ```
 
 ```
-EFS_validate ($800f)
+EFS_validate ($800f):
 Parameter: 
   none
 Returns:
@@ -168,7 +166,7 @@ Call this to check of there are any corruptions in the writeable part of the
 efs. The function returns .C set if any corruptions are found. The function
 will delete corrupted files. Call EFS_defragment to repair the remaining files.
 It will also check and erase all unused and unerased banks prior to usage. Some
-hardware and older software implemenations might not clear unused banks.
+hardware and older software implementations might not erase unused banks.
 ```
 
 You can use the following code to bank in before calling an init function:
@@ -211,8 +209,8 @@ Parameter:
   Y: name address high
 Peturn:
   none
-The name must not be in memory areas where banking occurs: $8000 - $bfff and 
-$e000 - $ffff, as well as the memory below io area ($d000 - $dfff).
+The name must not be in memory areas where banking occurs: $8000 - $bfff, 
+$e000 - $ffff as well as the memory below io area ($d000 - $dfff).
 ```
 
 ```
