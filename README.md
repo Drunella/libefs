@@ -99,68 +99,77 @@ be banked in as 16k cartridge. You should also call EFS_validate on every
 start. Call EFS_defragment if EFS_validate returns an error.
 
 
-**EFS_init ($8000)**
-Parameter: none
-Returns: none
+```
+EFS_init ($8000):
+Parameter:
+  none
+Returns:
+  none
 Initializes the efs library, copies code and variables to the io2 area
 ($df00-$df7f). EFS_init can be called before or after EFS_init_eapi or
 EFS_initminieapi. Bank 0 must be banked in as 16k cartridge.
-
-**EFS_init_eapi ($8003)**
 ```
+
+```
+EFS_init_eapi ($8003)
 Parameter:
   A: the high byte of the address where eapi will reside in c64 memory
 Return:
   .C: set if eapi is not on the cartridge
-```
 Copies the epi code (768 bytes) to the memory location given as high byte
 in the eaccumulator. A low address is not necessary as the eapi must be page
 aligned. C flag will be set if eapi is not on the cartridge. You can
 overwrite a previous initialized minieapi. Bank 0 must be banked in as 16k 
 cartridge.
+```
 
-**EFS_init_minieapi ($8006)**
 ```
-Parameter: none
-Returns: none
-```
+EFS_init_minieapi ($8006)
+Parameter: 
+  none
+Returns: 
+  none
 Initalizes minieapi in the io2 area ($df80-$dfff). You can overwrite a 
 previously initialized eapi. With minieapi calls to EAPIWriteFlash, 
 EAPIEraseSector and EAPIGetSlot will do nothing. Bank 0 must be banked in 
 as 16k cartridge.
-
-**EFS_defragment ($8009)**
 ```
-Parameter: none
+
+```
+EFS_defragment ($8009)
+Parameter: 
+  none
 Returns:
   A: error code or 0
   .C: set if error occurs
-```
 Defragments the writeable part of the efs. This process can take several
 minutes depending on size of writable part and used files. While defragmenting
 a progress function can be called to indicate the process.
-
-**EFS_format ($800c)**
 ```
-Parameter: none
+
+```
+EFS_format ($800c)
+Parameter: 
+  none
 Returns:
   A: error code or 0
   .C: set if error occurs
 ```
 Formats the writeable part of the efs.
-
-**EFS_validate ($800f)**
 ```
-Parameter: none
+
+```
+EFS_validate ($800f)
+Parameter: 
+  none
 Returns:
   .C: set if efs is corrupted
-```
 Call this to check of there are any corruptions in the writeable part of the
 efs. The function returns .C set if any corruptions are found. The function
 will delete corrupted files. Call EFS_defragment to repair the remaining files.
 It will also check and erase all unused and unerased banks prior to usage. Some
 hardware and older software implemenations might not clear unused banks.
-
+```
 
 You can use the following code to bank in before calling an init function:
 ```
@@ -173,43 +182,41 @@ You can use the following code to bank in before calling an init function:
 ```
 
 
-## Minieapi
+## MiniEapi
 
 Minieapi provides the EAPI functions EAPIGetBank, EAPISetBank, EAPISetPtr, 
-EAPISetLen and EAPIReadFlashInc. See the EasyFlash Programmer Reference 
+EAPISetLen and EAPIReadFlashInc. See the EasyFlash [Documentation for Developers](https://skoe.de/easyflash/develdocs/)
 for more information.
 
 Calling EAPIWriteFlash, EAPIEraseSector and EAPIGetSlot in minieapi will 
-do nothing, they will immediately return. Calling EAPIWriteFlashInc is 
-identical to EAPISetBank. Calling EAPISetSlot will change the current bank, 
-but not the shadow bank.
-
+do nothing, they will immediately return. EAPIWriteFlashInc and EAPISetSlot 
+jumps into the code of EAPISetBank and changes the current bank.
 
 
 ## libefs
 
-**EFS_setlfs ($df00)**
 ```
+EFS_setlfs ($df00):
 Parameter:
   Y: secondary address (0: relocate, 1: load to loadaddress of file)
 Return: 
   none
 ```
 
-**EFS_setnam ($df06)**
 ```
+EFS_setnam ($df06):
 Parameter:
   A: name length
   X: name address low
   Y: name address high
 Peturn:
   none
-```
 The name must not be in memory areas where banking occurs: $8000 - $bfff and 
 $e000 - $ffff, as well as the memory below io area ($d000 - $dfff).
-
-**EFS_load ($df0c)**
 ```
+
+```
+EFS_load ($df0c):
 Parameter:
   A: 0=load, 1-255=verify
   X: load address for relocation low
@@ -223,8 +230,8 @@ Supported commands:
   "$0:[filename]" will load the directory
 ```
 
-**EFS_open ($df12)**
 ```
+EFS_open ($df12):
 Parameter:
   A: 0=read 1=write
 Return:
@@ -233,10 +240,11 @@ Return:
 Supported commands:
   "$0:[filename]" will load the directory
   "S0:[filename]" will delete a file
+The parameter in the accumulator is not part of the original c64 kernal call.
 ```
 
-**EFS_close ($df18)**
 ```
+EFS_close ($df18):
 Parameter: 
   none
 Return:
@@ -244,8 +252,8 @@ Return:
   .C: set if error
 ```
 
-**EFS_chrin ($df1e)**
 ```
+EFS_chrin ($df1e):
 Parameter: 
   none
 Return:
@@ -253,8 +261,8 @@ Return:
   .C: set if error
 ```
 
-**EFS_save ($df24)**
 ```
+EFS_save ($df24):
 Parameter:
   A: z-page variable to start address
   X: end address low
@@ -266,16 +274,16 @@ Supported commands:
   "@0:[filename]" will overwrite the file
 ```
 
-**EFS_chrout ($df2a)**
 ```
+EFS_chrout ($df2a):
 Parameter:
   A: character to output
 Return:
   .C: set if error
 ```
 
-**EFS_readst ($df30)**
 ```
+EFS_readst ($df30):
 Parameter:
   none
 Return:
@@ -286,7 +294,7 @@ Status codes:
 ```
 
 
-Error Codes:
+## Error Codes:
 ```
   $01: file scratched (no error)
   $02: file open
@@ -301,7 +309,7 @@ Error Codes:
   $1e: command syntax error
   $ef: file exists
   $47: directory error
-  $48: disk dull
+  $48: disk full
 ```
 
 
@@ -309,36 +317,41 @@ Error Codes:
 
 ### Interrupts:
 
-libefs does not use sei. You have to take care of your interrupts beforehand. 
-EAPI uses sei but restores the interrupt flag with plp. You can block 
-interrupts by calling sei and cli before resp. after calling efs functions.
+libefs does not use ```sei``` for the most part. You have to take care of 
+your interrupts beforehand. EAPI uses sei but restores the interrupt flag 
+with ```plp```. You can block interrupts by calling ```sei``` and ```cli``` 
+before resp. after calling efs functions.
 
 libefs uses $37 (BASIC and KERNAL banked in) as memory configuration. If 
-this collides with your interrupt usage you need to turn interrupts off 
+this collides with your interrupt usage you need to turn off interrupts 
 before calling libefs functions.
 
 
 ### Allowed commands
 
-Not all acommands are allowed to be usesd in load, open and save.
+The following commands willcan be used in the following functions:
 
 ```
-S: scratch: open
-$: directory: open, load
-@: overwrite: save
+S: scratch: EFS_open
+$: directory: EFS_open, EFS_load
+@: overwrite: EFS_save
 ```
 
 
 
 # Other
 
+## Example
+See the testefs cartridge source code in ```src/ef``` as example. You can find 
+the build test cartridge in the build directory: ```build/test-libefs.crt```
+
 ## Bugs
 
 I did not test the library thoroughly. There are some tests to
 validate the basic functions and a long running test thats reads, scratches
-and saves files repeatadly. But there are many cases that these simple tests
-do not cover. I consider the library "beta" quality. The features are there
-but largely untested. Use at your own risk.
+and saves files repeatadly. But there are many cases that the simple tests
+do not cover. I consider the library "beta" quality at best. The features 
+are there but largely untested. Use at your own risk.
 
 
 ## License and Copyright
