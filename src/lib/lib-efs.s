@@ -49,7 +49,6 @@
 
 .import efs_io_byte
 .import efs_generic_command
-;.import efs_bankin
 .import efs_bankout
 .import efs_bankout_end
 .import efs_enter_pha
@@ -86,15 +85,7 @@
 .export rom_flags_set_area
 .export rom_flags_get_area_invert
 .export rom_config_rw_available
-;.export rom_config_get_area_bank
-;.export rom_config_get_area_mode_invert
-;.export rom_config_get_area_addr_high_invert
-;.export rom_config_get_area_addr_low_invert
-;.export rom_config_get_area_bank_invert
-;.export rom_config_get_area_addr_high
-;.export rom_config_get_area_addr_low
 .export rom_config_get_area_size
-;.export rom_config_get_area_mode
 .export rom_config_get_area_dirbank
 .export rom_config_get_area_dirbank_invert
 .export rom_config_get_area_dirhigh
@@ -153,7 +144,7 @@
         jmp efs_init_minieapi_body
 
     EFS_defragment: ; @ $8009
-        ; validates (defragments) the rw area
+        ; defragments the rw area
         jmp rom_defragment_body
 
     EFS_format: ; @ $800c
@@ -625,8 +616,6 @@
         clc             ; .C set and no error
       : jmp @leave      ; leave
 
-;        jmp @leave  ; always finish after commands
-
       @loadcheck:
         lda internal_state
         and #%11000000
@@ -640,17 +629,14 @@
         and #%11000000
         cmp #%11000000  ; file save processing
         bne @dircheck
-;        lda #%11000000  ; file save processing
-;        sta internal_state
-;        jsr rom_command_save_process
-;        bcs @leave
         jsr rom_filesave_chrin_prepare
+        bcs @errorx
         jmp @leave
 
       @dircheck:
         lda internal_state
         and #%11000000
-        cmp #%01000000  ; dir save processing
+        cmp #%01000000  ; dir processing
         bne @error
         jsr rom_dirload_begin  ; only command that will be executed here
         jmp @leave
@@ -658,6 +644,10 @@
       @error:
         lda #ERROR_SYNTAX_ERROR_30
         sta error_byte
+      @errorx:
+        lda #$00
+        sta internal_state  ; ### on any error file will be closed, fs might be corrupted
+        lda error_byte
         sec
 
       @leave:
@@ -1446,6 +1436,7 @@
         jsr efs_directory_search
         bcs :+      ; not found, ignore
         jsr rom_scratch_process
+        bcs @error
       : lda #$00    ; no error
         sta error_byte
         clc         ; continue after
@@ -2025,8 +2016,8 @@
         jsr rom_scratch_begin  ; this finishes the operation
         jmp @leave
 
-      ; ### check for disk drive commands
-      ; "R0:..."  rename file ###
+      ; check for disk drive commands
+      ; "R0:..."  rename file
 */
 
 /*    rom_scratch_isrequested:
@@ -2095,7 +2086,7 @@
         jsr rom_config_prepare_config
 
         jsr efs_init_set startbank
-        ;lda #$00  ; ### 0, could be different bank
+        ;lda #$00  ; 0, could be different bank
         ldy zp_var_x8
         lda ($35), y  ; at libefs_config::libefs_area::bank
         jsr efs_generic_command
@@ -2383,7 +2374,7 @@
         sec
         rts*/
 
-/*    rom_filesave_freeblocks:  ; ### ???
+/*    rom_filesave_freeblocks:  ; ???
         ; config must be set to either area 1 or 2
         ; returns free blocks in X/Y (x=low)
         ; one chip contains 32 pages
@@ -2406,7 +2397,7 @@
         rts*/
 
 
-/*    rom_filesave_freedirentries:  ; ### ???
+/*    rom_filesave_freedirentries:  ; ???
         ; config must be set to either area 1 or 2
         ; directory is set properly
         ; returns free directory entries in a
@@ -2438,7 +2429,7 @@
         rts*/
 
 
-/*    rom_filesave_usedspace:  ; ### ???
+/*    rom_filesave_usedspace:  ; ???
         ; space by real active files
         ; config must be set to either area 1 or 2
         ; directory is set properly
@@ -2458,7 +2449,7 @@
         sta zp_var_xd
 
       @loop:
-        ; ### check overflow
+        ; check overflow
         jsr efs_readef
         cmp #$ff
         beq @leave
@@ -2494,7 +2485,7 @@
         rts*/
 
 
-/*    rom_filesave_blockedspace:  ; ### ???
+/*    rom_filesave_blockedspace:  ; ???
         ; space blocked by real and deleted files
         ; config must be set to either area 1 or 2
         ; directory is set properly
@@ -2514,7 +2505,7 @@
         sta zp_var_xd
 
       @loop:
-        ; ### check overflow
+        ; check overflow
         jsr efs_readef
         cmp #$ff
         beq :+  ; leave

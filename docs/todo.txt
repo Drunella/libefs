@@ -1,15 +1,16 @@
 ToDo
 ====
 
-- bug: saving in basic or kernal area ignores original memory config
+- (ok) bug: saving file that exists in area 0 leads to crash
+  should: error file exists, overwrite on, file write protected
 - implement EFS_validate
-- (ok) mark the first directory entry of the unused
-  area with 0xfe as the bank high (reserved)
 - check for corrupt files (size of 0xffffff)
-  -> delete file and defragment
-- rename command
+  -> delete file and (recommend) defragment
+- iec2sd does not work on hardware for file manager
+
+- rename command (next version)
 - support open with "command0:filaname,w,p" notation; support the w for
-  write, r for read; p only for prg type
+  write, r for read; p only for prg type (next version)
 
 
 Done

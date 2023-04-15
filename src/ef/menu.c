@@ -45,15 +45,20 @@ void draw_version(void)
     cputsxy(39-n, 24, text);
 }
 
-void draw_system(uint8_t s)
+void draw_system(uint8_t system, uint8_t sid)
 {
     cprintf("c64 type: ");
-    switch(s) {
+    switch(system) {
         case 0: cprintf("EU-PAL"); break;
         case 1: cprintf("NTSC-old"); break;
         case 2: cprintf("PAL-N"); break;
         case 3: cprintf("NTSC-new"); break;
         default: cprintf("unknown"); break;
+    }
+    switch(sid) {
+        case 1: cprintf(", SID6581"); break;
+        case 2: cprintf(", SID8085"); break;
+        default: break;
     }
     cprintf("\n\r");
 }
@@ -385,6 +390,7 @@ void main(void)
     char* commandname;
     char* address;
     uint8_t sysident;
+    uint8_t sidident;
     uint8_t cleartoggle;
     
     filename = &filename_data[3];
@@ -401,6 +407,7 @@ void main(void)
     
     //sysident = TIMER_get_system();
     sysident = SYS_get_system();
+    sidident = SYS_get_sid();
     
     while (kbhit()) {
         cgetc();
@@ -428,7 +435,7 @@ void main(void)
             menu_option(20, wherey(), '8', "Save file");
             gotoxy(0, OUTPUT_START_Y);
             //cprintf("%x (4a:60,9 a6:60,1 51:50,9 c0:50,1)\n\r", sysident);
-            draw_system(sysident);
+            draw_system(sysident, sidident);
             cprintf("filename: '%s'\n\r", filename);
             cprintf("mode: %d\n\r", mode);
             cprintf("secondary: %d\n\r", secondary);

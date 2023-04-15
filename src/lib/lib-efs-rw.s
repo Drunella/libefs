@@ -364,12 +364,12 @@
         bcs @leave
         jsr efs_directory_search
         bcs @savefile ; not found
-        jsr rom_scratch_process
-        bcs @leave
-;        lda #ERROR_FILE_EXISTS  ; ### delete instead?
-;        sta error_byte
-;        sec
-;        bne @leave
+;        jsr rom_scratch_process
+;        bcs @leave
+        lda #ERROR_FILE_EXISTS
+        sta error_byte
+        sec
+        bne @leave
 
       @savefile:
         lda #$00
@@ -696,14 +696,14 @@
         jsr efs_readef
         jsr efs_io_byte  ; use eapiwriteflash without inc?
         ;bcs @error ignore errors :(
-        jsr rom_defragment_copy_data_sourceinc  ; ### unroll ?
-        jsr rom_defragment_copy_data_destinc  ; ### unroll ?
-        jsr rom_filesave_decrease_size  ; ### unroll ?
+        jsr rom_defragment_copy_data_sourceinc  ; unroll ?
+        jsr rom_defragment_copy_data_destinc  ; unroll ?
+        jsr rom_filesave_decrease_size  ; unroll ?
         bcc @loop
 
         ; save dest file address
         ;jsr EAPIGetBank
-        ;sta zp_var_x8  ; ### redundant ?
+        ;sta zp_var_x8  ; redundant ?
 
         jsr efs_readef_swap
         lda efs_temp_var2  ; has the destination directory bank

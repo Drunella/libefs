@@ -121,7 +121,7 @@
     efs_dirload_nextarea:
         ; prepares the data for the next area
         ; dirload_area_var contains current area
-        ; returns .C set if there us no next
+        ; returns .C set if there is no next
         ; dirload_area_var contains the next area
         jsr rom_config_prepare_config
 
@@ -198,7 +198,7 @@
 ;        lda ($35), y  ; at libefs_config::libefs_area::size
 ;        tay
 ;        dey
-        ;sty ### 
+        ;sty 
         rts
 
 
