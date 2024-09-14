@@ -39,10 +39,10 @@ Configuration starts at 00:1:1b18
 00-17:    [ef name]
 18,19,1a  LIB ($4c, $49, $42)
 1b,1c,1d  EFS ($45, $46, $53)
-1e,1f     $00, $00, $00
+1e,1f,20  $00, $00, $00
 21:       1:only one area (default read only); 3:two additional read/write areas
 22,23,24: start of area 0 directory: bank, low/high (usually 00:2000)
-25:       banking mode according to eapi ($d0=lhlh, $b0=llll, $d4=hhhh
+25:       banking mode according to eapi ($d0=lhlh, $b0=llll, $d4=hhhh)
 26:       number of banks (every bank, low and high must count) (can be empty)
 27,28,29: start of area 1 directory: bank, low/high; this must start at an erase area
 2a:       banking mode
@@ -53,7 +53,7 @@ Configuration starts at 00:1:1b18
 31:       call rom function on defragmentation
 32,33:    low/high address of rom function in memory ($8000 - $bfff), must be in bank 0
           to start and update defragmentation warning
-34,35:    low/high address of rpm function in memory 
+34,35:    low/high address of rom function in memory 
           to finish defragmentation warning
 34-37:    empty
 
