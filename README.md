@@ -167,6 +167,7 @@ efs. The function returns .C set if any corruptions are found. The function
 will delete corrupted files. Call EFS_defragment to repair the remaining files.
 It will also check and erase all unused and unerased banks prior to usage. Some
 hardware and older software implementations might not erase unused banks.
+NOT YET IMPLEMENTED!
 ```
 
 You can use the following code to bank in before calling an init function:
@@ -348,10 +349,11 @@ the build test cartridge in the build directory: ```build/test-libefs.crt```
 I did not test the library thoroughly. There are some tests to
 validate the basic functions and a long running test thats reads, scratches
 and saves files repeatadly. But there are many cases that the simple tests
-do not cover. I consider the library "beta" quality at best. The features 
-are there but largely untested. Use at your own risk.
+do not cover. I consider the library "alpha" quality. The features 
+are there but largely untested. Use at your own risk. Some features have not
+been implemented yet.
 
 
 ## License and Copyright
 
-The code is © 2023 Drunella, available under the MIT license.
+The code is © 2023 Drunella, available under the Apache 2.0 license.
