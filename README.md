@@ -28,6 +28,8 @@ Find the prg of libefs in the build sub-directory:
 
 # Manual
 
+Read more in [docs/manual.txt](./docs/manual.txt)
+
 The library uses the low rom space of the EasyFlash cartridge on bank
 (0:l:0000 - 0:l:1fff) and the 128 bytes in the io2 area (df00 - df7f). 
 No further ram is needed. All banking code and variables reside in the 
