@@ -28,7 +28,7 @@ Find the prg of libefs in the build sub-directory:
 
 # Manual
 
-Read more in [docs/manual.txt](./docs/manual.md)
+Read more in [docs/manual.md](./docs/manual.md)
 
 
 
