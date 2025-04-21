@@ -22,6 +22,9 @@ GENERIC_COMMAND_SIZE .set 14
 
 ; must be page aligned
 DIRECTORY_SIZE = $1800
+; $D0: 00:0:1FFF=>00:1:0000, 00:1:1FFF=>01:0:1FFF (lhlh...)
+; $B0: 00:0:1FFF=>01:0:0000 (llll...)
+; $D4: 00:1:1FFF=>01:1:0000 (hhhh...)
 BANKING_MODE = $d0
 
 
@@ -136,6 +139,7 @@ EAPIGetSlot       = $df9b
     files_bank .byte
     files_high .byte
     size .byte
+    bankmode .byte
 .endstruct
 
 .struct libefs_config

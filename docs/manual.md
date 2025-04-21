@@ -43,28 +43,30 @@ progress. In the example the border color flashes.
 | --------- | ----------- |
 | 00-17     | EasyFlash name (8+16), see EasyFlash documentation |
 | 18-1d     | LIBEFS ($4c, $49, $42, $45 $46 $53) |
-| 1e-1f     | empty ($00, $00) |
-| 20        | empty ($00) |
+| 1e-20     | empty ($00, $00, $00) |
 | 21        | 1:only one area (default); 3:two additional read/write areas |
 | 22        | bank of area 0 directory (default 0) |
 | 23        | high address of area 0 directory (default $a0) |
 | 24        | bank of area 0 files (default 1) |
 | 25        | high address of area 0 files (default $80) |
 | 26        | number of banks of area 0 (every 8k bank counts), can be zero for area 0 (default $ff) |
-| 27        | bank of area 1 directory |
-| 28        | high address of area 1 directory |
-| 29        | bank of area 1 files |
-| 2a        | high address of area 1 files |
-| 2b        | number of banks of area 1 used (must be divisible by 8) |
-| 2c        | bank of area 2 directory |
-| 2d        | high address of area 2 directory |
-| 2e        | bank of area 2 files |
-| 2f        | high address of area 2 files |
-| 30        | number of banks of area 2 used (must be divisible by 8) |
-| 31        | call function on defragmentation (1: yes, 0: no) |
-| 32,33     | vector to update defragmentation warning; must be callable while EasyFlash is banked in |
-| 34,35     | vector to the defragmentation all clear function; must be callable while EasyFlash is banked in |
-| 34-3f     | unused |
+| 27        | banking mode of area 0 ($d0: lhlh, $b0: llll, $d4: hhhh) |
+| 28        | bank of area 1 directory |
+| 29        | high address of area 1 directory |
+| 2a        | bank of area 1 files |
+| 2b        | high address of area 1 files |
+| 2c        | number of banks of area 1 used (must be divisible by 8) |
+| 2d        | banking mode of area 1 ($d0: lhlh, $b0: llll, $d4: hhhh) |
+| 2e        | bank of area 2 directory |
+| 2f        | high address of area 2 directory |
+| 30        | bank of area 2 files |
+| 31        | high address of area 2 files |
+| 32        | number of banks of area 2 used (must be divisible by 8) |
+| 33        | banking mode of area 2 ($d0: lhlh, $b0: llll, $d4: hhhh) |
+| 34        | call function on defragmentation (1: yes, 0: no) |
+| 35,36     | vector to update defragmentation warning; must be callable while EasyFlash is banked in |
+| 37,38     | vector to the defragmentation all clear function; must be callable while EasyFlash is banked in |
+| 39-3f     | unused |
 
 See src/ef/efs-config.s as example.
 
@@ -282,7 +284,7 @@ Error Codes:
   $1e: command syntax error
   $ef: file exists
   $47: directory error
-  $48: disk dull
+  $48: disk full
 ```
 
 

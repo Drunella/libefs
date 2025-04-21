@@ -34,17 +34,15 @@
         .byte 0, 0, 0
 
         .byte $03
-        ;    bank  dir  bank files size
+        ;    bank  dir  bank files size bankmode
         ;           hi        hi
-        .byte $00, $a0, $01, $80,   0  ; area 0: bank 0, $a000, mode lhlh, ignore size
-        .byte  32, $80,  32, $80,  32  ; area 1: lower banks of 262144 bytes
-        .byte  48, $80,  48, $80,  32  ; area 2: upper banks of 262144 bytes
-        .byte $01                      ; defragment warning: yes
+        .byte $00, $a0, $01, $80,   0,  $d0  ; area 0: bank 0, $a000, ignore size, lhlh
+        .byte  32, $80,  32, $80,  32,  $d0  ; area 1: lower banks of 262144 bytes, lhlh
+        .byte  48, $80,  48, $80,  32,  $d0  ; area 2: upper banks of 262144 bytes, lhlh
+        .byte $01                            ; defragment warning: yes
         .addr __EFS_CONFIG_RUN__ + efs_defragment_warning_offset
         .addr __EFS_CONFIG_RUN__ + efs_defragment_allclear_offset
-        .byte $00, $00, $00, $00  ; unused
-        .byte $00, $00, $00, $00  ; unused
-        .byte $00, $00            ; unused
+        .byte $00, $00, $00, $00, $00, $00, $00 ; unused
 
     efs_config_size = * - efs_config
     .if efs_config_size <> 40

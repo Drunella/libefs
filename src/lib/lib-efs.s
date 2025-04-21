@@ -165,16 +165,16 @@
         .byte "libefs"
         .byte major_version, minor_version, patch_version
 
-        ;    bank  dir  bank files size
+        ;    bank  dir  bank files size bankmode
         ;           hi        hi
         .byte $01                      ; one area
-        .byte $00, $a0, $01, $80, $ff  ; area 0: bank 0, $a000, mode lhlh, unlimited
-        .byte $00, $00, $00, $00, $00  ; area 1: none
-        .byte $00, $00, $00, $00, $00  ; area 2: none
-        .byte $00, $00, $00            ; defragment: no
-        .byte $00, $00, $00, $00  ; dummy
-        .byte $00, $00, $00, $00  ; dummy
-        .byte $00, $00, $00, $00  ; dummy
+        .byte $00, $a0, $01, $80, $ff, $d0  ; area 0: bank 0, $a000, mode lhlh, unlimited
+        .byte $00, $00, $00, $00, $00, $d0  ; area 1: none
+        .byte $00, $00, $00, $00, $00, $d0  ; area 2: none
+        .byte $00                           ; defragment: no
+        .byte $00, $00                      ; no defragmentation update vector
+        .byte $00, $00                      ; no defragmentation clear vector
+        .byte $00, $00, $00, $00, $00, $00, $00  ; unused
 
     efs_config_size = * - efs_default_config
     .if efs_config_size <> 40
