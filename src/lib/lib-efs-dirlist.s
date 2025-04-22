@@ -135,7 +135,7 @@
         ; ### only look into active area
       @area1:
         lda #libefs_config::areas
-        jsr rom_config_get_value
+        jsr rom_config_get_value  ; not file based
         cmp #$03
         bne @done
         lda dirload_area_var

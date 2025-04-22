@@ -84,16 +84,23 @@
 ;.import rom_config_get_area_addr_high
 ;.import rom_config_get_area_addr_low
 .import rom_config_get_area_size
+.import rom_config_get_area_size_invert
+.import rom_config_get_area_size_active_file
 .import rom_config_get_area_mode
 .import rom_config_get_area_mode_invert
+.import rom_config_get_area_mode_active_file
 .import rom_config_get_area_dirbank
 .import rom_config_get_area_dirbank_invert
+.import rom_config_get_area_dirbank_active_file
 .import rom_config_get_area_dirhigh
 .import rom_config_get_area_dirhigh_invert
+.import rom_config_get_area_dirhigh_active_file
 .import rom_config_get_area_filesbank
 .import rom_config_get_area_filesbank_invert
+.import rom_config_get_area_filesbank_active_file
 .import rom_config_get_area_fileshigh
 .import rom_config_get_area_fileshigh_invert
+.import rom_config_get_area_fileshigh_active_file
 
 
 .import efs_init_readef
@@ -423,22 +430,22 @@
         ; init erase sector call
         jsr efs_init_eapierasesector
 
-        jsr rom_config_get_area_dirbank
+        jsr rom_config_get_area_dirbank  ; not file based
         sta zp_var_x8
 
-        jsr rom_config_get_area_mode
+        jsr rom_config_get_area_mode     ; not file based
         ;lda #BANKING_MODE
         sta zp_var_x7
 
-        lda #$80  ; for ll and lh ###
+        lda #$80  ; for ll and lh
         sta zp_var_xa
-;        lda zp_var_x7
-;        cmp #$d4
-;        bne :+
-;        lda #$a0  ; for hh
-;        sta zp_var_xa
-;      :
-        jsr rom_config_get_area_size
+        lda zp_var_x7
+        cmp #$d4
+        bne :+
+        lda #$a0  ; for hh
+        sta zp_var_xa
+      :
+        jsr rom_config_get_area_size     ; not file based
         lsr a
         lsr a
         lsr a
@@ -449,7 +456,7 @@
         ldy zp_var_xa
         jsr efs_io_byte
 
-        ; mode lh
+        ; mode lh ### ###
 ;        lda zp_var_x7  ; mode
 ;        cmp #$d0
 ;        bne @mode_ll_hh
@@ -525,13 +532,13 @@
         pla  ; old area
         jsr rom_flags_set_area
 
-        jsr rom_config_get_area_dirbank
+        jsr rom_config_get_area_dirbank    ; defragment is not file based
         sta efs_readef_bank
 
         ;jsr rom_config_get_area_addr_low
         lda #$00
         sta efs_readef_low
-        jsr rom_config_get_area_dirhigh
+        jsr rom_config_get_area_dirhigh    ; defragment is not file based
         sta efs_readef_high
 
 ;        jsr rom_config_get_area_mode
@@ -540,9 +547,9 @@
 
         ; prepare destination
         pla  ; new area
-        jsr rom_config_get_area_filesbank_invert
+        jsr rom_config_get_area_filesbank_invert  ; defragment is not file based
         sta zp_var_x8
-        jsr rom_config_get_area_dirbank_invert
+        jsr rom_config_get_area_dirbank_invert    ; defragment is not file based
         sta efs_temp_var2
 
         ;jsr rom_config_get_area_addr_low_invert
@@ -550,20 +557,20 @@
         sta zp_var_x9  ; file pointer 
         sta zp_var_xe  ; dir pointer
 
-        jsr rom_config_get_area_dirhigh_invert
+        jsr rom_config_get_area_dirhigh_invert    ; defragment is not file based
         sta zp_var_xf  ; dir pointer
-        jsr rom_config_get_area_fileshigh_invert
+        jsr rom_config_get_area_fileshigh_invert  ; defragment is not file based
         clc
         adc #>DIRECTORY_SIZE  ; offset for files start
         sta zp_var_xa  ; file pointer
 
-        jsr rom_config_get_area_mode_invert
+        jsr rom_config_get_area_mode_invert       ; defragment is not file based
         ;lda #BANKING_MODE
         sta zp_var_x7
 
         ; start iterating through source directory
       @loop:
-        jsr rom_config_get_area_dirhigh
+        jsr rom_config_get_area_dirhigh           ; defragment is not file based
         jsr efs_readef_dirboundary
         bcs @leave  ; directory out of bounds
 
@@ -587,7 +594,7 @@
         iny      ; offset high
         jsr efs_readef
         sta efs_readef_storedaddr_high
-        jsr rom_config_get_area_fileshigh
+        jsr rom_config_get_area_fileshigh        ; defragment is not file based
         clc
         adc efs_readef_storedaddr_high
         sta efs_readef_storedaddr_high 
@@ -654,7 +661,7 @@
         jsr efs_io_byte  ; write
         lda zp_var_xa    ; offset high
         sec
-        sbc #$80  ; ### correct value from config
+        sbc #$80  ; ### ### correct value from config
         jsr efs_io_byte  ; write
 
         ; write size
@@ -727,7 +734,7 @@
         and #$e0
         cmp zp_var_xa  ; addr high
         bne @noinc
-        ; inc bank
+        ; inc bank ; ### ### ?
         lda zp_var_x7  ; mode
         asl
         asl
@@ -1118,7 +1125,7 @@
         sta zp_var_xd
 
       @loop:
-        jsr rom_config_get_area_dirhigh
+        jsr rom_config_get_area_dirhigh_active_file  ; file based
         jsr efs_readef_dirboundary
         bcs @leave  ; directory out of bounds
         jsr efs_readef
@@ -1189,7 +1196,7 @@
  
         ; init read_ef
       @next1:
-        jsr rom_config_get_area_dirbank
+        jsr rom_config_get_area_dirbank_active_file  ; file based
         sta efs_readef_bank
         sta zp_var_x8
         jsr efs_setstartbank_ext
@@ -1197,7 +1204,7 @@
         ;jsr rom_config_get_area_addr_low
         lda #$00
         sta efs_readef_low
-        jsr rom_config_get_area_dirhigh
+        jsr rom_config_get_area_dirhigh_active_file  ; file based
         sta efs_readef_high
 
         ; set file offset
@@ -1220,7 +1227,7 @@
         sta zp_var_xd
 
 ;        lda #BANKING_MODE 
-        jsr rom_config_get_area_mode
+        jsr rom_config_get_area_mode_active_file  ; file based
         cmp #$d0
         beq @lhlh
         cmp #$b0
@@ -1323,7 +1330,7 @@
         lda efs_readef_high
         tay
         ;lda #BANKING_MODE
-        jsr rom_config_get_area_mode
+        jsr rom_config_get_area_mode_active_file  ; file based
         jsr EAPISetPtr        
 
         lda filename_address
@@ -1386,7 +1393,7 @@
         
         ldx filename_address
         ldy filename_address + 1
-        jsr rom_config_get_area_mode
+        jsr rom_config_get_area_mode_active_file  ; file based
         ;lda #BANKING_MODE
         jsr EAPISetPtr
 
@@ -1416,38 +1423,38 @@
         sta filename_length
 
         ; get bank for overflow checking
-        jsr rom_config_get_area_dirbank
+        jsr rom_config_get_area_dirbank_active_file  ; file based
         sta io_end_address + 1
-        ;jsr rom_config_get_area_mode ###
-;        lda #BANKING_MODE
-;        cmp #$d0
-;        beq @lhlh
-;
-;        jsr rom_config_get_area_size
-;        clc
-;        adc io_end_address + 1
-;        and #%00111111  ; max bank
-;        sta io_end_address + 1
-;        jmp @continue
-;
-;      @lhlh:
-        jsr rom_config_get_area_size
+        jsr rom_config_get_area_mode_active_file  ; file based
+        ;lda #BANKING_MODE
+        cmp #$d0
+        beq @lhlh
+
+        jsr rom_config_get_area_size_active_file ; ###
+        clc
+        adc io_end_address + 1
+        and #%00111111  ; max bank
+        sta io_end_address + 1
+        jmp @continue
+
+      @lhlh:
+        jsr rom_config_get_area_size_active_file  ; file based
         lsr a
         clc
         adc io_end_address + 1
         and #%00111111  ; max bank
         sta io_end_address + 1
 
-;      @continue:
+      @continue:
         lda zp_var_x8
         jsr efs_setstartbank_ext
 
-        jsr rom_config_get_area_fileshigh
+        jsr rom_config_get_area_fileshigh_active_file  ; file based
         clc
         adc zp_var_xa
         tay
         ldx zp_var_x9
-        jsr rom_config_get_area_mode
+        jsr rom_config_get_area_mode_active_file  ; file based
         ;lda #BANKING_MODE
         jsr EAPISetPtr
 
@@ -1474,12 +1481,12 @@
 
         jsr efs_init_readmem
         
-        jsr rom_config_get_area_fileshigh
+        jsr rom_config_get_area_fileshigh_active_file  ; file based
         clc
         adc zp_var_xa
         tay
         ldx zp_var_x9
-        jsr rom_config_get_area_mode
+        jsr rom_config_get_area_mode_active_file  ; file based
         ;lda #BANKING_MODE
         jsr EAPISetPtr
 
@@ -1638,10 +1645,10 @@
         jsr efs_readef_pointer_advance
 
         ; prepare bank
-        jsr rom_config_get_area_dirbank
+        jsr rom_config_get_area_dirbank_active_file  ; file based
         jsr efs_setstartbank_ext
 
-        jsr rom_config_get_area_mode
+        jsr rom_config_get_area_mode_active_file  ; file based
         ;lda #BANKING_MODE
         ldx efs_readef_low
         ldy efs_readef_high

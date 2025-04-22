@@ -86,16 +86,23 @@
 .export rom_flags_get_area_invert
 .export rom_config_rw_available
 .export rom_config_get_area_size
+.export rom_config_get_area_size_invert
+.export rom_config_get_area_size_active_file
 .export rom_config_get_area_dirbank
 .export rom_config_get_area_dirbank_invert
+.export rom_config_get_area_dirbank_active_file
 .export rom_config_get_area_dirhigh
 .export rom_config_get_area_dirhigh_invert
+.export rom_config_get_area_dirhigh_active_file
 .export rom_config_get_area_filesbank
 .export rom_config_get_area_filesbank_invert
+.export rom_config_get_area_filesbank_active_file
 .export rom_config_get_area_fileshigh
 .export rom_config_get_area_fileshigh_invert
+.export rom_config_get_area_fileshigh_active_file
 .export rom_config_get_area_mode
 .export rom_config_get_area_mode_invert
+.export rom_config_get_area_mode_active_file
 
 .export efs_directory_search
 .export efs_finish_tempvars
@@ -989,7 +996,6 @@
 
     rom_flags_clear_area_active_file:
         ; area is in a
-        pha  ; push area to stack
         lda efs_flags  ; clear area flags
         and #$ff - LIBEFS_FLAGS_FILE_AREA0
         sta efs_flags
@@ -1631,12 +1637,12 @@
 
         ; directory entry
         ldx zp_var_x9  ; efs_directory_entry + efs_directory::offset_low
-        jsr rom_config_get_area_fileshigh ; rom_config_get_area_addr_high
+        jsr rom_config_get_area_fileshigh_active_file  ; file based
         clc
         adc zp_var_xa  ; efs_directory_entry + efs_directory::offset_high
         sta zp_var_xa
         tay
-        jsr rom_config_get_area_mode
+        jsr rom_config_get_area_mode_active_file  ; file based
         ;lda #BANKING_MODE
         jsr EAPISetPtr
 
@@ -2003,7 +2009,7 @@
         bcs @error4    ; terminator, file not found
         cmp #$00       ; compare for invalid
         beq @nomatch   ; file not valid
-        jsr rom_config_get_area_dirhigh ; rom_config_get_area_addr_high
+        jsr rom_config_get_area_dirhigh  ; no active file present
         jsr efs_readef_dirboundary
 ;        bcs @leave  ; directory out of bounds
 ;        jsr rom_dirsearch_checkboundary

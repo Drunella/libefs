@@ -65,13 +65,16 @@ def efs_makefileentry(data, maxsize):
         startaddr = 0x0000
     elif (data_files_bankingmode == 'hh'):
         divisor = 0x2000
-        startaddr = 0x2000
+        startaddr = 0x0000
     else:
         raise Exception("illegal banking mode " + data_files_bankingmode)
-    entry["bank"] = int(offset // divisor + data_files_startbank) # size of one bank
-    entry["startoffset"] = startaddr + int(offset % divisor) + data_files_pointer_offset
+    offset2 = offset + data_files_pointer_offset
+    entry["bank"] = int(offset2 // divisor + data_files_startbank) # size of one bank
+    entry["startoffset"] = startaddr + int(offset2 % divisor)
     entry["filesize"] = size
     entries_files[hash] = entry
+    #pprint.pprint(entry)
+    #pprint.pprint((offset, data_files_pointer))
     return entry
 
 

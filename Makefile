@@ -163,5 +163,5 @@ build/ef/files-rw.list:
 	./tools/mkdata.py -f build/files/delme640.prg -a 0x3000 -s 640 >> build/ef/files-rw.list
 	./tools/mkdata.py -f build/files/delme641.prg -a 0x3000 -s 641 >> build/ef/files-rw.list
 	./tools/mkdata.py -f build/files/delme642.prg -a 0x3000 -s 642 >> build/ef/files-rw.list
+	./tools/mkdata.py -f build/files/delme17k.prg -a 0x3000 -s 17000 >> build/ef/files-rw.list
 	./tools/mkdata.py -f build/files/delme50k.prg -a 0x3000 -s 50000 >> build/ef/files-rw.list
-	

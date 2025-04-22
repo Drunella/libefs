@@ -58,9 +58,11 @@ def bin_initialize():
 def bin_placedata(data, bank, address, size, start, mode):
     global binary_file
     if address < 0x8000 or address >= 0xC000:
-        raise Exception("address outside allowed range: 0x{0:04x}".format(address))
+        raise Exception("address outside allowed range: 0x{0:04x}".format(address))    
+    print("processing file:");
     #address -= 0x8000
     address += bank * 16384
+    #pprint.pprint((bank, address, size, start, mode))
     
     if (size > 0) and (start+size > len(data)):
         raise Exception("given data size is more than actual data size")
@@ -77,7 +79,7 @@ def bin_placedata(data, bank, address, size, start, mode):
                 address += 0x2000
                 
         binary_file[address+i - 0x8000] = data[start+i]
-    
+
 #     if size == 0:
 #        binary_file[address:address+len(data)] = data[start:]
 #    else:
