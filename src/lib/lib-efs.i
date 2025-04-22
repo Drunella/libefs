@@ -25,7 +25,7 @@ DIRECTORY_SIZE = $1800
 ; $D0: 00:0:1FFF=>00:1:0000, 00:1:1FFF=>01:0:1FFF (lhlh...)
 ; $B0: 00:0:1FFF=>01:0:0000 (llll...)
 ; $D4: 00:1:1FFF=>01:1:0000 (hhhh...)
-BANKING_MODE = $d0
+;BANKING_MODE = $d0
 
 
 zp_var_xf := ZEROPAGE_BACKUP_END
@@ -73,11 +73,15 @@ EF_NAME = $bb08
 LIBEFS_CONFIG_START = $bb18
 
 ; flags
-LIBEFS_FLAGS_RELOCATE = $01
-LIBEFS_FLAGS_VERIFY   = $02
-LIBEFS_FLAGS_COMMAND  = $04
-LIBEFS_FLAGS_AREA1    = $40  ; must be bit 6
-LIBEFS_FLAGS_AREA2    = $80  ; must be bit 7
+LIBEFS_FLAGS_RELOCATE    = $01
+LIBEFS_FLAGS_VERIFY      = $02
+LIBEFS_FLAGS_COMMAND     = $04
+LIBEFS_FLAGS_UNUSED      = $08
+LIBEFS_FLAGS_FILE_AREA0  = $30  ; bit 5 and 6
+LIBEFS_FLAGS_FILE_AREA1  = $10  ; bit 5
+LIBEFS_FLAGS_FILE_AREA2  = $20  ; bit 6
+LIBEFS_FLAGS_AREA1       = $40  ; must be bit 6
+LIBEFS_FLAGS_AREA2       = $80  ; must be bit 7
 
 ; eapi data and functions
 EAPI_SOURCE  = $b800  ; $a000 (hirom) + 1800

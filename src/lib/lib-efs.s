@@ -94,6 +94,8 @@
 .export rom_config_get_area_filesbank_invert
 .export rom_config_get_area_fileshigh
 .export rom_config_get_area_fileshigh_invert
+.export rom_config_get_area_mode
+.export rom_config_get_area_mode_invert
 
 .export efs_directory_search
 .export efs_finish_tempvars
@@ -168,7 +170,7 @@
         ;    bank  dir  bank files size bankmode
         ;           hi        hi
         .byte $01                      ; one area
-        .byte $00, $a0, $01, $80, $ff, $d0  ; area 0: bank 0, $a000, mode lhlh, unlimited
+        .byte $00, $a0, $01, $80, $ff, $d0  ; area 0: bank 0, $a000, unlimited, lhlh
         .byte $00, $00, $00, $00, $00, $d0  ; area 1: none
         .byte $00, $00, $00, $00, $00, $d0  ; area 2: none
         .byte $00                           ; defragment: no
@@ -501,7 +503,6 @@
         jmp efs_bankout  ; ends with rts
 
       @exit:
-;        pla
         lda #ERROR_FILE_OPEN
         sta error_byte
         sec
@@ -925,9 +926,7 @@
 
 ; --------------------------------------------------------------------
 ; efs config functions
-; 35/36 pointer to configuration
-
-;    zp_pointer_configuration = zp_var_x5 ; $36
+; 35/36 pointer to configuration (zp_var_x5/zp_var_x6)
 
     rom_flags_set_area:
         ; area is in a
@@ -948,12 +947,10 @@
         sta efs_flags
         rts
 
-      : lda efs_flags
+      : lda efs_flags  ; area 2
         ora #LIBEFS_FLAGS_AREA2
-;        ora #LIBEFS_FLAGS_AREA1
         sta efs_flags
         rts
-
 
     rom_flags_get_area:
         ; returns the active area in a
@@ -987,6 +984,70 @@
         rts
 
       : lda #$00
+        rts
+
+
+    rom_flags_clear_area_active_file:
+        ; area is in a
+        pha  ; push area to stack
+        lda efs_flags  ; clear area flags
+        and #$ff - LIBEFS_FLAGS_FILE_AREA0
+        sta efs_flags
+        rts
+
+    rom_flags_set_area_active_file:
+        ; area is in a
+        pha  ; push area to stack
+        lda efs_flags  ; clear area flags
+        and #$ff - LIBEFS_FLAGS_FILE_AREA0
+        sta efs_flags
+
+        pla  ; get area back from stack
+        cmp #$00
+        bne :+
+        lda efs_flags
+        ora #LIBEFS_FLAGS_FILE_AREA0
+        sta efs_flags
+        rts            ; area 0
+
+      : cmp #$01
+        bne :+
+        lda efs_flags  ; area 1
+        ora #LIBEFS_FLAGS_FILE_AREA1
+        sta efs_flags
+        rts
+
+      : lda efs_flags  ; area 2
+        ora #LIBEFS_FLAGS_FILE_AREA2
+        sta efs_flags
+        rts
+
+    rom_flags_get_area_active_file:
+        ; returns the active area in a
+        lda efs_flags
+        and #LIBEFS_FLAGS_FILE_AREA0
+
+        cmp #LIBEFS_FLAGS_FILE_AREA0
+        beq @area0
+        cmp #LIBEFS_FLAGS_FILE_AREA1
+        beq @area1
+        cmp #LIBEFS_FLAGS_FILE_AREA2
+        beq @area2
+
+        lda #$00  ; no file, error
+        sec
+        rts
+      @area0:
+        lda #$00
+        clc
+        rts
+      @area1:
+        lda #$01
+        clc
+        rts
+      @area2:
+        lda #$02
+        clc
         rts
 
 
@@ -1092,9 +1153,17 @@
         adc #libefs_area::dir_bank
         jmp rom_config_get_value
 
+    rom_config_get_area_dirbank_active_file:
+        jsr rom_flags_get_area_active_file
+        jsr rom_config_areaoffset
+        clc
+        adc #libefs_area::dir_bank
+        jmp rom_config_get_value
+
     rom_config_get_area_dirbank_zero:
         lda #libefs_config::area_0 + libefs_area::dir_bank
         jmp rom_config_get_value
+
 
     rom_config_get_area_filesbank:
         jsr rom_flags_get_area
@@ -1105,6 +1174,13 @@
 
     rom_config_get_area_filesbank_invert:
         jsr rom_flags_get_area_invert
+        jsr rom_config_areaoffset
+        clc
+        adc #libefs_area::files_bank
+        jmp rom_config_get_value
+
+    rom_config_get_area_filesbank_active_file:
+        jsr rom_flags_get_area_active_file
         jsr rom_config_areaoffset
         clc
         adc #libefs_area::files_bank
@@ -1125,6 +1201,13 @@
         adc #libefs_area::dir_high
         jmp rom_config_get_value
 
+    rom_config_get_area_dirhigh_active_file:
+        jsr rom_flags_get_area_active_file
+        jsr rom_config_areaoffset
+        clc
+        adc #libefs_area::dir_high
+        jmp rom_config_get_value
+
 
     rom_config_get_area_fileshigh:
         jsr rom_flags_get_area
@@ -1140,20 +1223,34 @@
         adc #libefs_area::files_high
         jmp rom_config_get_value
 
+    rom_config_get_area_fileshigh_active_file:
+        jsr rom_flags_get_area_active_file
+        jsr rom_config_areaoffset
+        clc
+        adc #libefs_area::files_high
+        jmp rom_config_get_value
 
-;    rom_config_get_area_mode:
-;        jsr rom_flags_get_area
-;        jsr rom_config_areaoffset
-;        clc
-;        adc #libefs_area::mode
-;        jmp rom_config_get_value
 
-;    rom_config_get_area_mode_invert:
-;        jsr rom_flags_get_area_invert
-;        jsr rom_config_areaoffset
-;        clc
-;        adc #libefs_area::mode
-;        jmp rom_config_get_value
+    rom_config_get_area_mode:
+        jsr rom_flags_get_area
+        jsr rom_config_areaoffset
+        clc
+        adc #libefs_area::bankmode
+        jmp rom_config_get_value
+
+    rom_config_get_area_mode_invert:
+        jsr rom_flags_get_area_invert
+        jsr rom_config_areaoffset
+        clc
+        adc #libefs_area::bankmode
+        jmp rom_config_get_value
+
+    rom_config_get_area_mode_active_file:
+        jsr rom_flags_get_area_active_file
+        jsr rom_config_areaoffset
+        clc
+        adc #libefs_area::bankmode
+        jmp rom_config_get_value
 
 
     rom_config_get_area_size:
@@ -1165,6 +1262,13 @@
 
     rom_config_get_area_size_invert:
         jsr rom_flags_get_area_invert
+        jsr rom_config_areaoffset
+        clc
+        adc #libefs_area::size
+        jmp rom_config_get_value
+
+    rom_config_get_area_size_active_file:
+        jsr rom_flags_get_area_active_file
         jsr rom_config_areaoffset
         clc
         adc #libefs_area::size
@@ -1532,8 +1636,8 @@
         adc zp_var_xa  ; efs_directory_entry + efs_directory::offset_high
         sta zp_var_xa
         tay
-        ;jsr rom_config_get_area_mode
-        lda #BANKING_MODE
+        jsr rom_config_get_area_mode
+        ;lda #BANKING_MODE
         jsr EAPISetPtr
 
         ldx zp_var_xb  ; efs_directory_entry + efs_directory::size_low
@@ -1703,43 +1807,44 @@
         sta zp_var_xe + 1
 
         jsr rom_config_prepare_config
-        lda #libefs_config::areas  ; ###
+        jsr rom_flags_clear_area_active_file
+        lda #libefs_config::areas     ; check if efs is readonly or has read-write
         jsr rom_config_get_value
         cmp #$03
         beq :+
 
         ; read only efs
-        lda #$00
+        lda #$00  ; search in area 0
         jsr rom_flags_set_area
-;        sta dirsearch_area_var_zp
         lda #libefs_config::area_0
         jsr rom_dirsearch_begin
         jsr rom_dirsearch_find
+        lda #$00  ; set area of active file
         bcc @found
         sec
         rts
         
         ; rw efs
-      : lda #$00
-;        sta dirsearch_area_var_zp
+      : lda #$00  ; search in area 0
         jsr rom_flags_set_area
         lda #libefs_config::area_0
         jsr rom_dirsearch_begin
         jsr rom_dirsearch_find
+        lda #$00  ; set area of active file
         bcc @found
-        lda #$01
-;        sta dirsearch_area_var_zp
+        lda #$01  ; search in area 1
         jsr rom_flags_set_area
         lda #libefs_config::area_1
         jsr rom_dirsearch_begin
         jsr rom_dirsearch_find
+        lda #$01  ; set area of active file
         bcc @found
-        lda #$02
-;        sta dirsearch_area_var_zp
+        lda #$02  ; search in area 2
         jsr rom_flags_set_area
         lda #libefs_config::area_2
         jsr rom_dirsearch_begin
         jsr rom_dirsearch_find
+        lda #$02  ; set area of active file
         bcc @found
 
         ; not found
@@ -1749,6 +1854,8 @@
         rts
 
        @found:
+        ; area ofactive file is in A
+        jsr rom_flags_set_area_active_file
         jsr rom_dirsearch_filedata
         rts
 

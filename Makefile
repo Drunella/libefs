@@ -126,7 +126,7 @@ build/ef/efs-config.bin: build/ef/efs-config.o src/ef/efs-config.cfg
 
 # build efs
 build/ef/efs.dir.prg build/ef/efs.files.prg: build/ef/files.list build/ef/menu.prg
-	tools/mkefs.py -v -u -s 507904 -l ./build/ef/files.list -f . -d ./build/ef
+	tools/mkefs.py -v -m lh -u -s 507904 -l ./build/ef/files.list -f . -d ./build/ef
 
 # test files
 build/ef/files.list:
@@ -152,7 +152,7 @@ build/ef/files.list:
 
 # build efs rw
 build/ef/efs-rw.dir.prg build/ef/efs-rw.files.prg: build/ef/files-rw.list
-	tools/mkefs.py -v -u -s 256000 -o 6144 -m lh -b 32 -n efs-rw -l ./build/ef/files-rw.list -f . -d ./build/ef
+	tools/mkefs.py -v -u -s 256000 -o 6144 -m ll -b 32 -n efs-rw -l ./build/ef/files-rw.list -f . -d ./build/ef
 
 # test files rw
 build/ef/files-rw.list:

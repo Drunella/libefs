@@ -78,14 +78,14 @@
 .import rom_config_get_value
 .import rom_config_prepare_config
 .import rom_config_get_area_bank
-;.import rom_config_get_area_mode_invert
 ;.import rom_config_get_area_addr_high_invert
 ;.import rom_config_get_area_addr_low_invert
 ;.import rom_config_get_area_bank_invert
 ;.import rom_config_get_area_addr_high
 ;.import rom_config_get_area_addr_low
 .import rom_config_get_area_size
-;.import rom_config_get_area_mode
+.import rom_config_get_area_mode
+.import rom_config_get_area_mode_invert
 .import rom_config_get_area_dirbank
 .import rom_config_get_area_dirbank_invert
 .import rom_config_get_area_dirhigh
@@ -426,11 +426,11 @@
         jsr rom_config_get_area_dirbank
         sta zp_var_x8
 
-        ;jsr rom_config_get_area_mode
-        lda #BANKING_MODE
+        jsr rom_config_get_area_mode
+        ;lda #BANKING_MODE
         sta zp_var_x7
 
-        lda #$80  ; for ll and lh
+        lda #$80  ; for ll and lh ###
         sta zp_var_xa
 ;        lda zp_var_x7
 ;        cmp #$d4
@@ -557,8 +557,8 @@
         adc #>DIRECTORY_SIZE  ; offset for files start
         sta zp_var_xa  ; file pointer
 
-;        jsr rom_config_get_area_mode_invert
-        lda #BANKING_MODE
+        jsr rom_config_get_area_mode_invert
+        ;lda #BANKING_MODE
         sta zp_var_x7
 
         ; start iterating through source directory
@@ -1219,18 +1219,18 @@
         adc zp_var_xd
         sta zp_var_xd
 
-;        lda #BANKING_MODE
-;        jsr rom_config_get_area_mode
-;        cmp #$d0
-;        beq @lhlh
-;        cmp #$b0
-;        beq @llll
-;        cmp #$d4
-;        beq @hhhh
-;        lda #ERROR_DIRECTORY_ERROR
-;        jmp @error
+;        lda #BANKING_MODE 
+        jsr rom_config_get_area_mode
+        cmp #$d0
+        beq @lhlh
+        cmp #$b0
+        beq @llll
+        cmp #$d4
+        beq @hhhh
+        lda #ERROR_DIRECTORY_ERROR
+        jmp @error
 
-;      @lhlh:
+      @lhlh:
         ; get bank from buffer for lhlh banking model
         asl zp_var_xd  ; high bits
         asl zp_var_xd
@@ -1252,36 +1252,36 @@
 
         lda zp_var_xb
         sta zp_var_x9
-;        jmp @next
-;
-;      @llll:
-;      @hhhh:
-;        ; get bank from buffer
-;        asl zp_var_xd  ; high bits (3 shifts)
-;        asl zp_var_xd
-;        asl zp_var_xd
-;
-;        lda zp_var_xc  ; low bits (2)
-;        and #$e0  ; mask %11100000
-;        clc
-;        ;rol
-;        rol
-;        rol
-;        clc
-;        adc zp_var_xd
-;        adc zp_var_x8
-;        sta zp_var_x8
-;
-;        lda zp_var_xc
-;        and #$1f  ; mask %00011111
-;        sta zp_var_xa
-;
-;        lda zp_var_xb
-;        sta zp_var_x9
-        ;jmp @next
+        jmp @next
+
+      @llll:
+      @hhhh: ; ###
+        ; get bank from buffer
+        asl zp_var_xd  ; high bits (3 shifts)
+        asl zp_var_xd
+        asl zp_var_xd
+
+        lda zp_var_xc  ; low bits (2)
+        and #$e0  ; mask %11100000
+        clc
+        ;rol
+        rol
+        rol
+        clc
+        adc zp_var_xd
+        adc zp_var_x8
+        sta zp_var_x8
+
+        lda zp_var_xc
+        and #$1f  ; mask %00011111
+        sta zp_var_xa
+
+        lda zp_var_xb
+        sta zp_var_x9
+        jmp @next
 
         ; calculate size
-;      @next:
+      @next:
         sec
         lda io_end_address
         sbc io_start_address
@@ -1322,8 +1322,8 @@
         tax
         lda efs_readef_high
         tay
-        lda #BANKING_MODE
-        ;jsr rom_config_get_area_mode
+        ;lda #BANKING_MODE
+        jsr rom_config_get_area_mode
         jsr EAPISetPtr        
 
         lda filename_address
@@ -1386,8 +1386,8 @@
         
         ldx filename_address
         ldy filename_address + 1
-        ;jsr rom_config_get_area_mode
-        lda #BANKING_MODE
+        jsr rom_config_get_area_mode
+        ;lda #BANKING_MODE
         jsr EAPISetPtr
 
         lda io_start_address
@@ -1418,7 +1418,7 @@
         ; get bank for overflow checking
         jsr rom_config_get_area_dirbank
         sta io_end_address + 1
-        ;jsr rom_config_get_area_mode
+        ;jsr rom_config_get_area_mode ###
 ;        lda #BANKING_MODE
 ;        cmp #$d0
 ;        beq @lhlh
@@ -1447,8 +1447,8 @@
         adc zp_var_xa
         tay
         ldx zp_var_x9
-        ;jsr rom_config_get_area_mode
-        lda #BANKING_MODE
+        jsr rom_config_get_area_mode
+        ;lda #BANKING_MODE
         jsr EAPISetPtr
 
         ; prepare vars for filesize
@@ -1479,8 +1479,8 @@
         adc zp_var_xa
         tay
         ldx zp_var_x9
-        ;jsr rom_config_get_area_mode
-        lda #BANKING_MODE
+        jsr rom_config_get_area_mode
+        ;lda #BANKING_MODE
         jsr EAPISetPtr
 
         lda io_start_address
@@ -1641,8 +1641,8 @@
         jsr rom_config_get_area_dirbank
         jsr efs_setstartbank_ext
 
-        ;jsr rom_config_get_area_mode
-        lda #BANKING_MODE
+        jsr rom_config_get_area_mode
+        ;lda #BANKING_MODE
         ldx efs_readef_low
         ldy efs_readef_high
         jsr EAPISetPtr

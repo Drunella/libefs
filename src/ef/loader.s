@@ -87,7 +87,7 @@
 
         ; eapi / minieapi
 ;        jsr EFS_init_minieapi
-        lda #$cd
+        lda #$cd   ; address to load eapi to
         jsr EFS_init_eapi
 
         lda #$36
