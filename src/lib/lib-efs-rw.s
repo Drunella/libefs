@@ -74,6 +74,8 @@
 .import rom_flags_get_area
 .import rom_flags_set_area
 .import rom_flags_get_area_invert
+.import rom_flags_set_area_active_file
+.import rom_flags_get_area_active_file
 .import rom_config_rw_available
 .import rom_config_get_value
 .import rom_config_prepare_config
@@ -1188,6 +1190,8 @@
         ;   filename_length
         ; result
         jsr rom_config_prepare_config
+        jsr rom_flags_get_area
+        jsr rom_flags_set_area_active_file
         jsr efs_init_readef
 
         lda filename_length
@@ -1263,7 +1267,7 @@
         jmp @next
 
       @llll:
-      @hhhh: ; ###
+      @hhhh: ; ### ###
         ; get bank from buffer
         asl zp_var_xd  ; high bits (3 shifts)
         asl zp_var_xd
@@ -1430,6 +1434,7 @@
         ;lda #BANKING_MODE
         cmp #$d0
         beq @lhlh
+        ; ### ### llll, hhhh ?
 
         jsr rom_config_get_area_size_active_file ; ###
         clc

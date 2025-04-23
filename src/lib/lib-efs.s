@@ -84,6 +84,8 @@
 .export rom_flags_get_area
 .export rom_flags_set_area
 .export rom_flags_get_area_invert
+.export rom_flags_set_area_active_file
+.export rom_flags_get_area_active_file
 .export rom_config_rw_available
 .export rom_config_get_area_size
 .export rom_config_get_area_size_invert
