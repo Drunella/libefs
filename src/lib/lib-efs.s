@@ -547,6 +547,7 @@
 
       @next:
         lda status_byte    ; previous eof
+        and #STATUS_EOF
         beq @fileop
         lda #$00
         sta error_byte
@@ -1859,9 +1860,12 @@
         sec
         rts
 
-       @found:
-        ; area ofactive file is in A
-        jsr rom_flags_set_area_active_file
+      @found:
+        ; area of active file is in A
+        beq :+   ; zero flag is still set from area
+        lda #STATUS_RW
+        sta status_byte
+      : jsr rom_flags_set_area_active_file
         jsr rom_dirsearch_filedata
         rts
 

@@ -59,7 +59,7 @@ def bin_placedata(data, bank, address, size, start, mode):
     global binary_file
     if address < 0x8000 or address >= 0xC000:
         raise Exception("address outside allowed range: 0x{0:04x}".format(address))    
-    print("processing file:");
+    #print("processing file:");
     #address -= 0x8000
     address += bank * 16384
     #pprint.pprint((bank, address, size, start, mode))

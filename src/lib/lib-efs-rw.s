@@ -209,6 +209,7 @@
 
       @next1:
         lda status_byte    ; previous eof -> error
+        and #STATUS_EOF
         beq @next2
         lda #ERROR_WRITE_ERROR
         sta error_byte

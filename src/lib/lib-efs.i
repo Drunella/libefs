@@ -61,6 +61,7 @@ ERROR_FILE_EXISTS        = $3f  ; 63
 ERROR_DISK_FULL          = $48  ; 72
 ERROR_DIRECTORY_ERROR    = $47  ; 71
 
+STATUS_RW        = $80
 STATUS_EOF       = $40
 STATUS_MISMATCH  = $10
 
