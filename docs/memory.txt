@@ -41,21 +41,21 @@ Configuration starts at 00:1:1b18
 1b,1c,1d  EFS ($45, $46, $53)
 1e,1f,20  $00, $00, $00
 21:       1:only one area (default read only); 3:two additional read/write areas
-22,23,24: start of area 0 directory: bank, low/high (usually 00:2000)
-25:       banking mode according to eapi ($d0=lhlh, $b0=llll, $d4=hhhh)
+22,23,24,25: start of area 0 directory and files: bank, low/high (usually 00:2000)
 26:       number of banks (every bank, low and high must count) (can be empty)
-27,28,29: start of area 1 directory: bank, low/high; this must start at an erase area
-2a:       banking mode
-2b:       number of banks used (must be divisible by 8)
-2c,2d,2e: start of area 2 directory
-2f:       banking mode
-30:       number of banks used (must be divisible by 8)
-31:       call rom function on defragmentation
-32,33:    low/high address of rom function in memory ($8000 - $bfff), must be in bank 0
+27:       banking mode according to eapi ($d0=lhlh, $b0=llll, $d4=hhhh)
+28,29,2a,2b: start of area 1 directory: bank, low/high; this must start at an erase area
+2c:       number of banks used (must be divisible by 8)
+2d:       banking mode
+2e,2f,30,31: start of area 2 directory
+32:       number of banks used (must be divisible by 8)
+33:       banking mode
+34:       call rom function on defragmentation
+35,36:    low/high address of rom function in memory ($8000 - $bfff), must be in bank 0
           to start and update defragmentation warning
-34,35:    low/high address of rom function in memory 
+37,38:    low/high address of rom function in memory 
           to finish defragmentation warning
-34-37:    empty
+39-3f:    empty
 
 
 Cartridge Memory Map
