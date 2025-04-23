@@ -212,7 +212,7 @@ Parameter:
 Return:
   A: error code
   .C: set if error
-Supported commands:
+Supported commands (only with load):
   "$0:[filename]" will load the directory
   "S0:[filename]" will delete a file
 ```
@@ -266,6 +266,7 @@ Return:
 Status codes:
   $10: verify mismatch
   $40: EOF
+  $80: file in rw area (set after EFS_open)
 ```
 
 

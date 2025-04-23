@@ -1865,8 +1865,10 @@
       @found:
         ; area of active file is in A
         beq :+   ; zero flag is still set from area
+        pha
         lda #STATUS_RW
         sta status_byte
+        pla
       : jsr rom_flags_set_area_active_file
         jsr rom_dirsearch_filedata
         rts
