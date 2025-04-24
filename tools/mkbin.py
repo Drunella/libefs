@@ -69,6 +69,8 @@ def bin_placedata(data, bank, address, size, start, mode):
     
     if size == 0:
         size = len(data)
+    if mode != 'll' and mode != 'hh' and mode != 'lh':
+        raise Exception("illegal banlk mode: " + mode)
         
     for i in range(0, size):
         if (i > 0 and mode == 'll'):
@@ -112,6 +114,7 @@ def bin_write(filename):
 
 def process(e):
     global build_path
+    global bankmode
     bank = int(e[0], 0)
     type = e[1]
     source = e[2]
@@ -121,8 +124,8 @@ def process(e):
         size = int(e[4], 0)
         start = int(e[5], 0)
         mode = e[6]
-        #if flag != "addr":
-        #    raise Exception("unknown flag " + flag)
+        if mode == "var":
+            mode = bankmode
     else:
         #address = 0
         start = 0
@@ -162,29 +165,26 @@ def process(e):
 def main(argv):
     global binary_file
     global build_path
+    global bankmode
     p = argparse.ArgumentParser()
     p.add_argument("-v", dest="verbose", action="store_true", help="Verbose output.")
-#    p.add_argument("-s", dest="source", action="store", required=True, help="source directory.")
+    p.add_argument("-m", dest="bankmode", action="store", required=False, default='lh', help="bank mode.")
     p.add_argument("-b", dest="build", action="store", required=True, help="build directory.")
-    p.add_argument("-m", dest="mapfiles", action="append", required=True, help="mapfile.")
+    p.add_argument("-a", dest="mapfiles", action="append", required=True, help="mapfile.")
     p.add_argument("-o", dest="outputfile", action="store", required=True, help="bin output file.")
+    
     args = p.parse_args()
-#    source_path = args.source
-#    temp_path = os.path.join(args.build, "temp")
-#    os.makedirs(temp_path, exist_ok=True)
     build_path = args.build
     os.makedirs(build_path, exist_ok=True)
-    #obj_path = os.path.join(args.build, "obj")
-    #os.makedirs(obj_path, exist_ok=True)
 
     if (args.verbose):
         print("creating binary cartridge image")
-
+    bankmode = args.bankmode
+    
     bin_initialize()
 
     # add prg files
     for files in args.mapfiles:
-        #map = load_map(files))
         map = load_map(files)
         for e in map:
             a = process(e)

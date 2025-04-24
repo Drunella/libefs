@@ -25,6 +25,9 @@ LD65FLAGS=-t $(TARGET)
 CA65FLAGS=-t $(TARGET) -I . -I build/obj --debug-info
 CC65FLAGS=-t $(TARGET) -O
 #LD65FLAGS=
+# lh(0) or ll(1)
+BANKMODE=lh
+BANKMODE_VALUE=0
 
 .SUFFIXES: .prg .s .c
 .PHONY: clean all testef testprg libefs mrproper
@@ -49,7 +52,7 @@ testprg: build/test-efs.d64
 # assemble
 build/%.o: src/%.s
 	@mkdir -p ./build/lib ./build/ef ./build/prg
-	$(CA65) $(CA65FLAGS) -g -o $@ $<
+	$(CA65) $(CA65FLAGS) -D BANKMODE=$(BANKMODE_VALUE) -g -o $@ $<
 
 # compile
 build/%.s: src/%.c
@@ -59,7 +62,7 @@ build/%.s: src/%.c
 # assemble2
 build/%.o: build/%.s
 	@mkdir -p ./build/lib ./build/ef
-	$(CA65) $(CA65FLAGS) -g -o $@ $<
+	$(CA65) $(CA65FLAGS) -D BANKMODE=$(BANKMODE_VALUE) -g -o $@ $<
 
 clean:
 	rm -rf build/lib
@@ -104,7 +107,7 @@ build/test-libefs.crt: build/ef/test-libefs.bin
 build/ef/test-libefs.bin: build/ef/init.bin src/ef/eapi-am29f040.prg build/lib-efs.prg build/ef/loader.prg build/ef/efs.dir.prg build/ef/efs.files.prg build/ef/efs-config.bin build/ef/efs-rw.dir.prg build/ef/efs-rw.files.prg
 	cp ./src/ef/eapi-am29f040.prg ./build/ef/eapi-am29f040.prg
 	cp ./build/lib-efs.prg ./build/ef/lib-efs.prg
-	tools/mkbin.py -v -b ./build/ef -m ./src/ef/crt.map -o ./build/ef/test-libefs.bin
+	tools/mkbin.py -v -b ./build/ef -m $(BANKMODE) -a ./src/ef/crt.map -o ./build/ef/test-libefs.bin
 
 # easyflash init.bin
 build/ef/init.bin: build/ef/init.o
@@ -152,7 +155,7 @@ build/ef/files.list:
 
 # build efs rw
 build/ef/efs-rw.dir.prg build/ef/efs-rw.files.prg: build/ef/files-rw.list
-	tools/mkefs.py -v -u -s 256000 -o 6144 -m lh -b 32 -n efs-rw -l ./build/ef/files-rw.list -f . -d ./build/ef
+	tools/mkefs.py -v -u -s 256000 -o 6144 -m $(BANKMODE) -b 32 -n efs-rw -l ./build/ef/files-rw.list -f . -d ./build/ef
 
 # test files rw
 build/ef/files-rw.list:
