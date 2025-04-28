@@ -46,8 +46,11 @@ BANKMODE = -1
 .elseif BANKMODE = 1
         .byte  32, $80,  32, $80,  32,  $b0  ; area 1: lower banks of 262144 bytes, llll
         .byte  32, $a0,  32, $a0,  32,  $d4  ; area 2: upper banks of 262144 bytes, hhhh
+.elseif BANKMODE = 2
+        .byte  32, $a0,  32, $a0,  32,  $d4  ; area 1: upper banks of 262144 bytes, llll
+        .byte  32, $80,  32, $80,  32,  $b0  ; area 2: lower banks of 262144 bytes, hhhh
 .else
-    .error "bankmode must be set to 0(lh) or 1(ll)"
+    .error "bankmode must be set to 0(lh), 1(ll) or (2(hh)"
 .endif
         .byte $01                            ; defragment warning: yes
         .addr __EFS_CONFIG_RUN__ + efs_defragment_warning_offset

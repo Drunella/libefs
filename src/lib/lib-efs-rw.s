@@ -665,12 +665,28 @@
         jsr efs_io_byte  ; write
         lda zp_var_x9    ; offset low
         jsr efs_io_byte  ; write
+
+        ; depending on banking mode
+        lda zp_var_x7
+        cmp #$d4
+        beq @hh
+
+      @lh_ll:
         lda zp_var_xa    ; offset high
         sec
-        sbc #$80  ; ### defragment ### correct value from config
+        sbc #$80  ; for lhlh and llll
         jsr efs_io_byte  ; write
+        jmp @next
+
+      @hh:
+        lda zp_var_xa    ; offset high
+        sec
+        sbc #$a0  ; for hhhh
+        jsr efs_io_byte  ; write
+        ;jmp @next
 
         ; write size
+      @next:
         lda zp_var_xb
         jsr efs_io_byte  ; write
         lda zp_var_xc
@@ -1183,7 +1199,7 @@
         ; prepare variables for save
         ; usage:
         ;   38: bank
-        ;   39/3a: offset in bank (with $8000 added)
+        ;   39/3a: offset in bank (with $8000 not yet added)
         ;   3b/3c/3d: size
         ; parameter
         ;   fe/ff: name

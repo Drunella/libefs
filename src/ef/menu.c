@@ -540,7 +540,7 @@ void main(void)
 
         case '8':
             gotoxy(0, CONSOLE_START_Y);
-            savefile(filename, (char*)(ADDRESS), 1100);
+            savefile(filename, (char*)(ADDRESS), 384);
             repaint == true;
             break;
 

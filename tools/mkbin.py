@@ -126,6 +126,8 @@ def process(e):
         mode = e[6]
         if mode == "var":
             mode = bankmode
+        if mode == "hh" and address != 0:
+            address += 0x2000
     else:
         #address = 0
         start = 0
