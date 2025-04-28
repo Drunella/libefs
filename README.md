@@ -45,10 +45,9 @@ validate the basic functions and a long running test thats reads, scratches
 and saves files repeatadly. But there are many cases that the simple tests
 do not cover. I consider the library "alpha" quality. The features 
 are there but largely untested. Use at your own risk. Some features have not
-been implemented yet: validating, write in low banks only, write in high
-banks only.
+been implemented yet: validating.
 
 
 ## License and Copyright
 
-The code is © 2023 Drunella, available under the Apache 2.0 license.
+The code is © 2025 Drunella, available under the Apache 2.0 license.
