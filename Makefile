@@ -26,8 +26,8 @@ CA65FLAGS=-t $(TARGET) -I . -I build/obj --debug-info
 CC65FLAGS=-t $(TARGET) -O
 #LD65FLAGS=
 # lh(0) or ll(1)
-BANKMODE=lh
-BANKMODE_VALUE=0
+BANKMODE=ll
+BANKMODE_VALUE=1
 
 .SUFFIXES: .prg .s .c
 .PHONY: clean all testef testprg libefs mrproper

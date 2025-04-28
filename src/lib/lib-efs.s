@@ -657,7 +657,7 @@
         sta error_byte
       @errorx:
         lda #$00
-        sta internal_state  ; ### on any error file will be closed, fs might be corrupted
+        sta internal_state  ; on any error file will be closed, fs might be corrupted
         lda error_byte
         sec
 
@@ -730,7 +730,7 @@
         clc            ; .C set and no error
       : jmp @leave     ; leave
 
-/*      @dircheck: ; ### move to commands
+/*      @dircheck: ; move to commands
         jsr rom_dirload_isrequested
         bcc @fileload
 

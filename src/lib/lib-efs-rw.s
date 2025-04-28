@@ -367,7 +367,7 @@
         sta io_start_address
         sta io_start_address + 1
         sta io_end_address
-        lda #$20  ; ### assume ?
+        lda #$20  ; assume ?
         sta io_end_address + 1
 
         jsr rom_filesave_conditions
@@ -459,10 +459,13 @@
         ldy zp_var_xa
         jsr efs_io_byte
 
-        ; mode lh ### ###
-;        lda zp_var_x7  ; mode
-;        cmp #$d0
-;        bne @mode_ll_hh
+        ; select depending on mode
+        lda zp_var_x7  ; mode
+        cmp #$d0
+        bne @mode_ll_hh
+        ;jmp @mode_lh
+
+      @mode_lh:
         lda zp_var_xa
         cmp #$80   ; step from low to high
         bne :+
@@ -477,12 +480,12 @@
         sta zp_var_x8
         bne @loopend
 
-;      @mode_ll_hh:
-;        clc
-;        lda #$08
-;        adc zp_var_x8
-;        sta zp_var_x8
-;        ;bne @loopend
+      @mode_ll_hh:
+        clc
+        lda #$08
+        adc zp_var_x8
+        sta zp_var_x8
+        ;bne @loopend
 
       @loopend:
         dex
@@ -664,7 +667,7 @@
         jsr efs_io_byte  ; write
         lda zp_var_xa    ; offset high
         sec
-        sbc #$80  ; ### ### correct value from config
+        sbc #$80  ; ### defragment ### correct value from config
         jsr efs_io_byte  ; write
 
         ; write size
@@ -737,7 +740,7 @@
         and #$e0
         cmp zp_var_xa  ; addr high
         bne @noinc
-        ; inc bank ; ### ### ?
+        ; inc bank ; ### defragment ### ?
         lda zp_var_x7  ; mode
         asl
         asl
@@ -1244,11 +1247,11 @@
 
       @lhlh:
         ; get bank from buffer for lhlh banking model
-        asl zp_var_xd  ; high bits
+        asl zp_var_xd  ; ignore highest bits in upper
         asl zp_var_xd
 
         lda zp_var_xc  ; low bits
-        and #$c0
+        and #$c0  ; mask %11000000
         clc
         rol
         rol
@@ -1267,28 +1270,33 @@
         jmp @next
 
       @llll:
-      @hhhh: ; ### ###
+      @hhhh: ;
         ; get bank from buffer
-        asl zp_var_xd  ; high bits (3 shifts)
+        ; xd       xc       xb
+        ; uuuuuuuu hhhhhhhh llllllll
+        ;             xxxxx xxxxxxxx (offset)
+        ; xxxxxxxx xxx (bank)
+        asl zp_var_xd  ; we ignore the upper bits (3 shifts)
         asl zp_var_xd
         asl zp_var_xd
 
-        lda zp_var_xc  ; low bits (2)
+        lda zp_var_xc  ; high bits get masked to receive the bank part
         and #$e0  ; mask %11100000
         clc
-        ;rol
+        rol ; and rotated via carry
         rol
         rol
-        clc
-        adc zp_var_xd
-        adc zp_var_x8
-        sta zp_var_x8
+        rol
+        clc ; carry not needed
+        adc zp_var_xd  ; add to upper
+        adc zp_var_x8  ; add to bank
+        sta zp_var_x8  ; store bank
 
-        lda zp_var_xc
-        and #$1f  ; mask %00011111
+        lda zp_var_xc  ; offset part
+        and #$1f       ; mask out bank part: %00011111
         sta zp_var_xa
 
-        lda zp_var_xb
+        lda zp_var_xb  ; offset part 
         sta zp_var_x9
         jmp @next
 
@@ -1305,8 +1313,8 @@
         sta zp_var_xd
 
         clc
-        lda #$02  ; for the address
-        adc zp_var_xb
+        lda #$02  ; add for the address
+        adc zp_var_xb  ; add to size
         sta zp_var_xb
         bne :+
         inc zp_var_xc
@@ -1325,7 +1333,7 @@
     rom_filesave_transfer_dir:
         ; usage:
         ;   38: bank
-        ;   39/3a: offset in bank (with $8000 added)
+        ;   39/3a: offset in bank (with $8000 or $a000 added)
         ;   3b/3c/fd: size
         ;   3e/3f: name
         jsr efs_init_eapiwriteinc  ; repair dynamic code
@@ -1434,8 +1442,10 @@
         ;lda #BANKING_MODE
         cmp #$d0
         beq @lhlh
-        ; ### ### llll, hhhh ?
+        ;jmp @llll, @hhhh
 
+      @llll:
+      @hhhh:
         jsr rom_config_get_area_size_active_file ; ###
         clc
         adc io_end_address + 1
@@ -1445,7 +1455,7 @@
 
       @lhlh:
         jsr rom_config_get_area_size_active_file  ; file based
-        lsr a
+        lsr a  ; ### is this correct?
         clc
         adc io_end_address + 1
         and #%00111111  ; max bank
@@ -1477,7 +1487,7 @@
     rom_filesave_transfer_data:
         ; usage:
         ;   38: bank
-        ;   39/3a: offset in bank (with $8000 added)
+        ;   39/3a: offset in bank (with $8000 not yet added)
         ;   3b/3c/fd: size
         ;   3e/3f: filedata
 ;        jsr efs_init_setstartbank   ; prepare bank
