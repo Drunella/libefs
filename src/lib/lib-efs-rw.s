@@ -279,12 +279,12 @@
         sta io_start_address + 1
 
         ; reduce end address by one
+        lda io_end_address
         sec
-        lda #$01
-        sbc io_end_address
+        sbc #$01
         sta io_end_address
-        lda #$00
-        sbc io_end_address + 1
+        lda io_end_address + 1
+        sbc #$00
         sta io_end_address + 1
         clc
 
