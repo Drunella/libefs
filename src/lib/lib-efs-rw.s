@@ -1231,10 +1231,13 @@
         jsr rom_config_get_area_dirhigh_active_file  ; file based
         sta efs_readef_high
 
-        ; set file offset
+        ; set file offset and size
         ;lda #<DIRECTORY_SIZE
         lda #$00
-        sta zp_var_x9
+        sta zp_var_xb  ; size
+        sta zp_var_xc
+        sta zp_var_xd
+        sta zp_var_x9  ; offset
         lda #>DIRECTORY_SIZE
         sta zp_var_xa
 
@@ -1314,7 +1317,7 @@
 
         lda zp_var_xb  ; offset part 
         sta zp_var_x9
-        jmp @next
+        ;jmp @next
 
         ; calculate size
       @next:
