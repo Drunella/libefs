@@ -113,7 +113,7 @@ void savefile(char* filename, char* address, uint16_t size)
 
 //    startaddress[0] = (uint8_t)((uint16_t)address & 0xff);
 //    startaddress[1] = (uint8_t)((uint16_t)address >> 8);
-    endaddress = address + size;
+    endaddress = address + size + 1;
         
     menu_clear(CONSOLE_START_Y, 24);
     gotoxy(0, CONSOLE_START_Y);
@@ -330,7 +330,7 @@ void longtest()
     createpattern((char*)0xc000, size, counter);
     EFS_setnam_wrapper(filename, strlen(filename));
     EFS_setlfs_wrapper(0);  // no secondary
-    retval = EFS_save_wrapper((char*)(0xc000), (char*)(0xc000) + size);
+    retval = EFS_save_wrapper((char*)(0xc000), (char*)(0xc000) + size + 1);
     if (retval != 0) errors++;
 
     while (true) {
@@ -367,7 +367,7 @@ void longtest()
         sprintf(address, "%lu", counter);
         EFS_setnam_wrapper(cmdname, strlen(cmdname));
         EFS_setlfs_wrapper(0);
-        retval = EFS_save_wrapper(address, address + size);
+        retval = EFS_save_wrapper(address, address + size + 1);
         if (retval != 0) errors++;
         status = EFS_readst_wrapper();
         if (status != 0x00) errors++;

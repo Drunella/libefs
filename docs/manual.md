@@ -239,8 +239,8 @@ Return:
 EFS_save ($df24)
 Parameter:
   A: z-page variable to start address
-  X: end address low
-  Y: end address high
+  X: end address (plus 1) low
+  Y: end address (plus 1) high
 Return:
   A: error code
   .C: set if error

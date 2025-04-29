@@ -278,6 +278,16 @@
         lda $01, x
         sta io_start_address + 1
 
+        ; reduce end address by one
+        sec
+        lda #$01
+        sbc io_end_address
+        sta io_end_address
+        lda #$00
+        sbc io_end_address + 1
+        sta io_end_address + 1
+        clc
+
         jsr backup_zeropage
 
         lda #$00
