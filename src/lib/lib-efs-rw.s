@@ -17,6 +17,7 @@
 .feature c_comments
 .localchar '@'
 
+.include "config.i"
 .include "lib-efs.i"
 .include "../../version.txt"
 
@@ -142,6 +143,15 @@
 .import rom_space_subtractsize_blocks
 .import rom_space_maxspace
 .import rom_space_usedspace
+
+.macro indicate_save
+        lda $d020
+        tax
+        lda #$02
+        sta $d020
+        txa
+        sta $d020
+.endmacro
 
 
 .segment "EFS_ROM_RW"
@@ -1552,6 +1562,9 @@
         jsr efs_readmem
         jsr efs_io_byte
         bcs @error
+.if SHOW_INDICATE_ACTIVITY = 1
+        indicate_save
+.endif
         inc zp_var_xe
         bne :+
         inc zp_var_xf

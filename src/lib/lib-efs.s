@@ -1,5 +1,5 @@
 ; ----------------------------------------------------------------------------
-; Copyright 2023 Drunella
+; Copyright 2025 Drunella
 ;
 ; Licensed under the Apache License, Version 2.0 (the "License");
 ; you may not use this file except in compliance with the License.
@@ -14,14 +14,10 @@
 ; limitations under the License.
 ; ----------------------------------------------------------------------------
 
-
-; ### implement conditional switches for non rom version ???
-; ### segments for read only
-
-
 .feature c_comments
 .localchar '@'
 
+.include "config.i"
 .include "lib-efs.i"
 .include "../../version.txt"
 
@@ -129,6 +125,24 @@
 .export rom_config_call_defragment_allclear
 .export rom_config_call_defragment_warning
 
+.macro indicate_load
+        lda $d020
+        tax
+        lda #11  ; gray 
+        sta $d020
+        txa
+        sta $d020
+.endmacro
+
+.macro indicate_search
+        lda $d020
+        tax
+        lda #$07
+        sta $d020
+        txa
+        sta $d020
+.endmacro
+
 
 .segment "EFS_CALL"
 
@@ -185,7 +199,9 @@
         .byte $00                           ; defragment: no
         .byte $00, $00                      ; no defragmentation update vector
         .byte $00, $00                      ; no defragmentation clear vector
-        .byte $00, $00, $00, $00, $00, $00, $00  ; unused
+        .byte $00                           ; activity indicator: no (not implemented)
+        .byte $00, $00                      ; activity indicator vector (not implemented)
+        .byte $00, $00, $00, $00            ; unused
 
     efs_config_size = * - efs_default_config
     .if efs_config_size <> 40
@@ -1711,6 +1727,9 @@
     rom_fileload_transfer:
         ldy #$00
       @loop:
+.if SHOW_INDICATE_ACTIVITY = 1
+        indicate_load
+.endif
         jsr efs_io_byte
         bcs @eof
         ldy #$00
@@ -1747,6 +1766,9 @@
     rom_fileload_verify:
         jsr efs_init_readmem  ; prepare verify command
       @loop:
+.if SHOW_INDICATE_ACTIVITY = 1
+        indicate_load
+.endif
         jsr efs_io_byte
         bcs @eof  ; eof
         sta zp_var_x7
@@ -2039,6 +2061,9 @@
       @nomatch:
         lda #$07
         jsr efs_readef_pointer_advance
+.if SHOW_INDICATE_ACTIVITY = 1
+        indicate_search
+.endif
         jmp @repeat
 
       @match:

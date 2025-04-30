@@ -29,6 +29,9 @@
 #define ADDRESS 0x3000
 
 
+static uint16_t global_size = 384;
+
+
 static void draw_startmenu(void) {
     clrscr();
     textcolor(COLOR_GRAY2);
@@ -99,6 +102,7 @@ void loadverify(char* filename, uint8_t verify, uint8_t secondary)
     address = EFS_get_endadress();
     if (verify == 0) cprintf("l: "); else cprintf("v: ");
     cprintf("sc=%d, rt=%d, sa=$%04x, ea=$%04x\n\r", secondary, retval, ADDRESS, address);
+    global_size = address - ADDRESS;
     status = EFS_readst_wrapper();
     seconds = timer / 1000000; timer = timer % 1000000;
     cprintf("st: $%02x, timer = %lu.%06lu sec\n\r", status, seconds, timer);
@@ -540,7 +544,7 @@ void main(void)
 
         case '8':
             gotoxy(0, CONSOLE_START_Y);
-            savefile(filename, (char*)(ADDRESS), 384);
+            savefile(filename, (char*)(ADDRESS), global_size);
             repaint == true;
             break;
 

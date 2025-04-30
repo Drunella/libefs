@@ -157,6 +157,8 @@ EAPIGetSlot       = $df9b
     dfcall .byte
     dfwarning .addr 
     dfallclear .addr
+    actcall .byte
+    actvector .addr
 
 .endstruct
 
