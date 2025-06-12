@@ -160,14 +160,16 @@ MiniEAPI provides the EAPI functions EAPIGetBank, EAPISetBank, EAPISetPtr,
 EAPISetLen and EAPIReadFlashInc.
 See the EasyFlash Programmer Reference for more information.
 
-Calling EAPIWriteFlash, EAPIEraseSector and EAPIGetSlot in MiniEAPI will do
-nothing, they will immediately return. Calling EAPIWriteFlashInc is identical
-to EAPISetBank. Calling EAPISetSlot will change the current bank, but not the
-shadow bank.
+Do not use EAPIWriteFlash, EAPIWriteFlashInc, EAPIEraseSector, EAPISetSlot 
+and EAPIGetSlot. They will damage the data integrity of MiniEAPI.
 
 
 
 # libefs
+
+To call libefs functions at least the IO area must be accessible. All memory 
+configurations will be restored upon exit. Exrom and Game will be inactive
+upon exit (meaning both high)
 
 ```
 EFS_setlfs ($df00)
@@ -212,7 +214,7 @@ Parameter:
 Return:
   A: error code
   .C: set if error
-Supported commands (only with load):
+Supported commands (only with chrin):
   "$0:[filename]" will load the directory
   "S0:[filename]" will delete a file
 ```
@@ -298,9 +300,10 @@ beforehand. EAPI uses sei but restores the interrupt flag with plp.
 You can block interrupts by calling sei and cli before and after calling
 libefs functions.
 
-libefs uses $37 (BASIC and KERNAL banked in) as memory configuration. If
-this conflicts with your interrupt usage you need to turn interrupts off
-before calling libefs functions.
+libefs uses $37 (BASIC and KERNAL banked in) as memory configuration
+(processor port 0x01). It will restore the processor port before returning. 
+If this conflicts with your interrupt usage you need to turn interrupts 
+off before calling libefs functions.
 
 
 ## Allowed commands

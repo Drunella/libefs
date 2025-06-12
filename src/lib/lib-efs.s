@@ -182,8 +182,17 @@
         ;    .C set if problems occured (defragmentation necessary)
         jmp rom_validate_body
 
-    ; unused
-        .byte $00, $00, $00, $00, $00, $00
+    ; unused call
+    ; @ $8012
+        rts
+        nop
+        nop
+
+    ; unused call
+    ; @ $8015
+        rts
+        nop
+        nop
 
     efs_magic: ; @ $8018
     efs_default_config:

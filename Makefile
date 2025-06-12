@@ -34,7 +34,7 @@ CC65FLAGS=-t $(TARGET) -O
 .SUFFIXES: .prg .s .c
 .PHONY: clean all testef testprg libefs mrproper
 
-EF_LOADER_FILES=build/ef/loader.o
+#EF_LOADER_FILES=build/ef/loader.o
 EF_MENU_FILES=build/ef/menu.o build/ef/util.o build/ef/efs-wrapper.o build/ef/version.o
 #EF_DIREFS_FILES=build/prg/direfs.o build/lib/lib-efs.o build/lib/lib-efs-ram.o build/lib/lib-efs-minieapi.o build/lib/lib-efs-dirlist.o build/lib/lib-efs-space.o
 EF_DIREFS_FILES=build/prg/direfs.o
@@ -106,7 +106,7 @@ build/test-libefs.crt: build/ef/test-libefs.bin
 	cartconv -b -t easy -o build/test-libefs.crt -i build/ef/test-libefs.bin -n "libefs test" -p
 
 # cartridge binary
-build/ef/test-libefs.bin: build/ef/init.bin src/ef/eapi-am29f040.prg build/lib-efs.prg build/ef/loader.prg build/ef/efs.dir.prg build/ef/efs.files.prg build/ef/efs-config.bin build/ef/efs-rw.dir.prg build/ef/efs-rw.files.prg
+build/ef/test-libefs.bin: build/ef/init.bin src/ef/eapi-am29f040.prg build/lib-efs.prg build/ef/efs.dir.prg build/ef/efs.files.prg build/ef/efs-config.bin build/ef/efs-rw.dir.prg build/ef/efs-rw.files.prg
 	cp ./src/ef/eapi-am29f040.prg ./build/ef/eapi-am29f040.prg
 	cp ./build/lib-efs.prg ./build/ef/lib-efs.prg
 	tools/mkbin.py -v -b ./build/ef -m $(BANKMODE) -a ./src/ef/crt.map -o ./build/ef/test-libefs.bin
@@ -115,9 +115,9 @@ build/ef/test-libefs.bin: build/ef/init.bin src/ef/eapi-am29f040.prg build/lib-e
 build/ef/init.bin: build/ef/init.o
 	$(LD65) $(LD65FLAGS) -o $@ -C src/ef/init.cfg $^
 
-# easyflash loader.bin
-build/ef/loader.prg: $(EF_LOADER_FILES)
-	$(LD65) $(LD65FLAGS) -vm -m ./build/ef/loader.map -Ln ./build/ef/loader.lst -o $@ -C src/ef/loader.cfg c64.lib $(EF_LOADER_FILES)
+## easyflash loader.bin
+#build/ef/loader.prg: $(EF_LOADER_FILES)
+#	$(LD65) $(LD65FLAGS) -vm -m ./build/ef/loader.map -Ln ./build/ef/loader.lst -o $@ -C src/ef/loader.cfg c64.lib $(EF_LOADER_FILES)
 
 # easyflash menu.prg
 build/ef/menu.prg: $(EF_MENU_FILES)

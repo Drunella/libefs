@@ -15,25 +15,16 @@
 ; ----------------------------------------------------------------------------
 
 
-; io functions
-EF_SETNAM = $0200
-EF_LOAD = $0203
-EF_SAVE = $0206
-
-; io rom
-EF_ROM_START = $8000
-EF_ROM_BANK  = 0
-
 ; efs banks
-EFS_FILES_DIR_BANK     = 0
-EFS_FILES_DIR_START    = $A000
-EFS_FILES_DATA_BANK    = 1
-EFS_FILES_DATA_START   = $8000
-EFS_FILES_BANKSTRATEGY = $D0
+;EFS_FILES_DIR_BANK     = 0
+;EFS_FILES_DIR_START    = $A000
+;EFS_FILES_DATA_BANK    = 1
+;EFS_FILES_DATA_START   = $8000
+;EFS_FILES_BANKSTRATEGY = $D0
 
 
 ; eapi data and functions
-EAPI_SOURCE  = $b800  ; $a000 (hirom) + 1800
+;EAPI_SOURCE  = $b800  ; $a000 (hirom) + 1800
 
 EASYFLASH_BANK    = $de00
 EASYFLASH_CONTROL = $de02
@@ -55,21 +46,22 @@ EAPIGetSlot       = $df9b
 
 ; EFS lib
 
-EFS_init    = $8000
+EFS_init          = $8000
 EFS_init_minieapi = $8006
-EFS_init_eapi = $8003
-EFS_defragment = $8009
-EFS_format = $800c
+EFS_init_eapi     = $8003
+EFS_defragment    = $8009
+EFS_format        = $800c
+EFS_validate      = $800f
 
-EFS_setlfs  = $DF00
-EFS_setnam  = $DF06
-EFS_load    = $DF0C
-EFS_open    = $DF12
-EFS_close   = $DF18
-EFS_chrin   = $DF1E
-EFS_readst  = $DF30
-EFS_save    = $DF24
-EFS_chrout  = $DF2A
+EFS_setlfs  = $df00
+EFS_setnam  = $df06
+EFS_load    = $df0c
+EFS_open    = $df12
+EFS_close   = $df18
+EFS_chrin   = $df1e
+EFS_readst  = $df30
+EFS_save    = $df24
+EFS_chrout  = $df2a
 
 
 ; efs struct

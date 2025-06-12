@@ -14,6 +14,21 @@
 ; limitations under the License.
 ; ----------------------------------------------------------------------------
 
+.feature c_comments
+.include "easyflash.i"
+
+
+; this can be changed
+EAPI_LOCATION     = $cd00
+MENU_START        = $0801
+
+
+; do not change this
+LOADER_SOURCE     = $bc00
+LOADER_DEST       = $c000
+LOADER_START      = $c000
+
+
 .import __BOOTSTRAP_LOAD__
 .import __BOOTSTRAP_RUN__
 .import __BOOTSTRAP_SIZE__
@@ -21,16 +36,6 @@
 .import __LOADER_LOAD__
 .import __LOADER_RUN__
 .import __LOADER_SIZE__
-
-EASYFLASH_BANK    = $DE00
-EASYFLASH_CONTROL = $DE02
-EASYFLASH_LED     = $80
-EASYFLASH_16K     = $07
-EASYFLASH_KILL    = $04
-
-LOADER_SOURCE = $bc00
-LOADER_DEST = $c000
-LOADER_START = $c000
 
 
 .segment "ULTIMAX_VECTORS"
@@ -45,7 +50,7 @@ LOADER_START = $c000
         .addr dummy
 
 
-.segment "ULTIMAX_STARTUP"
+.segment "ULTIMAX_CRT"
 
     ultimax_reset:
         ; the reset vector points here
@@ -156,9 +161,109 @@ LOADER_START = $c000
         ; start
         jmp LOADER_START
 
-
     kill:
         lda #EASYFLASH_KILL
         sta EASYFLASH_CONTROL
         cli
         jmp ($fffc) ; reset
+
+
+.segment "LOADER"
+
+    _init_loader:
+        ; void __fastcall__ init_loader(void);
+        ; @ $c000
+        jmp init_loader_body
+
+        ; empty call
+        ; @ $c003
+        rts
+        nop
+        nop
+
+        ; empty call
+        ; @ $c006
+        rts
+        nop
+        nop
+
+        ; empty call
+        ; @ $c009
+        rts
+        nop
+        nop
+
+        ; empty call
+        ; @ $c00c
+        rts
+        nop
+        nop
+
+
+    init_loader_body:
+        ; lower character mode
+        lda #$17
+        sta $d018
+
+        lda $d011  ; enable output
+        ora #$10
+        sta $d011
+
+        ; write loading...
+        ldx #$00
+    :   lda loader_text, x
+        sta $07e8 - loader_text_len, x  ; write text
+        lda #$0c  ; COLOR_GRAY2
+        sta $dbe8 - loader_text_len, x  ; write color
+        inx
+        cpx #loader_text_len
+        bne :-
+
+        ; load efs
+        lda #$37
+        sta $01
+        lda #$87   ; led, 16k mode
+        sta $de02
+        lda #$00   ; EFSLIB_ROM_BANK
+        sta $de00
+        jsr EFS_init
+        ; bcs error ###
+
+        ; eapi / minieapi
+        jsr EFS_init_minieapi
+        ;lda #>EAPI_LOCATION  ; address to load eapi to
+        ;jsr EFS_init_eapi
+
+        lda #$36
+        sta $01
+        lda #$04   ; easyflash off
+        sta $de02
+
+        ; load menu
+        lda #$01  ; channel
+        ldy #$00  ; secondary address: relocate load
+        jsr EFS_setlfs
+        lda #menu_name_length
+        ldx #<menu_name
+        ldy #>menu_name
+        jsr EFS_setnam
+        ldx #<MENU_START
+        ldy #>MENU_START
+        lda #$00  ; load to x/y
+        jsr EFS_load
+        
+    startup:
+        jmp MENU_START
+
+
+    loader_text:
+        .byte $0c, $0f, $01, $04, $09, $0e, $07, $2e, $2e, $2e  ; "loading..."
+    loader_text_end:
+    loader_text_len = loader_text_end - loader_text
+
+
+    menu_name:
+        .byte $4d, $45, $4e, $55  ; "MENU"
+    menu_name_end:
+    menu_name_length = menu_name_end - menu_name
+

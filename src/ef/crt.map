@@ -2,10 +2,9 @@
 # bank type filename            address length start mode
 
 0      f    lib-efs.prg         0x8000  0      0     lh
-0      f    efs-config.bin      0xbb00  0      0     lh
-0      f    init.bin            0xbf00  0      0     lh
 0      f    eapi-am29f040.prg   0xb800  0      0     lh
-0      f    loader.prg          0xbc00  0      0     lh
+0      f    efs-config.bin      0xbb00  0      0     lh
+0      f    init.bin            0xbc00  0      0     lh
 
 0      f    efs.dir.prg         0xa000  0      0     lh
 1      f    efs.files.prg       0x8000  0      0     lh
