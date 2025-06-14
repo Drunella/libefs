@@ -406,10 +406,9 @@ void main(void)
     sprintf(filename, "delme384");
     secondary = 0;
     mode = 0;
-    memset((char*)ADDRESS, 0, 0x6000);
+    memset((char*)ADDRESS, 0, 0x7000);
     cleartoggle = 0;
-    
-    //sysident = TIMER_get_system();
+
     sysident = SYS_get_system();
     sidident = SYS_get_sid();
     

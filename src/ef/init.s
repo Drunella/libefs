@@ -18,6 +18,8 @@
 .include "easyflash.i"
 
 
+; ----------------------------------------------------------------------------
+
 ; this can be changed
 EAPI_LOCATION     = $cd00
 MENU_START        = $0801
@@ -38,6 +40,8 @@ LOADER_START      = $c000
 .import __LOADER_SIZE__
 
 
+; ----------------------------------------------------------------------------
+
 .segment "ULTIMAX_VECTORS"
 
     vector_nmi:
@@ -49,6 +53,8 @@ LOADER_START      = $c000
     vector_irq:
         .addr dummy
 
+
+; ----------------------------------------------------------------------------
 
 .segment "ULTIMAX_CRT"
 
@@ -84,6 +90,8 @@ LOADER_START      = $c000
     dummy:
         rti
 
+
+; ----------------------------------------------------------------------------
 
 .segment "BOOTSTRAP"
 
@@ -121,16 +129,6 @@ LOADER_START      = $c000
         cmp #$e0
         bne kill    ; branch if one of these keys is pressed
  
-        ; clear screen
-;        lda #$20
-;        ldx #$00
-;    :   sta $0400, x
-;        sta $0500, x
-;        sta $0600, x
-;        sta $0700, x
-;        dex
-;        bne :-
-
         ; c64 reset
         jsr $fda3  ; initialize i/o
         jsr $fd50  ; initialize memory
@@ -167,6 +165,8 @@ LOADER_START      = $c000
         cli
         jmp ($fffc) ; reset
 
+
+; ----------------------------------------------------------------------------
 
 .segment "LOADER"
 
@@ -230,9 +230,9 @@ LOADER_START      = $c000
         ; bcs error ###
 
         ; eapi / minieapi
-        jsr EFS_init_minieapi
-        ;lda #>EAPI_LOCATION  ; address to load eapi to
-        ;jsr EFS_init_eapi
+        ;jsr EFS_init_minieapi
+        lda #>EAPI_LOCATION  ; address to load eapi to
+        jsr EFS_init_eapi
 
         lda #$36
         sta $01
@@ -255,15 +255,15 @@ LOADER_START      = $c000
     startup:
         jmp MENU_START
 
-
     loader_text:
         .byte $0c, $0f, $01, $04, $09, $0e, $07, $2e, $2e, $2e  ; "loading..."
     loader_text_end:
     loader_text_len = loader_text_end - loader_text
-
 
     menu_name:
         .byte $4d, $45, $4e, $55  ; "MENU"
     menu_name_end:
     menu_name_length = menu_name_end - menu_name
 
+
+; ----------------------------------------------------------------------------

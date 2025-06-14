@@ -16,8 +16,8 @@
 
 # test settings
 # lh(0) or ll(1), hh(2)
-BANKMODE=hh
-BANKMODE_VALUE=2
+BANKMODE=ll
+BANKMODE_VALUE=1
 
 # Settings
 TARGET=c64
@@ -34,9 +34,7 @@ CC65FLAGS=-t $(TARGET) -O
 .SUFFIXES: .prg .s .c
 .PHONY: clean all testef testprg libefs mrproper
 
-#EF_LOADER_FILES=build/ef/loader.o
 EF_MENU_FILES=build/ef/menu.o build/ef/util.o build/ef/efs-wrapper.o build/ef/version.o
-#EF_DIREFS_FILES=build/prg/direfs.o build/lib/lib-efs.o build/lib/lib-efs-ram.o build/lib/lib-efs-minieapi.o build/lib/lib-efs-dirlist.o build/lib/lib-efs-space.o
 EF_DIREFS_FILES=build/prg/direfs.o
 
 # all

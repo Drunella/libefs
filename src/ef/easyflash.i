@@ -16,6 +16,7 @@
 
 
 ; efs banks
+EFS_BANK                = 0
 ;EFS_FILES_DIR_BANK     = 0
 ;EFS_FILES_DIR_START    = $A000
 ;EFS_FILES_DATA_BANK    = 1
