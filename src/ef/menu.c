@@ -337,6 +337,8 @@ void longtest()
     retval = EFS_save_wrapper((char*)(0x9000), (char*)(0x9000) + size + 1);
     if (retval != 0) errors++;
 
+    menu_clear(CONSOLE_START_Y, 24);
+
     while (true) {
         c = 0;
         if (kbhit()) c = cgetc();
