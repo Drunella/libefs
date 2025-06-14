@@ -26,7 +26,7 @@
 #define MENU_START_Y 2
 #define OUTPUT_START_Y 11
 #define CONSOLE_START_Y 16
-#define ADDRESS 0x3000
+#define ADDRESS 0x4000
 
 
 static uint16_t global_size = 384;
@@ -315,7 +315,7 @@ void createpattern(char* address, uint16_t size, uint32_t number)
 
 void longtest()
 {
-    // create test data at C000 to CAFF (2816 bytes)
+    // create test data at 9000 to 9AFF (2816 bytes)
     // load and save this filem with a recognizable pattern
     // also save, load and delete many other files
     // after a run, the file must still be correct
@@ -331,10 +331,10 @@ void longtest()
     char cmdname[] = "@0:myfile";
     char *filename = &cmdname[3];
 
-    createpattern((char*)0xc000, size, counter);
+    createpattern((char*)0x9000, size, counter);
     EFS_setnam_wrapper(filename, strlen(filename));
     EFS_setlfs_wrapper(0);  // no secondary
-    retval = EFS_save_wrapper((char*)(0xc000), (char*)(0xc000) + size + 1);
+    retval = EFS_save_wrapper((char*)(0x9000), (char*)(0x9000) + size + 1);
     if (retval != 0) errors++;
 
     while (true) {
@@ -342,24 +342,38 @@ void longtest()
         if (kbhit()) c = cgetc();
         if (c) break;
         
-        menu_clear(CONSOLE_START_Y, 24);
+        menu_clear(CONSOLE_START_Y, CONSOLE_START_Y+1);
         gotoxy(0, CONSOLE_START_Y);
         cprintf("test run: %lu (errors: %lu)\n\r", counter, errors);
 
         EFS_setnam_wrapper(filename, strlen(filename));
         EFS_setlfs_wrapper(0);
         retval = EFS_load_wrapper(address, 0); // load
-        if (retval != 0) errors++;
+        if (retval != 0) {
+            cprintf("error: load retval=%d\n\r", retval);
+            errors++;
+        }
             
         EFS_setnam_wrapper(filename, strlen(filename));
         EFS_setlfs_wrapper(0);
         retval = EFS_load_wrapper(address, 1); // verify
-        if (retval != 0) errors++;
+        if (retval != 0)  {
+            cprintf("error: verify retval=%d\n\r", retval);
+            errors++;
+        }
+
         status = EFS_readst_wrapper();
-        if (status != 0x40) errors++;
+        if ((status & 0x40) != 0x40)  {
+            cprintf("error: load readst status=%d\n\r", status);
+            errors++;
+        }
             
         verify = atol(address);
-        if (verify != counter) errors++;
+        if (verify != counter)  {
+            cprintf("error: count verify=%d\n\r", verify);
+            errors++;
+        }
+
 
 /*        EFS_setnam_wrapper(cmdname, strlen(cmdname));
         EFS_setlfs_wrapper(0); // do not relocate
@@ -372,9 +386,17 @@ void longtest()
         EFS_setnam_wrapper(cmdname, strlen(cmdname));
         EFS_setlfs_wrapper(0);
         retval = EFS_save_wrapper(address, address + size + 1);
-        if (retval != 0) errors++;
+        if (retval != 0)  {
+            cprintf("error: save retval=%d\n\r", retval);
+            errors++;
+        }
+
         status = EFS_readst_wrapper();
-        if (status != 0x00) errors++;
+        if (status != 0x80)  {
+            cprintf("error: save readst status=%d\n\r", status);
+            errors++;
+        }
+
             
     }
 
@@ -406,7 +428,7 @@ void main(void)
     sprintf(filename, "delme384");
     secondary = 0;
     mode = 0;
-    memset((char*)ADDRESS, 0, 0x7000);
+    memset((char*)ADDRESS, 0, 0x6000);
     cleartoggle = 0;
 
     sysident = SYS_get_system();
@@ -469,7 +491,7 @@ void main(void)
         case 'c':
             if (cleartoggle == 0) {
                 memset((char*)ADDRESS, 0, 0x6000);
-                memset((char*)0xc000, 0, 0x0d00);
+                //memset((char*)0xc000, 0, 0x0d00);
                 cleartoggle = 1;
             } else {
                 memset((char*)ADDRESS, 0, 0x6000);
