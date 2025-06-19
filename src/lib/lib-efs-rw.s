@@ -289,14 +289,14 @@
         sta io_start_address + 1
 
         ; reduce end address by one
-        lda io_end_address
-        sec
-        sbc #$01
-        sta io_end_address
-        lda io_end_address + 1
-        sbc #$00
-        sta io_end_address + 1
-        clc
+;        lda io_end_address
+;        sec
+;        sbc #$01
+;        sta io_end_address
+;        lda io_end_address + 1
+;        sbc #$00
+;        sta io_end_address + 1
+;        clc
 
         jsr backup_zeropage
 
@@ -1549,6 +1549,9 @@
         sta zp_var_xe
         lda io_start_address + 1
         sta zp_var_xe + 1
+
+        jsr rom_filesave_decrease_size  ; decrease one ahead, as the count check
+                                        ; is after writing
 
         lda zp_var_xe  ; start address
         jsr efs_io_byte
