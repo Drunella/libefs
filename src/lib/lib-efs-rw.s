@@ -22,14 +22,6 @@
 .include "../../version.txt"
 
 
-;.import __EFS_RAM_LOAD__
-;.import __EFS_RAM_RUN__
-;.import __EFS_RAM_SIZE__
-
-;.import __EFS_MINIEAPI_LOAD__
-;.import __EFS_MINIEAPI_RUN__
-;.import __EFS_MINIEAPI_SIZE__
-
 .import backup_zeropage_data
 .import status_byte
 .import error_byte
@@ -42,7 +34,6 @@
 
 .import efs_io_byte
 .import efs_generic_command
-;.import efs_bankin
 .import efs_bankout
 .import efs_enter_pha
 .import efs_enter
