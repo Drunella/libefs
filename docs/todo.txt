@@ -1,6 +1,9 @@
 ToDo
 ====
 
+- implement copy file utility as prg
+  + use the one from codc-easyflash
+
 - implement EFS_validate
 - check for corrupt files (size of 0xffffff)
   -> delete file and (recommend) defragment
