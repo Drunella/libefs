@@ -31,7 +31,6 @@
 .import __EFS_MINIEAPI_SIZE__
 
 .import backup_zeropage_data
-.import temporary_variable
 .import backup_memory_config
 .import memory_byte
 .import status_byte
@@ -284,13 +283,19 @@
 
 
     efs_init_eapi_body:
-        sta temporary_variable
-        pha
+        pha   ; eapi high address
         txa
         pha
         tya
         pha
-        ldx temporary_variable
+
+        ; get eapi high address
+        tsx
+        inx
+        inx
+        inx
+        lda $0100, x
+        tax
 
         lda #$65
         cmp $b800
@@ -314,7 +319,7 @@
         dey
         bpl :-
 
-        stx efs_generic_command + @dest  ; store high value
+        stx efs_generic_command + @dest  ; store eapi high address
 
         ; copy blocks
         ldx #$00
@@ -508,9 +513,9 @@
     efs_temp_var2 := status_byte + 1
 
     efs_finish_tempvars:
-        lda #$a9
+        lda #$a9   ; lda #$xx
         sta status_byte - 1
-        lda #$60
+        lda #$60   ; rts
         sta status_byte + 1
         rts
 

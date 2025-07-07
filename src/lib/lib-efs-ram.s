@@ -45,7 +45,6 @@
 
 .export backup_zeropage_data
 .export backup_memory_config
-.export temporary_variable
 .export memory_byte
 .export status_byte
 .export error_byte
@@ -185,15 +184,13 @@
     efs_bankout:
         ; changes status: N, Z
         ; does not work with disabled io area
-        ; 13 bytes
+        ; 9 bytes
         pha
     backup_memory_config := * + 1  ; exclusive usage
         lda #$37  ; restore memory config
         sta $01
         lda #EASYFLASH_KILL
-        sta EASYFLASH_CONTROL
-        pla
-        rts
+        bne efs_leave
     efs_bankout_end:
 
         ; variable code area
@@ -217,10 +214,11 @@
 
     efs_enter:
         ; 11 bytes
-        lda #EASYFLASH_LED | EASYFLASH_16K
-        sta EASYFLASH_CONTROL
         lda #EFSLIB_ROM_BANK
         sta EASYFLASH_BANK
+        lda #EASYFLASH_LED | EASYFLASH_16K
+    efs_leave:
+        sta EASYFLASH_CONTROL
         pla
 
     efs_return:
@@ -260,8 +258,5 @@
     io_end_address:
         .word $0000
 
-    temporary_variable:
-        .byte $00
-
     unused:
-        .byte $00
+        .byte $00, $00, $00, $00, $00
