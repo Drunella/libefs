@@ -58,9 +58,9 @@
         sta $de02
 
         ; load "$"
-        ldx #$ff  ; efs device
+        lda #$01  ; setlfs mode
         ldy #$00  ; secondary address: relocate load
-        jsr EFS_setlfs
+        jsr EFS_util
         lda #dir_name_length
         ldx #<dir_name
         ldy #>dir_name

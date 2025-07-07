@@ -1,5 +1,5 @@
 // ----------------------------------------------------------------------------
-// Copyright 2023 Drunella
+// Copyright 2025 Drunella
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@ static void draw_startmenu(void) {
     clrscr();
     textcolor(COLOR_GRAY2);
     //     0123456789012345678901234567890123456789
-    cputs("libefs Test Cartridge  (c) 2023 Drunella");
+    cputs("libefs Test Cartridge  (c) 2025 Drunella");
 }
 
 void draw_version(void)
@@ -89,7 +89,8 @@ void loadverify(char* filename, uint8_t verify, uint8_t secondary)
 {
     uint8_t retval, status;
     uint32_t timer, seconds;
-    char* address;
+    char* startaddress;
+    char* endaddress;
 
     menu_clear(CONSOLE_START_Y, 24);
     gotoxy(0, CONSOLE_START_Y);
@@ -99,10 +100,11 @@ void loadverify(char* filename, uint8_t verify, uint8_t secondary)
     TIMER_reset();
     retval = EFS_load_wrapper((char*)(ADDRESS), verify);
     timer = UINT32_MAX - TIMER_measure();
-    address = EFS_get_endadress();
+    startaddress = EFS_get_startaddress();
+    endaddress = EFS_get_endadress();
     if (verify == 0) cprintf("l: "); else cprintf("v: ");
-    cprintf("sc=%d, rt=%d, sa=$%04x, ea=$%04x\n\r", secondary, retval, ADDRESS, address);
-    global_size = address - ADDRESS;
+    cprintf("sc=%d, rt=%d, sa=$%04x, ea=$%04x\n\r", secondary, retval, startaddress, endaddress);
+    global_size = endaddress - startaddress;
     status = EFS_readst_wrapper();
     seconds = timer / 1000000; timer = timer % 1000000;
     cprintf("st: $%02x, timer = %lu.%06lu sec\n\r", status, seconds, timer);
@@ -218,7 +220,8 @@ void closefile(void)
 void readdir()
 {
     uint8_t retval, status;
-    char* address;
+    char* startaddress;
+    char* endaddress;
 
     menu_clear(CONSOLE_START_Y, 24);
     gotoxy(0, CONSOLE_START_Y);
@@ -226,9 +229,10 @@ void readdir()
     EFS_setnam_wrapper("$", 1);
     EFS_setlfs_wrapper(0); // do not relocate
     retval = EFS_load_wrapper((char*)(ADDRESS), 0);
-    address = EFS_get_endadress();
+    startaddress = EFS_get_startaddress();
+    endaddress = EFS_get_endadress();
     status = EFS_readst_wrapper();
-    cprintf("st=$%02x, rt=%d, sa=$%4x, ea=$%4x\n\r", status, retval, ADDRESS, address);
+    cprintf("st=$%02x, rt=%d, sa=$%4x, ea=$%4x\n\r", status, retval, startaddress, endaddress);
 
     // ### print directory
 }

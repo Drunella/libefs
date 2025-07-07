@@ -172,11 +172,28 @@ configurations will be restored upon exit. Exrom and Game will be inactive
 upon exit (meaning both high)
 
 ```
-EFS_setlfs ($df00)
+EFS_util ($df00)
 Parameter:
+  A: command
+  X,Y: optional parameter
+  .C set if error
+Return:
+  A: error code
+  X,Y: optional return values
+
+command: setlfs ($0x):
+Parameter:
+  A: $0x
   Y: secondary address (0: relocate, 1: load to loadaddress of file)
 Return:
-  none
+  X,Y: optional return values
+
+command: get load address ($10):
+Parameter:
+  A: $10
+Return:
+  X: load address low
+  Y: load address high
 ```
 
 ```

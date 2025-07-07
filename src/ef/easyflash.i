@@ -54,7 +54,7 @@ EFS_defragment    = $8009
 EFS_format        = $800c
 EFS_validate      = $800f
 
-EFS_setlfs  = $df00
+EFS_util    = $df00
 EFS_setnam  = $df06
 EFS_load    = $df0c
 EFS_open    = $df12

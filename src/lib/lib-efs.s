@@ -67,7 +67,7 @@
 .export rom_open_body
 .export rom_load_body
 .export rom_setnam_body
-.export rom_setlfs_body
+.export rom_util_body
 
 .export restore_zeropage
 .export backup_zeropage
@@ -528,7 +528,18 @@
 
 .segment "EFS_ROM"
 
-    rom_setlfs_body:
+    rom_util_body:
+        cmp #$10   ; load address mode
+        beq rom_util_body_loadaddress
+        and #$f0   ; setlfs
+        beq rom_util_body_setlfs
+
+        lda #ERROR_SYNTAX_ERROR_30
+        sta error_byte
+        sec
+        jmp efs_bankout  ; ends with rts
+
+    rom_util_body_setlfs:
         ; Y: secondary address (relocation)
         lda internal_state
         bne @exit
@@ -538,13 +549,19 @@
         bne :+    ; zero => relocate
         lda #LIBEFS_FLAGS_RELOCATE
       : sta efs_flags
-
+        clc
         jmp efs_bankout  ; ends with rts
 
       @exit:
         lda #ERROR_FILE_OPEN
         sta error_byte
         sec
+        jmp efs_bankout  ; ends with rts
+
+    rom_util_body_loadaddress:
+        ldx io_start_address
+        ldy io_start_address + 1
+        clc
         jmp efs_bankout  ; ends with rts
 
 

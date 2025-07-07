@@ -240,9 +240,9 @@ LOADER_START      = $c000
         sta $de02
 
         ; load menu
-        lda #$01  ; channel
+        lda #$01  ; setlfs
         ldy #$00  ; secondary address: relocate load
-        jsr EFS_setlfs
+        jsr EFS_util
         lda #menu_name_length
         ldx #<menu_name
         ldy #>menu_name

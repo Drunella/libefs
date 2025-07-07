@@ -41,7 +41,7 @@
 .import rom_open_body
 .import rom_load_body
 .import rom_setnam_body
-.import rom_setlfs_body
+.import rom_util_body
 
 .export backup_zeropage_data
 .export backup_memory_config
@@ -67,14 +67,16 @@
 ; --------------------------------------------------------------------
 ; efs jump table
 
-    EFS_setlfs:  ; @ $DF00
+    EFS_util:  ; @ $DF00
         ; parameter:
-        ;    A: logical channel (will be ignored)
-        ;    X: device number (will be ignored)
-        ;    Y: secondary address (0: relocate)
-        ; return: none
+        ;    A: utility mode (01-15: setlfs; 16: loadaddress)
+        ;    Y: setlfs: secondary address (0: relocate, 1: use prg)
+        ;    X: 
+        ; return:
+        ;    Y: loadaddress: load address high
+        ;    X: loadaddress: load address low
         jsr efs_bankin
-        jmp rom_setlfs_body
+        jmp rom_util_body
 
     EFS_setnam:  ; @ $DF06
         ; parameter:

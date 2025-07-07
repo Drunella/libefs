@@ -30,6 +30,7 @@
 .export _EFS_readst_wrapper
 .export _EFS_setnam_wrapper
 .export _EFS_setlfs_wrapper
+.export _EFS_get_startaddress
 .export _EFS_load_wrapper
 .export _EFS_open_wrapper
 .export _EFS_close_wrapper
@@ -49,6 +50,13 @@
 
     end_address:
         .word $0000
+
+    util_temp:
+        .byte $00
+;    util_x:
+;        .byte $00
+;    util_y:
+;        .byte $00
 
 
 .segment "CODE"
@@ -141,25 +149,42 @@
         rts
 
 
-    ; uint8_t __fastcall__ EFS_setlfs_wrapper(uint8_t secondary);
+    ; uint8_t __fastcall__ EFS_setlfs_wrapper(uint8_t y);
     _EFS_setlfs_wrapper:
-        ;pha
-        ;jsr popa
         tay
-        ;pla
-        ;tay
-        ;txa
 
         ; parameter:
-        ;    Y: secondary address(0=load, ~0=verify)
-        ; return: none
-        jsr EFS_setlfs
+        ;    A: mode: $01
+        ;    Y: setlfs: secondary address(0: relocate, 1:prg address)
+        ; return:
+        ;    none
+        lda #$01
+        jsr EFS_util
         bcc :+
-        lda #$ff
+        ldx #$ff
+        rts
+      : ldx #$00
+        rts
+
+
+    ; void* __fastcall__ EFS_get_startaddress_wrapper();
+    _EFS_get_startaddress:
+
+        ; parameter:
+        ;    A: mode: $10
+        ; return:
+        ;    X/Y: load address
+        lda #$10
+        jsr EFS_util
+        bcc :+
+        lda #$00
         ldx #$00
         rts
-      : lda #$00
-        ldx #$00
+      : txa   ; low byte to a
+        pha   ; on stack
+        tya   ; high byte to a
+        tax   ; to x
+        pla   ; low byte to a
         rts
 
 
