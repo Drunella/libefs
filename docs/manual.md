@@ -186,7 +186,7 @@ Parameter:
   A: $0x
   Y: secondary address (0: relocate, 1: load to loadaddress of file)
 Return:
-  X,Y: optional return values
+  none
 
 command: get load address ($10):
 Parameter:
@@ -302,7 +302,7 @@ Error Codes:
   $19: write error
   $1a: write protected
   $1e: command syntax error
-  $ef: file exists
+  $3f: file exists
   $47: directory error
   $48: disk full
 ```
