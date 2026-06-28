@@ -1108,6 +1108,20 @@
 
 
     rom_config_call_defragment_warning:
+        ; The defragment copy loop runs with the source-file bank selected in
+        ; EASYFLASH_BANK.  rom_config_get_value reads the config block at $BB18
+        ; (bank 0 HIROM) via (zp_var_x5),y -- but with a non-zero bank active
+        ; that address holds the wrong bank's data, producing a garbage dfcall
+        ; byte and a garbage vector that crashes the machine.
+        ; Fix: save the caller's bank (mirrored in efs_readef_bank, since
+        ; EASYFLASH_BANK is write-only), force bank 0 for all config reads,
+        ; and restore on exit.
+        lda efs_readef_bank     ; save caller's bank
+        pha
+        lda #$00
+        sta EASYFLASH_BANK      ; select bank 0 for config reads
+        sta efs_readef_bank     ; keep shadow in sync
+
         lda #libefs_config::dfcall
         jsr rom_config_get_value
         beq @done
@@ -1138,14 +1152,25 @@
 
         pla
         sta zp_var_x5 + 1
-        pla 
+        pla
         sta zp_var_x5
 
       @done:
+        pla
+        sta EASYFLASH_BANK      ; restore caller's bank
+        sta efs_readef_bank
         rts
 
 
     rom_config_call_defragment_allclear:
+        ; See rom_config_call_defragment_warning for the full explanation.
+        ; Same bank-save/restore applied here for the same reason.
+        lda efs_readef_bank     ; save caller's bank
+        pha
+        lda #$00
+        sta EASYFLASH_BANK      ; select bank 0 for config reads
+        sta efs_readef_bank     ; keep shadow in sync
+
         lda #libefs_config::dfcall
         jsr rom_config_get_value
         beq @done
@@ -1180,6 +1205,9 @@
         sta zp_var_x5
 
       @done:
+        pla
+        sta EASYFLASH_BANK      ; restore caller's bank
+        sta efs_readef_bank
         rts
 
 
