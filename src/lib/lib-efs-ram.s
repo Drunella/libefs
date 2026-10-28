@@ -246,6 +246,7 @@
         .byte $00
         ; bits 76543210
         ;      xx: 10: load; 01: dir; 11: save
+        ;          00: command finished, only close allowed (value $01)
         ;        xxxxxx : state machine value
 
     filename_address:

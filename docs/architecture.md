@@ -174,6 +174,7 @@ of the area the found file lives in.
 | `%10xxxxxx` | file open for reading (chrin) |
 | `%11xxxxxx` | file open for writing (chrout) |
 | `%01ssssss` | directory open for reading; `ssssss` is the dirlist state |
+| `$01` (`STATE_COMMAND_DONE`) | a command (scratch) finished the operation; only close is valid |
 
 
 ## 4. Directory format

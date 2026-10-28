@@ -65,6 +65,10 @@ STATUS_RW        = $80
 STATUS_EOF       = $40
 STATUS_MISMATCH  = $10
 
+; internal_state: channel is open, but a command (e.g. scratch) has
+; finished the operation; only close is valid (bits 7/6 = 00)
+STATE_COMMAND_DONE = $01
+
 ; io rom
 EFSLIB_ROM_START = $8000
 EFSLIB_ROM_BANK  = 0

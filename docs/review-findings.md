@@ -28,7 +28,7 @@ in [architecture.md](./architecture.md).
 | C5 | critical | **fixed** | `EFS_chrout` keeps writing after "disk full" / EOF |
 | C6 | critical | **fixed** | `EFS_save` stores a wrong size when (end − start) mod 256 = 255; the file is corrupt |
 | C7 | critical | **fixed** | `EFS_save` with end < start writes a ~64K garbage file |
-| C8 | critical | confirmed | `open(1)` with an `S:` command followed by `close` programs flash at a garbage address |
+| C8 | critical | **fixed** | `open(1)` with an `S:` command followed by `close` programs flash at a garbage address |
 | M1 | major | confirmed | Verify flag is never cleared; every later load is a verify |
 | M2 | major | confirmed | Scratch errors (write protected, write error) are swallowed, and the channel stays open |
 | M3 | major | confirmed | Command prefix parsing loses the carry: wrong name pointer when the name crosses a page |
@@ -359,6 +359,26 @@ program cycle during close, at an address that was never prepared.
 *Fix*: let `rom_command_process` reset `internal_state` for commands that
 finish the operation (`S`), or make close check a dedicated
 "write prepared" flag.
+
+**Fixed**: after a scratch, `rom_command_process` sets `internal_state`
+to the new value `STATE_COMMAND_DONE` (`$01`, bits 7/6 = `00`). The
+channel stays open, so the usual `open` … `close` sequence keeps working
+without an error. `close` does nothing, `chrin` returns "no input file"
+and `chrout` "no output file", and nothing is written.
+
+Verified in VICE with `work/c8test.s`. VICE wrote the flash back into a
+copy of the `.crt`, and `work/crtdiff.py` lists every changed flash
+byte:
+
+| step | fixed | before the fix (control) |
+| ---- | ----- | ------------------------ |
+| `open(1)` `S:DELME384` | `$01` scratched | `$01` scratched |
+| `chrin` | C set ("no input file") | C set |
+| `chrout $55` | `$07` "no output file", C set | `$19`, C set, **but written into the scratched entry** (its bank byte `$20` → `$00`) |
+| `close` | OK | OK, **but programs bank 8 `$8000` `$52` → `$50`** (inside an area 0, i.e. read-only, file) |
+| `open(0)` `DELME384` | `$04` not found | – (machine hung) |
+| `open(0)` `S0:DELME640`, `close` | `$01`, OK | – |
+| flash changes in total | only the 2 flags bytes (`$61` → `$60`) | 3 bytes, 2 of them corruption |
 
 ---
 
