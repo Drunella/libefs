@@ -399,10 +399,12 @@
 
 
     rom_validate_body:
-        lda #ERROR_DEVICE_NOT_PRESENT
         ; ### todo implement ###
         ; return 0: everything is fine
         ; return 1: deleted invalid files; defragmentation necessary
+        ; not implemented yet: report "nothing found" (A = 0, .C clear)
+        lda #$00
+        clc
         rts
 
 

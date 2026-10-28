@@ -133,6 +133,7 @@ Formats the writeable part of the efs.
 EFS_validate ($800f):
 Parameter: none
 Returns:
+  A: error code or 0
   .C: set if efs is corrupted
 Call this to check if there are any corruptions in the writeable part of the
 efs. The function returns .C set if any corruptions are found. The function
@@ -140,7 +141,7 @@ will delete corrupted files. Call EFS_defragment to repair the remaining
 files. It will also check and erase all unused banks prior to usage. Some
 hardware and older software implementations will not clear unused areas.
 (eg older VICE, Kung Fu Flash)
-Not yet implemented.
+Not yet implemented: always returns A = 0 and .C clear (nothing found).
 ```
 
 You can use the following code to bank in before calling an init function:

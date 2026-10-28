@@ -42,7 +42,7 @@ refer to the original code.
 | M7 | major | **fixed** | Zero-length save returns a garbage error code (low byte of the end address) |
 | M8 | major | **fixed** | `EFS_save`/`EFS_load` while a file is open return "file open" but close or corrupt that file |
 | M9 | major | **fixed** | "Blocks free" is garbage for read-only configurations and full areas |
-| M10 | major | partly confirmed | No recovery from an interrupted defragment or an unclosed write file; `EFS_validate` is a stub that does not even set C (confirmed) |
+| M10 | major | **partly fixed** | No recovery from an interrupted defragment or an unclosed write file (open); `EFS_validate` stub returned C unchanged (fixed: returns A = 0, C clear) |
 | M11 | major | by code | Defragment callbacks must preserve Y (and should preserve X), which is not documented or enforced |
 | m1 | minor | by code | Names longer than 16 characters can desynchronise the directory scan |
 | m2 | minor | by code | Directory bounds are not checked for deleted entries; dirlist uses a hard-coded `$b8` bound |
@@ -660,6 +660,19 @@ listing again), on the test cartridge and on a variant with `areas = 1`:
   written. If the save then fails (disk full after the scratch, write
   error), the old file is lost.
 
+**Partly fixed** (the `EFS_validate` part): until validation is
+implemented, the stub returns A = 0 and C clear ("nothing found"),
+independent of C at call time. That way programs that follow the manual
+do not defragment on every start. `docs/manual.md` describes this. The
+recovery issues above remain open.
+
+Verified in VICE (`work/m10test.s`):
+
+| call | fixed | before the fix |
+| ---- | ----- | -------------- |
+| `EFS_validate` with C clear | A = 0, C clear | A = 5, C clear |
+| `EFS_validate` with C set | A = 0, C clear | A = 5, C set |
+
 ### M11 – Defragment callbacks may clobber X/Y
 
 *By code.* In `rom_defragment_copy_data` the loop reads the source with
@@ -745,8 +758,8 @@ helpers.
 - `docs/manual.md` configuration table: bytes `39-3f` are "unused", but
   the default config in `lib-efs.s:208-211` and `libefs_config` define
   `actcall`/`actvector` there (marked "not implemented").
-- `docs/manual.md`, `EFS_validate`: says C is set on corruption, while
-  the code is a stub (see M10).
+- (Done) `docs/manual.md`, `EFS_validate`: now states what the stub
+  returns (see M10).
 - `docs/memory.txt` still shows the old `LIB`/`EFS` configuration layout
   and old zero page notes.
 - `lib-efs.i:85`: comment "bit 5 and 6" for `LIBEFS_FLAGS_FILE_AREA0` is
@@ -807,6 +820,7 @@ Fixed on `main`, each verified in VICE:
 | "Preserve zero page in close, defragment and format" | M5 |
 | "Refuse write operations when MiniEAPI is installed" | M6 |
 | "Fix blocks free for read-only and full areas" | M9 |
+| "Make the EFS_validate stub return a defined result" | M10 (part) |
 
 Most of the critical items were one-instruction branch or flag errors
 (`bne` instead of `bcc`, `beq` instead of `bne`, `plp` restoring the
