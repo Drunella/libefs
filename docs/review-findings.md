@@ -38,7 +38,7 @@ refer to the original code.
 | M3 | major | **fixed** | Command prefix parsing loses the carry: wrong name pointer when the name crosses a page |
 | M4 | major | **fixed** | Drive-number check accepts `'`…`0` instead of `0`…`9` |
 | M5 | major | **fixed** | `EFS_close` (write), `EFS_defragment` and `EFS_format` clobber zero page `$35-$3f` |
-| M6 | major | confirmed | `EFS_save` with MiniEAPI reports success but writes nothing |
+| M6 | major | **fixed** | `EFS_save` (and open for writing, defragment, format) with MiniEAPI report success but write nothing |
 | M7 | major | **fixed** | Zero-length save returns a garbage error code (low byte of the end address) |
 | M8 | major | **fixed** | `EFS_save`/`EFS_load` while a file is open return "file open" but close or corrupt that file |
 | M9 | major | confirmed | "Blocks free" is garbage for read-only configurations |
@@ -553,6 +553,26 @@ loading `MINI` afterwards → `$04` not found.
 stubs), or remember in `efs_flags` which EAPI was installed and reject
 writes with `ERROR_WRITE_PROTECTED`.
 
+**Fixed** (the second variant): the new `rom_check_writable` checks for
+the real EAPI. Its jump table has a `jmp` (`$4c`) at `$df80`, where
+MiniEAPI has an `rts`. `rom_filesave_conditions` (save, open for
+writing), `rom_scratch_process`, `EFS_defragment` and `EFS_format`
+return `ERROR_WRITE_PROTECTED` (`$1a`, C set) with MiniEAPI. MiniEAPI
+itself is unchanged (no free space for failing stubs).
+
+Verified in VICE (`work/m6test.s`):
+
+| operation with MiniEAPI | fixed | before the fix |
+| ----------------------- | ----- | -------------- |
+| `save` | `$1a`, C set | `$00` (nothing written) |
+| `open(1)` | `$1a`, C set | `$00` |
+| scratch | `$1a`, C set | `$19`, C set |
+| `EFS_defragment` | `$1a`, C set | `$00` (nothing done) |
+| `EFS_format` | `$1a`, C set | `$00` (nothing done) |
+| `load` | works | works |
+
+Switching back with `EFS_init_eapi` makes saving work again.
+
 ### M7 – Zero-length save returns garbage in A
 
 `rom_filesave_checkzero` (old code) returned C set with A = low
@@ -770,6 +790,7 @@ Fixed on `main`, each verified in VICE:
 | "Fix drive number check in command prefixes" | M4 |
 | "Keep open files intact when load or save is rejected" | M8 |
 | "Preserve zero page in close, defragment and format" | M5 |
+| "Refuse write operations when MiniEAPI is installed" | M6 |
 
 Most of the critical items were one-instruction branch or flag errors
 (`bne` instead of `bcc`, `beq` instead of `bne`, `plp` restoring the

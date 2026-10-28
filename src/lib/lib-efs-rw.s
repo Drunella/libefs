@@ -153,11 +153,26 @@
 ; need to leave with 'jmp efs_bankout'
 ; zeropage usage only after zeropage backup
 
+    rom_check_writable:
+        ; .C set and A = ERROR_WRITE_PROTECTED if MiniEAPI is installed:
+        ; it cannot write or erase (the real EAPI has a jmp at $df80)
+        lda EAPIWriteFlash
+        cmp #$4c  ; jmp
+        bne :+
+        clc
+        rts
+      : lda #ERROR_WRITE_PROTECTED
+        sec
+        rts
+
+
     rom_defragment_body:
         jsr rom_config_prepare_config
 
         ; rw areas available?
         jsr rom_config_rw_available
+        bcs @error
+        jsr rom_check_writable
         bcs @error
 
         lda internal_state  ; check if file open
@@ -187,6 +202,8 @@
 
         ; rw areas available?
         jsr rom_config_rw_available
+        bcs @error
+        jsr rom_check_writable
         bcs @error
 
         lda #$01
@@ -826,6 +843,8 @@
 
         ; rw areas available?
         jsr rom_config_rw_available   ; maybe check earlier?
+        bcs @error
+        jsr rom_check_writable        ; MiniEAPI cannot write
         bcs @error
 
         ; check address range: end address must be above start address
@@ -1687,6 +1706,9 @@
         ; configuration is at the correct area
         ; efs_readef must be at the correct position
         jsr efs_init_eapiwriteinc  ; prepare dynamic code
+
+        jsr rom_check_writable  ; MiniEAPI cannot write
+        bcs @error
 
         ; filedata are set
         ; if in area 0 -> write protected
