@@ -33,7 +33,7 @@ refer to the original code.
 | C6 | critical | **fixed** | `EFS_save` stores a wrong size when (end − start) mod 256 = 255; the file is corrupt |
 | C7 | critical | **fixed** | `EFS_save` with end < start writes a ~64K garbage file |
 | C8 | critical | **fixed** | `open(1)` with an `S:` command followed by `close` programs flash at a garbage address |
-| M1 | major | confirmed | Verify flag is never cleared; every later load is a verify |
+| M1 | major | **fixed** | Verify flag is never cleared; every later load is a verify |
 | M2 | major | confirmed | Scratch errors (write protected, write error) are returned with C clear |
 | M3 | major | confirmed | Command prefix parsing loses the carry: wrong name pointer when the name crosses a page |
 | M4 | major | confirmed | Drive-number check accepts `'`…`0` instead of `0`…`9` |
@@ -401,6 +401,17 @@ again and the memory is still empty, so the "load" was a verify.
 
 *Fix*: clear the bit at the start of `rom_load_body` (`and #$ff - LIBEFS_FLAGS_VERIFY`).
 
+**Fixed**: `rom_load_body` clears the verify flag on every call and sets
+it only if A ≠ 0.
+
+Verified in VICE (`work/m1test.s`): verify `DELME15` against empty
+memory (`$10`), then load with A = 0 without setlfs, then verify again.
+
+| step | fixed | before the fix |
+| ---- | ----- | -------------- |
+| load after a verify | OK, `readst` = `$40`, data loaded | C set, `readst` = `$10`, no data (verified instead) |
+| verify against loaded data | OK, `readst` = `$40` | – |
+
 ### M2 – Scratch errors are swallowed
 
 `src/lib/lib-efs.s:1585-1591` (`rom_command_process`). After
@@ -679,6 +690,7 @@ Fixed on `main`, each verified in VICE:
 | `337ed59` | C6 |
 | `9c0dd25` | C7, M7 |
 | `ae9949a` | C8 |
+| "Fix verify flag staying set after a verify" | M1 |
 
 Most of the critical items were one-instruction branch or flag errors
 (`bne` instead of `bcc`, `beq` instead of `bne`, `plp` restoring the

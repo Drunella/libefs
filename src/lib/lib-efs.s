@@ -749,13 +749,15 @@
         ;sta efs_verify
         stx io_start_address
         sty io_start_address + 1
-        cmp #$00
+        tax       ; 0 = load, other = verify
+        lda efs_flags  ; the verify flag is only valid for this call
+        and #$ff - LIBEFS_FLAGS_VERIFY
+        cpx #$00
         beq :+    ; zero => no verify
-        lda #LIBEFS_FLAGS_VERIFY
-        ora efs_flags
-        sta efs_flags
+        ora #LIBEFS_FLAGS_VERIFY
+      : sta efs_flags
 
-      : jsr backup_zeropage
+        jsr backup_zeropage
 
         lda #$00
         sta status_byte
