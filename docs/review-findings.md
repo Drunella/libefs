@@ -35,7 +35,7 @@ refer to the original code.
 | C8 | critical | **fixed** | `open(1)` with an `S:` command followed by `close` programs flash at a garbage address |
 | M1 | major | **fixed** | Verify flag is never cleared; every later load is a verify |
 | M2 | major | **fixed** | Scratch errors (write protected, write error) are returned with C clear |
-| M3 | major | confirmed | Command prefix parsing loses the carry: wrong name pointer when the name crosses a page |
+| M3 | major | **fixed** | Command prefix parsing loses the carry: wrong name pointer when the name crosses a page |
 | M4 | major | confirmed | Drive-number check accepts `'`…`0` instead of `0`…`9` |
 | M5 | major | confirmed | `EFS_close` (write), `EFS_defragment` and `EFS_format` clobber zero page `$35-$3f` |
 | M6 | major | confirmed | `EFS_save` with MiniEAPI reports success but writes nothing |
@@ -458,6 +458,17 @@ For `S` and `@` this can scratch the wrong file.
 *VICE*: `"S0:DELME640"` stored at `$33fe` → `open` returns `$04`
 (not found), because the name is read from `$3301` instead of `$3401`.
 
+**Fixed**: `bne :+` → `bcc :+`.
+
+Verified in VICE (`work/m3test.s`). `"S0:DELME640"` is placed at
+`$33fe`, so the name part starts at `$3401`. `$3301` holds `DELME641`
+as bait.
+
+| case | fixed | before the fix |
+| ---- | ----- | -------------- |
+| `open "S0:DELME640"` | `$01`; `DELME640` gone, `DELME641` intact | `$01`, but **`DELME641` was scratched** (wrong file) |
+| `load "$0:DELME6*"` at `$34fd` | listing shows `DELME641`, `DELME642` | – |
+
 ### M4 – Drive number check accepts the wrong characters
 
 `src/lib/lib-efs.s:1526-1530`:
@@ -706,6 +717,7 @@ Fixed on `main`, each verified in VICE:
 | `ae9949a` | C8 |
 | "Fix verify flag staying set after a verify" | M1 |
 | "Report scratch errors with carry set" | M2 |
+| "Fix command prefix parsing for names crossing a page" | M3 |
 
 Most of the critical items were one-instruction branch or flag errors
 (`bne` instead of `bcc`, `beq` instead of `bne`, `plp` restoring the

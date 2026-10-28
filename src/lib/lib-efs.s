@@ -1549,7 +1549,7 @@
         tya
         adc zp_var_xe
         sta zp_var_xe
-        bne :+
+        bcc :+         ; carry into the high byte
         inc zp_var_xf
       : lda zp_var_xe
         sta filename_address
