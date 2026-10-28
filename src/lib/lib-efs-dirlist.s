@@ -55,6 +55,7 @@
 
 .import rom_space_setdirstart
 .import rom_space_subtractsize_blocks
+.import rom_config_rw_available
 .import rom_space_maxspace
 .import rom_space_usedspace
 
@@ -802,11 +803,20 @@
         ; use calculation functions from save
         ; blocks in 3c/3d
         jsr rom_config_prepare_config
+        jsr rom_config_rw_available
+        bcs @none                  ; read-only efs: 0 blocks free
         jsr rom_space_setdirstart  ; init read_ef
         jsr rom_space_maxspace
         jsr rom_space_usedspace
         jsr rom_space_subtractsize_blocks
+        lda zp_var_xd
+        bpl @store                 ; negative (full area): 0 blocks free
+      @none:
+        lda #$00
+        sta zp_var_xc
+        sta zp_var_xd
 
+      @store:
         lda zp_var_xd
         sta dirload_state_var
         inc dirload_temp_state_zp

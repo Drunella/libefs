@@ -41,7 +41,7 @@ refer to the original code.
 | M6 | major | **fixed** | `EFS_save` (and open for writing, defragment, format) with MiniEAPI report success but write nothing |
 | M7 | major | **fixed** | Zero-length save returns a garbage error code (low byte of the end address) |
 | M8 | major | **fixed** | `EFS_save`/`EFS_load` while a file is open return "file open" but close or corrupt that file |
-| M9 | major | confirmed | "Blocks free" is garbage for read-only configurations |
+| M9 | major | **fixed** | "Blocks free" is garbage for read-only configurations and full areas |
 | M10 | major | partly confirmed | No recovery from an interrupted defragment or an unclosed write file; `EFS_validate` is a stub that does not even set C (confirmed) |
 | M11 | major | by code | Defragment callbacks must preserve Y (and should preserve X), which is not documented or enforced |
 | m1 | minor | by code | Names longer than 16 characters can desynchronise the directory scan |
@@ -621,6 +621,21 @@ load-back: `work/m8dtest.s`):
 
 *Fix*: show 0 blocks free when `areas` ≠ 3.
 
+The same underflow happens for a completely full r/w area: the free
+space minus the rounding block becomes −1, shown as 65535.
+
+**Fixed**: `rom_dirload_sm_freelow` shows 0 blocks free when there are
+no r/w areas, and clamps a negative result to 0.
+
+Verified in VICE (`work/m9test.s`: listing, fill the area with chrout,
+listing again), on the test cartridge and on a variant with `areas = 1`:
+
+| case | fixed | before the fix |
+| ---- | ----- | -------------- |
+| read-only configuration | `0 BLOCKS FREE.` | `64067 BLOCKS FREE.` |
+| r/w area filled completely (`BIG`, 730 blocks) | `0 BLOCKS FREE.` | `65535 BLOCKS FREE.` |
+| normal r/w area | `728 BLOCKS FREE.` | same |
+
 ### M10 – No recovery from interrupted operations
 
 *By code*, except `EFS_validate`, which is confirmed in VICE.
@@ -791,6 +806,7 @@ Fixed on `main`, each verified in VICE:
 | "Keep open files intact when load or save is rejected" | M8 |
 | "Preserve zero page in close, defragment and format" | M5 |
 | "Refuse write operations when MiniEAPI is installed" | M6 |
+| "Fix blocks free for read-only and full areas" | M9 |
 
 Most of the critical items were one-instruction branch or flag errors
 (`bne` instead of `bcc`, `beq` instead of `bne`, `plp` restoring the
