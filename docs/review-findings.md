@@ -25,7 +25,7 @@ in [architecture.md](./architecture.md).
 | C2 | critical | **fixed** | `rom_config_get_value` returns the caller's flags, so `dfcall = 0` is ignored and the callbacks jump through `$0000` |
 | C3 | critical | **fixed** | Defragment between areas with different banking modes corrupts every file that crosses a bank |
 | C4 | critical | **fixed** | chrout-writing past the end of the last area wraps to bank 0 and overwrites libefs in flash |
-| C5 | critical | confirmed | `EFS_chrout` keeps writing after "disk full" / EOF |
+| C5 | critical | **fixed** | `EFS_chrout` keeps writing after "disk full" / EOF |
 | C6 | critical | confirmed | `EFS_save` stores a wrong size when (end − start) mod 256 = 255; the file is corrupt |
 | C7 | critical | confirmed | `EFS_save` with end < start writes a ~64K garbage file |
 | C8 | critical | confirmed | `open(1)` with an `S:` command followed by `close` programs flash at a garbage address |
@@ -259,6 +259,17 @@ is area 2's first bank). Together with C4 this writes to bank 0.
 causes a flash program cycle.
 
 *Fix*: `bne @done` (or `jmp`).
+
+**Fixed**: `beq @done` → `bne @done`.
+
+Verified in VICE with `work/c5test.s`. It is the C4 test plus three more
+`chrout` calls after the first error, before `close`.
+
+| | fixed | before the fix (control, C4 already fixed) |
+| - | ----- | ------------------------------------------ |
+| 3 extra chrout calls | each returns `$19` with C set, nothing written | each returns `$40` with C set, but the byte **is** written |
+| file size after close / read back | 186,664 bytes, 0 mismatches | 186,667 bytes, 3 mismatches |
+| bank 0 ROML | unchanged | `$8000-$8002` overwritten with `$00` (libefs `EFS_init` destroyed) |
 
 ### C6 – `EFS_save` computes a wrong size when (end − start) mod 256 = 255
 
@@ -521,6 +532,8 @@ helpers.
   - The dirlist type table (`dirlist.s:380-392`) has 12 entries. Type
     values `$10-$1e` index past it.
   - `EFS_chrin` after EOF returns C set with A = 0 and no error code.
+  - `EFS_chrout` destroys X (`rom_chrout_body` starts with `tax`); the
+    KERNAL `CHROUT` preserves X and Y. Found while writing the C5 test.
   - Open for writing reserves `$2000` + 2 bytes. With less free space
     `open` fails ("disk full") even for small files. Larger files can be
     written as long as the area has room.

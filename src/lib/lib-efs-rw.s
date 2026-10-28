@@ -217,7 +217,7 @@
         lda #ERROR_WRITE_ERROR
         sta error_byte
         sec
-        beq @done
+        bne @done  ; always taken, nothing is written after eof
 
       @next2:
         bit internal_state  ; we check for bit 7/6 == 1/1
