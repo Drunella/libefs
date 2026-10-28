@@ -1476,20 +1476,18 @@
 
       @llll:
       @hhhh:
-        jsr rom_config_get_area_size_active_file ; ###
+        jsr rom_config_get_area_size_active_file
         clc
         adc io_end_address + 1
-        and #%00111111  ; max bank
-        sta io_end_address + 1
-        jmp @continue
+        sta io_end_address + 1  ; first bank after the area, may be 64 (no mask:
+        jmp @continue           ; EAPI counts past bank 63, the hardware wraps to 0)
 
       @lhlh:
         jsr rom_config_get_area_size_active_file  ; file based
-        lsr a  ; ### is this correct?
+        lsr a  ; lhlh: two 8k banks (low and high) per bank number
         clc
         adc io_end_address + 1
-        and #%00111111  ; max bank
-        sta io_end_address + 1
+        sta io_end_address + 1  ; first bank after the area, may be 64 (see above)
 
       @continue:
         lda zp_var_x8

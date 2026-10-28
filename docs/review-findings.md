@@ -24,7 +24,7 @@ in [architecture.md](./architecture.md).
 | C1 | critical | **fixed** | Defragment crashes: callback "fix" from PR #1 switches the ROM bank under running code |
 | C2 | critical | **fixed** | `rom_config_get_value` returns the caller's flags, so `dfcall = 0` is ignored and the callbacks jump through `$0000` |
 | C3 | critical | **fixed** | Defragment between areas with different banking modes corrupts every file that crosses a bank |
-| C4 | critical | confirmed | chrout-writing past the end of the last area wraps to bank 0 and overwrites libefs in flash |
+| C4 | critical | **fixed** | chrout-writing past the end of the last area wraps to bank 0 and overwrites libefs in flash |
 | C5 | critical | confirmed | `EFS_chrout` keeps writing after "disk full" / EOF |
 | C6 | critical | confirmed | `EFS_save` stores a wrong size when (end − start) mod 256 = 255; the file is corrupt |
 | C7 | critical | confirmed | `EFS_save` with end < start writes a ~64K garbage file |
@@ -212,6 +212,31 @@ cartridge's copy of libefs.
 and compare with `>=`. Better, check before writing (`EAPIGetBank`
 before `efs_io_byte`), so the byte that would cross the end is never
 written.
+
+**Fixed**: `rom_filesave_transfer_data_prepare` no longer masks the end
+bank with `$3f`. EAPI's bank counter goes to 64 after bank 63 (only the
+hardware wraps to 0), so the end bank 64 is now reached right after the
+last byte of bank 63 is written, and "disk full" is reported before
+anything is written to bank 0.
+
+Verified in VICE with a test program (`work/c4test.s`) that runs in the
+test cartridge environment. It writes `BIG` with chrout until the first
+error, closes it, reads it back with chrin, and copies bank 0 ROML to RAM
+for comparison with the built image.
+
+| | fixed | before the fix (control) |
+| - | ----- | ------------------------ |
+| bytes accepted before the error | 186,663 + 1 (the byte that reaches the end is written; C is set afterwards) | 186,664 |
+| error | disk full (`readst` = `$40`) | write error `$19` |
+| `close` | OK | – |
+| read back | 186,664 bytes, 0 mismatches (= exactly the free space: 256K − `$1800` − 69,336) | – |
+| bank 0 ROML | unchanged | `$8000` changed from `$4c` to `$08` (libefs `EFS_init` destroyed) |
+
+Remaining, related: C5 is still open. A program that keeps calling
+chrout after "disk full" would still write the next byte, and for an
+area ending at bank 63 that byte lands in bank 0. Also, on disk full
+chrout returns A = `$40` (the status value) instead of the error code
+`$48`; `error_byte` is correct.
 
 ### C5 – `EFS_chrout` ignores a previous EOF / disk full
 
