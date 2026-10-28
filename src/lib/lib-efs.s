@@ -746,7 +746,18 @@
     rom_load_body:
         ; return: X/Y: end address
         ; no internal state will be set
-        ;sta efs_verify
+        ; a file is open: report it without touching the state of that file
+        ; (io_start_address/io_end_address are in use by chrout/dirlist)
+        pha
+        lda internal_state
+        beq :+
+        pla
+        lda #ERROR_FILE_OPEN
+        sta error_byte
+        sec
+        jmp efs_bankout  ; ends with rts
+      : pla
+
         stx io_start_address
         sty io_start_address + 1
         tax       ; 0 = load, other = verify
@@ -762,13 +773,6 @@
         lda #$00
         sta status_byte
         sta error_byte
-
-        lda internal_state
-        beq @commandcheck
-        lda #ERROR_FILE_OPEN
-        sta error_byte
-        sec
-        bne @leave
 
       @commandcheck:
         jsr rom_command_begin

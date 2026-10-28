@@ -271,6 +271,18 @@
 
     rom_save_body:
         ; A: address of zero page with startaddress; X/Y: end address + 1
+        ; a file is open: report it without touching the state of that file
+        ; (io_start_address/io_end_address are in use by chrout/dirlist)
+        pha
+        lda internal_state
+        beq :+
+        pla
+        lda #ERROR_FILE_OPEN
+        sta error_byte
+        sec
+        jmp efs_bankout  ; ends with rts
+      : pla
+
         stx io_end_address
         sty io_end_address + 1
         tax
@@ -294,13 +306,6 @@
         lda #$00
         sta status_byte
         sta error_byte
-
-        lda internal_state
-        beq @checkconditions
-        lda #ERROR_FILE_OPEN
-        sta error_byte
-        sec
-        bne @leave
 
       @checkconditions:
         jsr rom_filesave_conditions

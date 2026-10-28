@@ -40,7 +40,7 @@ refer to the original code.
 | M5 | major | confirmed | `EFS_close` (write), `EFS_defragment` and `EFS_format` clobber zero page `$35-$3f` |
 | M6 | major | confirmed | `EFS_save` with MiniEAPI reports success but writes nothing |
 | M7 | major | **fixed** | Zero-length save returns a garbage error code (low byte of the end address) |
-| M8 | major | confirmed | `EFS_save` while a file is open returns "file open" but closes that file |
+| M8 | major | **fixed** | `EFS_save`/`EFS_load` while a file is open return "file open" but close or corrupt that file |
 | M9 | major | confirmed | "Blocks free" is garbage for read-only configurations |
 | M10 | major | partly confirmed | No recovery from an interrupted defragment or an unclosed write file; `EFS_validate` is a stub that does not even set C (confirmed) |
 | M11 | major | by code | Defragment callbacks must preserve Y (and should preserve X), which is not documented or enforced |
@@ -556,6 +556,25 @@ byte of `io_end_address`. `rom_filesave_conditions` stores A in
 *VICE*: `open "DATA1"`, `save` → `$02` (file open). The following
 `chrin` returns `$03` (file not open).
 
+While fixing this it turned out to be worse than described:
+`rom_save_body` (and `rom_load_body`) stored the new start/end addresses
+in `io_start_address`/`io_end_address` and reset the status *before*
+checking for an open file. For a file being written with chrout these
+variables hold the byte counter and end bank; for an open directory they
+hold the listing state.
+
+**Fixed**: `rom_save_body` and `rom_load_body` check `internal_state`
+first and return `ERROR_FILE_OPEN` (C set) without touching any state.
+
+Verified in VICE (`work/m8test.s`; control without the destructive
+load-back: `work/m8dtest.s`):
+
+| case | fixed | before the fix |
+| ---- | ----- | -------------- |
+| `load` and `save` while a chrout file is open | both `$02`; writing continues, `close` OK, file loads back with the right size and data | `$02`, but `save` closed the channel: `close` → `$03`, the size was never written, the directory shows `WF` with **8192 blocks** (size `$ffffff`), and loading it overwrites all memory |
+| `save` while a file is open for reading | `$02`; `chrin` continues | `$02`, then `chrin` → `$03` (file closed) |
+| `load` in the middle of a directory listing | `$02`; listing complete and unchanged | – |
+
 ### M9 – "Blocks free" is garbage for read-only configurations
 
 `rom_dirload_sm_freelow` (`lib-efs-dirlist.s:800`) → `rom_space_maxspace` uses area 0's size
@@ -734,6 +753,7 @@ Fixed on `main`, each verified in VICE:
 | "Report scratch errors with carry set" | M2 |
 | "Fix command prefix parsing for names crossing a page" | M3 |
 | "Fix drive number check in command prefixes" | M4 |
+| "Keep open files intact when load or save is rejected" | M8 |
 
 Most of the critical items were one-instruction branch or flag errors
 (`bne` instead of `bcc`, `beq` instead of `bne`, `plp` restoring the
