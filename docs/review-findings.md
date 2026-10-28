@@ -3,11 +3,15 @@
 Review of libefs 1.0.0 (commit `ff7d2d4`). How the code works is described
 in [architecture.md](./architecture.md).
 
+Last re-evaluation: after the fixes up to commit `ae9949a` (C1-C8, M7).
+Line numbers of open items refer to that state; for fixed items they
+refer to the original code.
+
 **Status**:
 
-- **confirmed**: reproduced by running the real, unmodified library
-  binary in a scripted 6502 + EasyFlash emulator (see the last section).
-  C1 and C3 were also reproduced on the real test cartridge in VICE 3.9.
+- **fixed**: fixed and verified in VICE, see the item for the test.
+- **confirmed**: reproduced in VICE 3.9 with the real test cartridge on
+  the current code (see "How the findings were verified").
 - **by code**: found by reading the code, not reproduced.
 
 **Severity**:
@@ -30,7 +34,7 @@ in [architecture.md](./architecture.md).
 | C7 | critical | **fixed** | `EFS_save` with end < start writes a ~64K garbage file |
 | C8 | critical | **fixed** | `open(1)` with an `S:` command followed by `close` programs flash at a garbage address |
 | M1 | major | confirmed | Verify flag is never cleared; every later load is a verify |
-| M2 | major | confirmed | Scratch errors (write protected, write error) are swallowed, and the channel stays open |
+| M2 | major | confirmed | Scratch errors (write protected, write error) are returned with C clear |
 | M3 | major | confirmed | Command prefix parsing loses the carry: wrong name pointer when the name crosses a page |
 | M4 | major | confirmed | Drive-number check accepts `'`…`0` instead of `0`…`9` |
 | M5 | major | confirmed | `EFS_close` (write), `EFS_defragment` and `EFS_format` clobber zero page `$35-$3f` |
@@ -38,15 +42,15 @@ in [architecture.md](./architecture.md).
 | M7 | major | **fixed** | Zero-length save returns a garbage error code (low byte of the end address) |
 | M8 | major | confirmed | `EFS_save` while a file is open returns "file open" but closes that file |
 | M9 | major | confirmed | "Blocks free" is garbage for read-only configurations |
-| M10 | major | by code | No recovery from an interrupted defragment or an unclosed write file; `EFS_validate` is a stub that does not even set C |
+| M10 | major | partly confirmed | No recovery from an interrupted defragment or an unclosed write file; `EFS_validate` is a stub that does not even set C (confirmed) |
 | M11 | major | by code | Defragment callbacks must preserve Y (and should preserve X), which is not documented or enforced |
-| m1 | minor | by code | Names longer than 16 characters desynchronise the directory scan |
+| m1 | minor | by code | Names longer than 16 characters can desynchronise the directory scan |
 | m2 | minor | by code | Directory bounds are not checked for deleted entries; dirlist uses a hard-coded `$b8` bound |
 | m3 | minor | by code | `rom_filesave_blockedspace` uses the stale "active file" area |
 | m4 | minor | by code | `rom_defragment_erasearea` with size < 8 erases 256 sectors |
 | m5 | minor | by code | Hard-coded `$80`/`$a0` file base and dir bank used as files bank |
 | m6 | minor | confirmed | LOAD returns the last address, not last + 1 like the KERNAL |
-| m7 | minor | by code | Various smaller API inconsistencies (see list) |
+| m7 | minor | partly confirmed | Various smaller API inconsistencies (see list) |
 | D1 | doc | – | Documentation mismatches |
 | T1-T12 | various | see section | Tools (`tools/*.py`), Makefile and test cartridge |
 
@@ -91,7 +95,7 @@ machine crashes and ends up in a blank, reset-like state. With only the
 *Fix*: remove the bank save, select and restore code that PR #1 added,
 and fix C2 instead.
 
-**Fixed** (branch `fix/defragment-callbacks`): the PR #1 code is removed
+**Fixed** (commit `564eb31`): the PR #1 code is removed
 and the two functions are back to their state before PR #1, plus the C2
 fix.
 
@@ -131,7 +135,7 @@ callbacks, or let `rom_config_get_value` end with `plp` followed by
 `ora #$00`. `ora` leaves C and I untouched. Check every other caller that
 branches directly on the result.
 
-**Fixed** (branch `fix/defragment-callbacks`): `rom_config_get_value`
+**Fixed** (commit `564eb31`): `rom_config_get_value`
 now ends with `ora #$00` after `plp`, so N/Z reflect the returned value,
 while C and I are preserved. The two callback functions are the only
 callers that branch on these flags.
@@ -386,32 +390,32 @@ byte:
 
 ### M1 – Verify flag is never cleared
 
-`src/lib/lib-efs.s:752-756` sets `LIBEFS_FLAGS_VERIFY` with `ora`. It is
+`src/lib/lib-efs.s:752-756` (`rom_load_body`) sets `LIBEFS_FLAGS_VERIFY` with `ora`. It is
 only cleared when `EFS_util` setlfs overwrites `efs_flags`. After one
 verify, every later `EFS_load` with A = 0 verifies instead of loading,
 unless setlfs is called first.
 
-*Reproduced*: verify `DATA1024` (mismatch), then load with A = 0 →
-status `$10`, memory untouched.
+*VICE*: verify `DELME15` against cleared memory (`readst` = `$10`),
+then `EFS_load` with A = 0 without calling setlfs → `readst` is `$10`
+again and the memory is still empty, so the "load" was a verify.
 
 *Fix*: clear the bit at the start of `rom_load_body` (`and #$ff - LIBEFS_FLAGS_VERIFY`).
 
 ### M2 – Scratch errors are swallowed
 
-`src/lib/lib-efs.s:1606-1614`, `1634-1637`. After `rom_scratch_process`
-the code always jumps to `@stop` (`lda #0; sec`). `rom_open_body` treats
-"C set, Z set" as "stop, no error" and clears C. So `ERROR_WRITE_PROTECTED`
-(file in area 0) and `ERROR_WRITE_ERROR` come back with C clear.
-`internal_state` also stays "open", so a following `chrin` reads from a
-stale EAPI pointer instead of returning "file not open".
+`src/lib/lib-efs.s:1585-1591` (`rom_command_process`). After
+`rom_scratch_process` the code always jumps to `@stop` (`lda #0; sec`).
+`rom_open_body` treats "C set, Z set" as "stop, no error" and clears C.
+So `ERROR_WRITE_PROTECTED` (file in area 0) and `ERROR_WRITE_ERROR`
+come back with C clear. (Since the C8 fix the channel is in the
+"command done" state afterwards, so `chrin` no longer reads from a stale
+pointer.)
 
-*Reproduced*: `open "S:DATA1"` → A = `$1a`, C = 0.
-`open "S0:DELME15"` then `chrin` → returns a byte with C clear. With
-MiniEAPI, scratch returns `$19` with C clear.
+*VICE*: `open "S:DATA1"` (area 0) → A = `$1a`, C clear.
 
 ### M3 – Command prefix: carry lost when advancing the name pointer
 
-`src/lib/lib-efs.s:1573-1578` (`rom_command_begin`), same pattern as C6:
+`src/lib/lib-efs.s:1546-1551` (`rom_command_begin`), same pattern as C6:
 
 ```
         sec
@@ -426,12 +430,12 @@ If the name after `S0:`/`$0:`/`@0:` starts in the next page, the high
 byte is not incremented and the wrong memory is used as the file name.
 For `S` and `@` this can scratch the wrong file.
 
-*Reproduced*: `"S0:DELME15"` stored at `$33fe` → file not found (looks at
-`$3301`).
+*VICE*: `"S0:DELME640"` stored at `$33fe` → `open` returns `$04`
+(not found), because the name is read from `$3301` instead of `$3401`.
 
 ### M4 – Drive number check accepts the wrong characters
 
-`src/lib/lib-efs.s:1553-1557`:
+`src/lib/lib-efs.s:1526-1530`:
 
 ```
         clc
@@ -443,22 +447,27 @@ For `S` and `@` this can scratch the wrong file.
 The accepted range is `$27`-`$30` (`'`, `(`, `)`, `*`, `+`, `,`, `-`, `.`,
 `/`, `0`), not `0`-`9`.
 
-*Reproduced*: `"$1:DATA1*"` is not treated as a directory command (the
-file `$1:DATA1*` is searched instead), and `"/:DATA1"` gives a syntax
-error instead of "not found".
+*VICE*: `load "$1:*"` → `$04` (searched as a file name instead of being
+a directory command); `load "/:DATA1"` → `$1e` (`/` accepted as drive
+number, then "syntax error").
 
 *Fix*: `sec; sbc #$30; cmp #$0a; bcs @nomatch`.
 
 ### M5 – Zero page `$35-$3f` is not preserved by some calls
 
 - `EFS_close` after writing: `rom_filesave_chrin_close` calls
-  `rom_config_prepare_config` and writes `$35/$36` (rw.s:409-414).
-- `EFS_defragment` and `EFS_format` (ROM calls `$8009`/`$800c`) use
-  `$35-$3f` without `backup_zeropage`.
+  `rom_config_prepare_config` and writes `$35/$36` (`lib-efs-rw.s:409-414`).
+- `EFS_defragment` and `EFS_format` (ROM calls `$8009`/`$800c`,
+  `lib-efs-rw.s:156`, `:185`) use `$35-$3f` without `backup_zeropage`.
 
-*Reproduced*: `$35-$3f` filled with `$a5` → after open/chrout/close
-`$35/$36` = `$18 $bb`; after `EFS_format`, `$35-$38` and `$3a` are
-changed. Directory chrin/close keep the zero page intact.
+*VICE*: `$35-$3f` filled with `$a5`, then counting the changed bytes:
+
+| call sequence | changed bytes |
+| ------------- | ------------- |
+| open(1) / chrout / close | 2 |
+| open(0) / chrin / close | 0 |
+| `EFS_defragment` | 11 (all) |
+| `EFS_format` | 5 |
 
 These locations are BASIC/KERNAL temporaries, and cc65 programs or games
 may use them as well. Load, save, open and chrin restore them, so callers
@@ -471,8 +480,8 @@ MiniEAPI has no `EAPIWriteFlashInc`. Its slot `$df95` is the body of
 shadow and `$de00` to the data byte and returns with C unchanged (clear).
 `rom_filesave_conditions` does not know that it runs on MiniEAPI.
 
-*Reproduced*: `save` with MiniEAPI → A = 0, C = 0, 0 flash writes. The
-file cannot be loaded afterwards.
+*VICE*: after `EFS_init_minieapi`, `save "MINI"` → A = 0, C clear;
+loading `MINI` afterwards → `$04` not found.
 
 *Fix*: make the MiniEAPI write entries return C set (e.g. `sec; rts`
 stubs), or remember in `efs_flags` which EAPI was installed and reject
@@ -480,47 +489,50 @@ writes with `ERROR_WRITE_PROTECTED`.
 
 ### M7 – Zero-length save returns garbage in A
 
-`rom_filesave_checkzero` (rw.s:1015-1017) returns C set with A = low
+`rom_filesave_checkzero` (old code) returned C set with A = low
 byte of `io_end_address`. `rom_filesave_conditions` stores A in
 `error_byte`.
 
-*Reproduced*: save `$4012-$4012` → A = `$12`, C = 1.
+*Reproduced* (before the fix): save `$4012-$4012` → A = `$12`, C = 1.
 
 **Fixed** with C7: A = `ERROR_SYNTAX_ERROR_30` (`$1e`).
 
 ### M8 – `EFS_save` while a file is open closes that file
 
-`rom_save_body` `@leave` (rw.s:354-357) always sets `internal_state = 0`,
-also in the "file open" error path.
+`rom_save_body` `@leave` (`lib-efs-rw.s:354-357`) always sets
+`internal_state = 0`, also in the "file open" error path.
 
-*Reproduced*: `open "DATA1"`, `save` → error 2. A following `chrin`
-returns error 3 (not open).
+*VICE*: `open "DATA1"`, `save` → `$02` (file open). The following
+`chrin` returns `$03` (file not open).
 
 ### M9 – "Blocks free" is garbage for read-only configurations
 
-`rom_dirload_sm_freelow` → `rom_space_maxspace` uses area 0's size
+`rom_dirload_sm_freelow` (`lib-efs-dirlist.s:800`) → `rom_space_maxspace` uses area 0's size
 (0 in the test config, `$ff` in the default config). It subtracts
 `$1800` and all file sizes, and shows the negative result.
 
-*Reproduced*: test cartridge with `areas = 1` → `64067 BLOCKS FREE.`
+*VICE*: test cartridge patched to `areas = 1` → the directory ends with
+`64067 BLOCKS FREE.` (save correctly returns `$05`).
 
 *Fix*: show 0 blocks free when `areas` ≠ 3.
 
 ### M10 – No recovery from interrupted operations
 
-*By code.*
+*By code*, except `EFS_validate`, which is confirmed in VICE.
 
 - **Interrupted defragment** (reset or power loss after the copy, before
   the erase): both areas then contain a directory.
   `rom_config_prepare_config` picks area 1 whenever its first entry is
   used, so the old area may stay active. The directory listing shows
   both r/w areas. The next defragment copies into a non-erased area,
-  where all writes fail, and the errors are ignored (rw.s:731).
+  where all writes fail, and the errors are ignored
+  (`rom_defragment_copy_data`, `lib-efs-rw.s:722`).
 - **Unclosed write file** (reset during chrout): the size stays
   `$ffffff`. Every later save then computes its position from this
   entry, and space calculations break.
-- **`EFS_validate`** (`lib-efs.s:338-343`) only loads A = 5 and returns
-  with C unchanged. The manual says it returns C set on corruption, so
+- **`EFS_validate`** (`lib-efs.s:377`) only loads A = 5 and returns
+  with C unchanged. *VICE*: called with C clear → A = 5, C clear; called
+  with C set → A = 5, C set. The manual says it returns C set on corruption, so
   callers that follow the manual ("call EFS_defragment if EFS_validate
   returns an error") may never or always defragment, depending on C at
   call time.
@@ -532,7 +544,8 @@ returns error 3 (not open).
 
 *By code.* In `rom_defragment_copy_data` the loop reads the source with
 `lda abs,y` and Y = 0 (`efs_init_readef_rely`). The warning callback is
-called from `rom_defragment_copy_data_destinc` inside that loop. A
+called from `rom_defragment_copy_data_destinc` (`lib-efs-rw.s:755`)
+inside that loop, via `jmp (zp_var_x5)` (`lib-efs.s:1136`, `:1174`). A
 callback that changes Y makes all following reads use the wrong address.
 Neither the manual nor `efs-config.s` says that the callbacks must
 preserve X and Y.
@@ -544,43 +557,46 @@ helpers.
 
 ## Minor
 
-- **m1 – long names** (`lib-efs.s:2018-2066`, `rom_dirsearch_checkname`).
+- **m1 – long names** (`lib-efs.s:1993`, `rom_dirsearch_checkname`).
   A name longer than 16 characters is compared beyond the name field. If
   the mismatch happens after the 16th character, the `@next` loop
   (`cpx #$10`) never terminates normally and advances the read pointer by
   up to 256 bytes, skipping directory entries. Names > 16 should be
   rejected (or truncated) up front. The same applies to
-  `rom_dirload_checkname`. The test with a 17-character name returned
-  "not found" without a crash.
+  `rom_dirload_checkname` (`lib-efs-dirlist.s:480`). In VICE, loading
+  the 17-character name `DATA567890123456X` (first 16 characters match
+  an existing file) returned "not found" without a crash. The skipped
+  entries only matter when the wanted file comes after the mismatch.
 - **m2 – directory bounds.** `rom_dirsearch_find` only checks the
-  directory boundary for non-deleted entries (`lib-efs.s:2097-2104`). A
+  directory boundary for non-deleted entries (`lib-efs.s:2060`ff). A
   directory filled to the end with deleted entries is scanned into the
-  file data. `rom_dirload_checkboundary` (`dirlist.s:430-433`)
+  file data. `rom_dirload_checkboundary` (`lib-efs-dirlist.s:427`)
   hard-codes `$b8`, which is only correct for directories at `$a000`.
   The r/w directories at `$8000` end at `$9800`.
 - **m3 – stale "active file" area.** `rom_filesave_blockedspace`
-  (`rw.s:1162`) uses `rom_config_get_area_dirhigh_active_file`, but
+  (`lib-efs-rw.s:1163`) uses `rom_config_get_area_dirhigh_active_file`, but
   during `rom_filesave_conditions` the file-area bits still describe the
   previously opened file. It should use `rom_config_get_area_dirhigh`.
   This only affects the bounds check.
-- **m4 – erase count.** `rom_defragment_erasearea` uses `size >> 3` as
+- **m4 – erase count.** `rom_defragment_erasearea` (`lib-efs-rw.s:430`) uses `size >> 3` as
   the loop counter. A configured size below 8 gives 0, and the loop then
   runs 256 times (erasing everything from the area start through the
   wrapped bank numbers, including bank 0). Sizes are not validated.
-- **m5 – hard-coded bases.** `rom_defragment_copy_dir` stores
+- **m5 – hard-coded bases.** `rom_defragment_copy_dir` (`lib-efs-rw.s:687`) stores
   `offset_high = pointer − $80` (or `− $a0` for hhhh) instead of
   `pointer − files_high`. `rom_filesave_begin` uses the directory bank as
   the files bank for the first file. Both only work because the test
   config has `dir bank = files bank` and `dir high = files high`.
-- **m6 – end address.** LOAD returns the address of the last byte
-  (X/Y = `$3000` for a 1-byte file at `$3000`). The KERNAL returns the
+- **m6 – end address** (*confirmed in VICE*). LOAD returns the address
+  of the last byte (X/Y = `$3000` for the 1-byte file `DATA1` loaded to
+  `$3000`). The KERNAL returns the
   address after the last byte. BASIC-style code (e.g. setting `$2d/$2e`)
   must add 1. The manual should state this explicitly.
 - **m7 – smaller inconsistencies**
   - Verify mismatch returns C set with A = 0. Only `readst` tells
     `$10`.
   - Status `$80` ("file in r/w area") is overwritten by EOF (`$40`) on
-    LOAD.
+    LOAD. *Confirmed in VICE* (`readst` = `$40` after loading `DELME15`).
   - `rom_command_begin` permanently moves `filename_address` /
     `filename_length` past the command prefix, so a second call without
     `setnam` uses the bare name.
@@ -589,9 +605,13 @@ helpers.
   - The dirlist type table (`dirlist.s:380-392`) has 12 entries. Type
     values `$10-$1e` index past it.
   - `EFS_chrin` after EOF returns C set with A = 0 and no error code.
-  - `EFS_chrout` destroys X (`rom_chrout_body` starts with `tax`); the
-    KERNAL `CHROUT` preserves X and Y. Found while writing the C5 test.
-  - Open for writing reserves `$2000` + 2 bytes. With less free space
+  - `EFS_chrout` destroys X (`rom_chrout_body`, `lib-efs-rw.s:202`,
+    starts with `tax`); the KERNAL `CHROUT` preserves X and Y.
+    *Confirmed in VICE* (X = `$5a` before, `$00` after `chrout $00`).
+  - On "disk full", `EFS_chrout` returns A = `$40` (the status value,
+    `lib-efs-rw.s:252`) instead of the error code `$48`; `error_byte` is
+    correct. *Confirmed in VICE* (C4 test).
+  - Open for writing reserves `$2000` + 2 bytes (`lib-efs-rw.s:381`). With less free space
     `open` fails ("disk full") even for small files. Larger files can be
     written as long as the area has room.
   - Loading into `$d000-$dfff` while I/O is visible (or over the EAPI
@@ -603,16 +623,19 @@ helpers.
 ## Documentation (D1)
 
 - `docs/manual.md` configuration table: bytes `39-3f` are "unused", but
-  the default config in `lib-efs.s:194-196` and `libefs_config` define
+  the default config in `lib-efs.s:208-211` and `libefs_config` define
   `actcall`/`actvector` there (marked "not implemented").
 - `docs/manual.md`, `EFS_validate`: says C is set on corruption, while
   the code is a stub (see M10).
 - `docs/memory.txt` still shows the old `LIB`/`EFS` configuration layout
   and old zero page notes.
-- `lib-efs.i`: comment "bit 5 and 6" for `LIBEFS_FLAGS_FILE_AREA0` is
+- `lib-efs.i:85`: comment "bit 5 and 6" for `LIBEFS_FLAGS_FILE_AREA0` is
   wrong (bits 4 and 5).
-- PR #1's explanation in `lib-efs.s:1110-1117` is wrong (see C1) and
-  should be removed together with the code.
+- `docs/manual.md` does not describe the end address convention of
+  `EFS_load` (m6), the new "command done" channel state after a scratch
+  (C8), or the `$1e` error of `EFS_save` for invalid ranges (C7).
+- (Done) PR #1's wrong explanation in `lib-efs.s` was removed with the C1
+  fix.
 
 ---
 
@@ -643,23 +666,59 @@ ll, lh and hh mode. All files resolve to the correct data.
 
 ---
 
-## Suggested order of fixes
+## Fix history and suggested order for the rest
 
-1. C1 + C2 (defragment unusable; one revert plus one instruction).
-2. C4 + C5 (flash corruption of the library itself).
-3. C3 (data corruption with mixed banking modes).
-4. C6, C7, C8, M1, M2 (simple branch fixes).
-5. M3-M9, then robustness (M10/M11) and the minor items.
+Fixed on `main`, each verified in VICE:
 
-Most critical items are one-instruction branch errors (`bne` instead of
-`bcc`, `beq` instead of `bne`) or flag-handling errors. A regression test
-in an emulator should cover them, see below.
+| commit | items |
+| ------ | ----- |
+| `564eb31` | C1, C2 |
+| `f208146` | C3 |
+| `eea4b14` | C4 |
+| `40bef68` | C5 |
+| `337ed59` | C6 |
+| `9c0dd25` | C7, M7 |
+| `ae9949a` | C8 |
+
+Most of the critical items were one-instruction branch or flag errors
+(`bne` instead of `bcc`, `beq` instead of `bne`, `plp` restoring the
+wrong flags).
+
+Suggested order for the remaining items:
+
+1. M1, M2, M3, M4, M8: small, local fixes in the command and load/save
+   entry code. M3 can scratch the wrong file.
+2. M5 (zero page) and M6 (MiniEAPI writes): API contract.
+3. M9 and the `chrout` return value / X register (m7).
+4. M11 (save X/Y around the callbacks), then robustness (M10:
+   `EFS_validate`, recovery after an interrupted defragment).
+5. Remaining minor items, documentation (D1), tools and test cartridge
+   (T1-T12).
 
 ## How the findings were verified
 
-The library was built with the installed cc65 (`make
-build/ef/test-libefs.bin`, default `BANKMODE=ll`, plus an `lh` build). The
-resulting 1 MB cartridge image was run in a small Python harness:
+**VICE (current method).** The test cartridge (`make
+build/test-libefs.crt`) is run in VICE 3.9 (`x64sc`, warp mode, headless
+via `xvfb-run`) and controlled through the remote monitor. Two drivers
+in the gitignored `work/` folder use only the Python standard library:
+
+- `work/vrun.py` types keys into the test menu and takes screenshots.
+- `work/vprg.py` loads a small ca65 test program into the running
+  menu, starts it with `g`, waits for its "done" flag and reads back its
+  result bytes.
+
+The test programs are `work/c4test.s` … `work/c8test.s` for the fixes,
+and `work/reeval.s` for the re-evaluation of the open items. Each fix
+was compared against a build without the fix (control).
+
+Pitfall: VICE writes the flash contents back into the `.crt` on exit
+(EasyFlash write-back). The drivers therefore run a throwaway copy with
+`+easyflashcrtwrite`. For the C8 test, write-back was used on purpose and
+the written cartridge was compared with the original by
+`work/crtdiff.py`.
+
+**Initial review (historical).** The first round of findings was
+reproduced with a one-off Python emulator built for the review:
 
 - the `py65` 6502 core;
 - C64 `$01` and PLA mapping for 16k, 8k, ultimax and cartridge-off modes;
@@ -667,13 +726,8 @@ resulting 1 MB cartridge image was run in a small Python harness:
 - two AM29F040 flash chips with the unlock, program, sector-erase and
   autoselect command state machine (programming can only clear bits).
 
-It runs the original EAPI driver and libefs code unchanged and calls the
-public entry points like a program would. It stops on illegal opcodes,
-on code executed from ROM while `$de00 ≠ 0`, and on endless loops. The
-harness was a one-off review aid and is not part of the repository.
-Regression tests for libefs are to be done in VICE only.
-
-C1 and C3 were cross-checked in VICE 3.9 (`x64sc`) with the real
-`build/test-libefs.crt`. Keystrokes were fed into the KERNAL keyboard
-buffer through the remote monitor, and screenshots were taken after the
-operation.
+It ran the original EAPI driver and libefs code unchanged and called
+the public entry points like a program would. It is not part of the
+repository and was not used for anything after the initial review.
+Every item marked "confirmed" or "fixed" has since been reproduced in
+VICE. Regression tests for libefs are to be done in VICE only.
