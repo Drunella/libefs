@@ -36,7 +36,7 @@ refer to the original code.
 | M1 | major | **fixed** | Verify flag is never cleared; every later load is a verify |
 | M2 | major | **fixed** | Scratch errors (write protected, write error) are returned with C clear |
 | M3 | major | **fixed** | Command prefix parsing loses the carry: wrong name pointer when the name crosses a page |
-| M4 | major | confirmed | Drive-number check accepts `'`…`0` instead of `0`…`9` |
+| M4 | major | **fixed** | Drive-number check accepts `'`…`0` instead of `0`…`9` |
 | M5 | major | confirmed | `EFS_close` (write), `EFS_defragment` and `EFS_format` clobber zero page `$35-$3f` |
 | M6 | major | confirmed | `EFS_save` with MiniEAPI reports success but writes nothing |
 | M7 | major | **fixed** | Zero-length save returns a garbage error code (low byte of the end address) |
@@ -484,10 +484,25 @@ The accepted range is `$27`-`$30` (`'`, `(`, `)`, `*`, `+`, `,`, `-`, `.`,
 `/`, `0`), not `0`-`9`.
 
 *VICE*: `load "$1:*"` → `$04` (searched as a file name instead of being
-a directory command); `load "/:DATA1"` → `$1e` (`/` accepted as drive
-number, then "syntax error").
+a directory command).
+
+Correction: the earlier example `"/:DATA1"` was wrong. There the `:` is at
+position 1, so this is the one-character command form `/:` and the drive
+number check is not involved (`$1e` before and after the fix). Wrongly
+*accepted* prefixes are three-character ones such as `"$/:"` or `"S.:"`.
 
 *Fix*: `sec; sbc #$30; cmp #$0a; bcs @nomatch`.
+
+**Fixed**: the check is now `sec; sbc #$30; cmp #$0a; bcs @nomatch`.
+
+Verified in VICE (`work/m4test.s`, `work/m4ctest.s`):
+
+| case | fixed | before the fix |
+| ---- | ----- | -------------- |
+| `load "$1:*"` | directory | `$04` not found |
+| `open "S1:DELME642"` | `$01` scratched | `$04` (taken as a file name) |
+| `load "$9:DELME64*"` after the scratch | listing with `DELME640`, `DELME641` | `$04` not found |
+| `load "0:DATA1"` | `$1e` (command `0`) | same |
 
 ### M5 – Zero page `$35-$3f` is not preserved by some calls
 
@@ -718,6 +733,7 @@ Fixed on `main`, each verified in VICE:
 | "Fix verify flag staying set after a verify" | M1 |
 | "Report scratch errors with carry set" | M2 |
 | "Fix command prefix parsing for names crossing a page" | M3 |
+| "Fix drive number check in command prefixes" | M4 |
 
 Most of the critical items were one-instruction branch or flag errors
 (`bne` instead of `bcc`, `beq` instead of `bne`, `plp` restoring the

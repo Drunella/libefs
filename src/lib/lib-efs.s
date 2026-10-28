@@ -1524,12 +1524,12 @@
         cmp (zp_var_xe), y
         beq @match
 
-        ; check for a number: 0 < n <= x <= m < $ff
-        lda (zp_var_xe), y    ; no fit
-        clc
-        adc #$ff - $30        ; lower bound $30
-        adc #$39 - $30 + $01  ; upper bound $39
-        bcc @nomatch          ; .C clear -> not in range
+        ; check for a drive number: $30 (0) <= x <= $39 (9)
+        lda (zp_var_xe), y
+        sec
+        sbc #$30              ; "0"
+        cmp #$0a              ; 10 digits
+        bcs @nomatch          ; .C set -> not a digit
 
         ; check for ':'
         iny
