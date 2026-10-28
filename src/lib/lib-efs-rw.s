@@ -823,6 +823,10 @@
         jsr rom_config_rw_available   ; maybe check earlier?
         bcs @error
 
+        ; check address range: end address must be above start address
+        jsr rom_filesave_checkzero
+        bcs @error
+
         ; init read_ef
         jsr rom_space_setdirstart
 
@@ -831,15 +835,10 @@
         jsr rom_space_usedspace
         jsr rom_filesave_addsize
         jsr rom_filesave_checksize
-        bcc @check1
+        bcc @check2
         lda #ERROR_DISK_FULL
         jmp @error
 
-      @check1:
-        ; check file size zero
-        jsr rom_filesave_checkzero
-        bcs @error
-        
       @check2:
         ; check conditions
         jsr rom_filesave_freedirentries  ; free disk entries
@@ -998,21 +997,24 @@
 
 
     rom_filesave_checkzero:
-        ; fill size: io_end_address - io_start_address
+        ; checks the address range: io_end_address (exclusive) must be
+        ; above io_start_address
+        ; returns .C clear if ok, .C set and A = error code if the range is
+        ; empty (end = start) or negative (end < start)
         lda io_end_address + 1    ; Val1 + 1    ; high bytes
         cmp io_start_address + 1  ; Val2 + 1
-        bcc @LsThan    ; hiVal1 < hiVal2 --> Val1 < Val2
-        bne @GrtEqu    ; hiVal1 != hiVal2 --> Val1 > Val2
+        bcc @invalid   ; hiVal1 < hiVal2 --> Val1 < Val2
+        bne @valid     ; hiVal1 != hiVal2 --> Val1 > Val2
         lda io_end_address        ; Val1       ; low bytes
         cmp io_start_address      ; Val2
-        beq @Equal     ; Val1 = Val2
-        ;bcs @GrtEqu     ; loVal1 >= loVal2 --> Val1 >= Val2
-      @GrtEqu:
-      @LsThan:
+        beq @invalid   ; Val1 = Val2
+        bcc @invalid   ; loVal1 < loVal2 --> Val1 < Val2
+      @valid:
         clc
         rts
 
-      @Equal:
+      @invalid:
+        lda #ERROR_SYNTAX_ERROR_30
         sec
         rts
 

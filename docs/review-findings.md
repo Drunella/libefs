@@ -27,7 +27,7 @@ in [architecture.md](./architecture.md).
 | C4 | critical | **fixed** | chrout-writing past the end of the last area wraps to bank 0 and overwrites libefs in flash |
 | C5 | critical | **fixed** | `EFS_chrout` keeps writing after "disk full" / EOF |
 | C6 | critical | **fixed** | `EFS_save` stores a wrong size when (end − start) mod 256 = 255; the file is corrupt |
-| C7 | critical | confirmed | `EFS_save` with end < start writes a ~64K garbage file |
+| C7 | critical | **fixed** | `EFS_save` with end < start writes a ~64K garbage file |
 | C8 | critical | confirmed | `open(1)` with an `S:` command followed by `close` programs flash at a garbage address |
 | M1 | major | confirmed | Verify flag is never cleared; every later load is a verify |
 | M2 | major | confirmed | Scratch errors (write protected, write error) are swallowed, and the channel stays open |
@@ -35,7 +35,7 @@ in [architecture.md](./architecture.md).
 | M4 | major | confirmed | Drive-number check accepts `'`…`0` instead of `0`…`9` |
 | M5 | major | confirmed | `EFS_close` (write), `EFS_defragment` and `EFS_format` clobber zero page `$35-$3f` |
 | M6 | major | confirmed | `EFS_save` with MiniEAPI reports success but writes nothing |
-| M7 | major | confirmed | Zero-length save returns a garbage error code (low byte of the end address) |
+| M7 | major | **fixed** | Zero-length save returns a garbage error code (low byte of the end address) |
 | M8 | major | confirmed | `EFS_save` while a file is open returns "file open" but closes that file |
 | M9 | major | confirmed | "Blocks free" is garbage for read-only configurations |
 | M10 | major | by code | No recovery from an interrupted defragment or an unclosed write file; `EFS_validate` is a stub that does not even set C |
@@ -326,6 +326,22 @@ directory entry has size 65282.
 
 *Fix*: return C set for end < start (`ERROR_SYNTAX_ERROR_30` or similar).
 
+**Fixed** together with M7: `rom_filesave_checkzero` now rejects
+end < start (in both the high and the low byte) and end = start with
+C set and A = `ERROR_SYNTAX_ERROR_30` (`$1e`). It also runs before the
+free-space checks, so an invalid range is reported as such and not as
+"disk full".
+
+Verified in VICE with `work/c7test.s` (5 saves, each loaded back and
+compared) and `work/c7ctl.s` (one invalid save, then the directory):
+
+| case | fixed | before the fix (control) |
+| ---- | ----- | ------------------------ |
+| `$4080`-`$4010` (end < start, same page) | `$1e`, C set, no file | accepted (A = 0, C clear); directory shows `V0`, blocks free 728 → 472 |
+| `$4100`-`$4000` (end < start, page below) | `$1e`, C set, no file | – |
+| `$4012`-`$4012` (empty) | `$1e`, C set, no file (was: A = `$12`, see M7) | – |
+| `$4000`-`$4001`, `$40f0`-`$4110` | saved, loaded back, 0 mismatches | – |
+
 ### C8 – `open` for writing with an `S:` command, then `close`, writes to flash
 
 `src/lib/lib-efs.s:1606-1614` and `src/lib/lib-efs-rw.s:409-414`.
@@ -449,6 +465,8 @@ byte of `io_end_address`. `rom_filesave_conditions` stores A in
 `error_byte`.
 
 *Reproduced*: save `$4012-$4012` → A = `$12`, C = 1.
+
+**Fixed** with C7: A = `ERROR_SYNTAX_ERROR_30` (`$1e`).
 
 ### M8 – `EFS_save` while a file is open closes that file
 
