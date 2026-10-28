@@ -23,7 +23,7 @@ in [architecture.md](./architecture.md).
 | -- | -------- | ------ | ----------------- |
 | C1 | critical | **fixed** | Defragment crashes: callback "fix" from PR #1 switches the ROM bank under running code |
 | C2 | critical | **fixed** | `rom_config_get_value` returns the caller's flags, so `dfcall = 0` is ignored and the callbacks jump through `$0000` |
-| C3 | critical | confirmed | Defragment between areas with different banking modes corrupts every file that crosses a bank |
+| C3 | critical | **fixed** | Defragment between areas with different banking modes corrupts every file that crosses a bank |
 | C4 | critical | confirmed | chrout-writing past the end of the last area wraps to bank 0 and overwrites libefs in flash |
 | C5 | critical | confirmed | `EFS_chrout` keeps writing after "disk full" / EOF |
 | C6 | critical | confirmed | `EFS_save` stores a wrong size when (end − start) mod 256 = 255; the file is corrupt |
@@ -175,6 +175,20 @@ defragment (0), verify (2)":
 *Fix*: keep the source mode separately and use it in `sourceinc`.
 `efs_temp_var1` was apparently intended for this; see the comment in
 `rom_defragment_copy`.
+
+**Fixed**: `rom_defragment_copy` stores the source area's banking mode
+in `efs_temp_var1` (the previously commented-out code), and
+`rom_defragment_copy_data_sourceinc` uses it instead of `zp_var_x7`.
+
+Verified in VICE. Sequence: load `delme17k`, defragment, verify,
+defragment, verify. That copies in both directions, `llll` → `hhhh` and
+back.
+
+| Cartridge | Result |
+| --------- | ------ |
+| `ll` build, fixed | both defragments `rt=0`, both verifies `rt=0 st: $40` |
+| `ll` build before the fix (control) | verify mismatch `st: $10` after the first defragment |
+| `lh` build, fixed (regression) | both defragments and both verifies OK |
 
 ### C4 – Writing with chrout past the area end overwrites libefs in bank 0
 

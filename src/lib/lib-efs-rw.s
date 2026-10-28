@@ -558,9 +558,8 @@
         jsr rom_config_get_area_dirhigh    ; defragment is not file based
         sta efs_readef_high
 
-;        jsr rom_config_get_area_mode
-;        lda #BANKING_MODE
-;        sta efs_temp_var1
+        jsr rom_config_get_area_mode       ; banking mode of the source area
+        sta efs_temp_var1                  ; used by rom_defragment_copy_data_sourceinc
 
         ; prepare destination
         pla  ; new area
@@ -779,19 +778,20 @@
 
 
     rom_defragment_copy_data_sourceinc:
-        ; increases source file address according to mode (zp_var_x7)
+        ; increases source file address according to the source mode
+        ; (efs_temp_var1), which can differ from the destination mode (zp_var_x7)
         ; inc to next position
         inc efs_readef_low  ; addr low
         bne @noinc
 
         ; inc page
         inc efs_readef_high  ; addr high
-        lda zp_var_x7    ; mode
+        lda efs_temp_var1    ; source mode
         and #$e0
         cmp efs_readef_high  ; addr high
         bne @noinc
         ; inc bank
-        lda zp_var_x7    ; mode
+        lda efs_temp_var1    ; source mode
         asl
         asl
         asl
