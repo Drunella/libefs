@@ -1346,7 +1346,7 @@
         lda #$02  ; add for the address
         adc zp_var_xb  ; add to size
         sta zp_var_xb
-        bne :+
+        bcc :+         ; carry into the middle byte
         inc zp_var_xc
         bne :+
         inc zp_var_xd

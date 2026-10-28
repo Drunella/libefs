@@ -26,7 +26,7 @@ in [architecture.md](./architecture.md).
 | C3 | critical | **fixed** | Defragment between areas with different banking modes corrupts every file that crosses a bank |
 | C4 | critical | **fixed** | chrout-writing past the end of the last area wraps to bank 0 and overwrites libefs in flash |
 | C5 | critical | **fixed** | `EFS_chrout` keeps writing after "disk full" / EOF |
-| C6 | critical | confirmed | `EFS_save` stores a wrong size when (end − start) mod 256 = 255; the file is corrupt |
+| C6 | critical | **fixed** | `EFS_save` stores a wrong size when (end − start) mod 256 = 255; the file is corrupt |
 | C7 | critical | confirmed | `EFS_save` with end < start writes a ~64K garbage file |
 | C8 | critical | confirmed | `open(1)` with an `S:` command followed by `close` programs flash at a garbage address |
 | M1 | major | confirmed | Verify flag is never cleared; every later load is a verify |
@@ -294,6 +294,25 @@ size 1 instead of 257. Loading it back does not return the data.
 
 *Fix*: `bcc :+` / `inc zp_var_xc` / `bne :+` / `inc zp_var_xd`.
 `rom_filesave_addsize` already does it right.
+
+**Fixed**: `bne :+` → `bcc :+` after adding the 2 bytes for the load
+address.
+
+Verified in VICE with `work/c6test.s`. It saves 6 files from a pattern
+with data lengths 255, 254, 511, 256, 1 and 767 (in this order). It then
+loads each one back relocated to `$5000`, compares every byte, and
+checks the end address and that the byte after the file is untouched.
+
+| length | fixed | before the fix (control) |
+| ------ | ----- | ------------------------ |
+| 255 | OK, end `$50fe`, 0 mismatches | end `$4fff` (recorded size 1), 254 mismatches |
+| 254 | OK | **save fails with write error `$19`**: the previous file wrote 257 bytes but recorded 1, so the next file was placed on already written flash |
+| 511 | OK | 255 mismatches (same bug, length mod 256 = 255) |
+| 256, 1 | OK | OK |
+| 767 | OK | 255 mismatches |
+
+So the bug corrupts the saved file, and also every following save into
+the same area until the next defragmentation.
 
 ### C7 – `EFS_save` with end < start is not rejected
 
