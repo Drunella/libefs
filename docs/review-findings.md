@@ -34,7 +34,7 @@ refer to the original code.
 | C7 | critical | **fixed** | `EFS_save` with end < start writes a ~64K garbage file |
 | C8 | critical | **fixed** | `open(1)` with an `S:` command followed by `close` programs flash at a garbage address |
 | M1 | major | **fixed** | Verify flag is never cleared; every later load is a verify |
-| M2 | major | confirmed | Scratch errors (write protected, write error) are returned with C clear |
+| M2 | major | **fixed** | Scratch errors (write protected, write error) are returned with C clear |
 | M3 | major | confirmed | Command prefix parsing loses the carry: wrong name pointer when the name crosses a page |
 | M4 | major | confirmed | Drive-number check accepts `'`…`0` instead of `0`…`9` |
 | M5 | major | confirmed | `EFS_close` (write), `EFS_defragment` and `EFS_format` clobber zero page `$35-$3f` |
@@ -424,6 +424,20 @@ pointer.)
 
 *VICE*: `open "S:DATA1"` (area 0) → A = `$1a`, C clear.
 
+**Fixed**: `rom_command_process` now checks the carry from
+`rom_scratch_process`. On an error it takes the normal error path: the
+channel is closed and the error is returned with C set. On success the
+channel goes into the "command done" state (C8) as before.
+
+Verified in VICE (`work/m2test.s`):
+
+| case | fixed | before the fix |
+| ---- | ----- | -------------- |
+| `open "S:DATA1"` (area 0) | `$1a`, C set; channel closed (`chrin`/`close` → `$03`) | `$1a`, C clear |
+| `open(1) "S:DATA1*"` (area 0) | `$1a`, C set | `$1a`, C clear |
+| `open "S0:DELME15"` | `$01`, C clear; `close` OK | same |
+| same again (already scratched) | `$04`, C set | same |
+
 ### M3 – Command prefix: carry lost when advancing the name pointer
 
 `src/lib/lib-efs.s:1546-1551` (`rom_command_begin`), same pattern as C6:
@@ -691,6 +705,7 @@ Fixed on `main`, each verified in VICE:
 | `9c0dd25` | C7, M7 |
 | `ae9949a` | C8 |
 | "Fix verify flag staying set after a verify" | M1 |
+| "Report scratch errors with carry set" | M2 |
 
 Most of the critical items were one-instruction branch or flag errors
 (`bne` instead of `bcc`, `beq` instead of `bne`, `plp` restoring the

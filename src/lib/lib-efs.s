@@ -1585,7 +1585,7 @@
         jsr efs_directory_search
         bcs @error     ; not found
         jsr rom_scratch_process
-        ; error and .C set in rom_scratch_process, may continue
+        bcs @error     ; write protected or write error: close, report error
         lda #STATE_COMMAND_DONE  ; operation finished: no read/write
         sta internal_state       ; channel, close must not write anything
         jmp @stop  ; error_byte is set to 1, due to scratch
