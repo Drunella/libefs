@@ -37,7 +37,7 @@ refer to the original code.
 | M2 | major | **fixed** | Scratch errors (write protected, write error) are returned with C clear |
 | M3 | major | **fixed** | Command prefix parsing loses the carry: wrong name pointer when the name crosses a page |
 | M4 | major | **fixed** | Drive-number check accepts `'`…`0` instead of `0`…`9` |
-| M5 | major | confirmed | `EFS_close` (write), `EFS_defragment` and `EFS_format` clobber zero page `$35-$3f` |
+| M5 | major | **fixed** | `EFS_close` (write), `EFS_defragment` and `EFS_format` clobber zero page `$35-$3f` |
 | M6 | major | confirmed | `EFS_save` with MiniEAPI reports success but writes nothing |
 | M7 | major | **fixed** | Zero-length save returns a garbage error code (low byte of the end address) |
 | M8 | major | **fixed** | `EFS_save`/`EFS_load` while a file is open return "file open" but close or corrupt that file |
@@ -520,6 +520,21 @@ Verified in VICE (`work/m4test.s`, `work/m4ctest.s`):
 | `EFS_defragment` | 11 (all) |
 | `EFS_format` | 5 |
 
+**Fixed**: `rom_close_body` backs up and restores the zero page around
+`rom_filesave_chrin_close`. The ROM entries `EFS_defragment` and
+`EFS_format` now go through `efs_defragment_entry`/`efs_format_entry`,
+which do the same. `restore_zeropage_keep_ac` keeps A and C of the
+result.
+
+Verified in VICE (`work/m5test.s`), counting changed bytes in `$35-$3f`:
+
+| call sequence | fixed | before the fix |
+| ------------- | ----- | -------------- |
+| open(1) / chrout / close | 0 | 2 |
+| open(0) / chrin / close | 0 | 0 |
+| `EFS_defragment` (result OK, file loads back afterwards) | 0 | 11 |
+| `EFS_format` (result OK, file gone afterwards) | 0 | 5 |
+
 These locations are BASIC/KERNAL temporaries, and cc65 programs or games
 may use them as well. Load, save, open and chrin restore them, so callers
 will assume close does too.
@@ -754,6 +769,7 @@ Fixed on `main`, each verified in VICE:
 | "Fix command prefix parsing for names crossing a page" | M3 |
 | "Fix drive number check in command prefixes" | M4 |
 | "Keep open files intact when load or save is rejected" | M8 |
+| "Preserve zero page in close, defragment and format" | M5 |
 
 Most of the critical items were one-instruction branch or flag errors
 (`bne` instead of `bcc`, `beq` instead of `bne`, `plp` restoring the

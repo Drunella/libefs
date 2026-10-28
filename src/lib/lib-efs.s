@@ -169,11 +169,11 @@
 
     EFS_defragment: ; @ $8009
         ; defragments the rw area
-        jmp rom_defragment_body
+        jmp efs_defragment_entry
 
     EFS_format: ; @ $800c
         ; initializes (erases) the rw area
-        jmp rom_format_body
+        jmp efs_format_entry
 
     EFS_validate: ; @ $800f
         ; parameter: none
@@ -246,6 +246,30 @@
         dex
         bpl :-
         rts
+
+
+    restore_zeropage_keep_ac:
+        ; restore the zero page, keep A and .C (result of the operation)
+        php
+        pha
+        jsr restore_zeropage
+        pla
+        plp
+        rts
+
+
+    efs_defragment_entry:
+        ; EFS_defragment and EFS_format are called directly in ROM (not via
+        ; the IO2 trampoline), so they back up the zero page themselves
+        jsr backup_zeropage
+        jsr rom_defragment_body
+        jmp restore_zeropage_keep_ac
+
+
+    efs_format_entry:
+        jsr backup_zeropage
+        jsr rom_format_body
+        jmp restore_zeropage_keep_ac
 
 
     efs_init_body:
@@ -717,7 +741,7 @@
 
 
     rom_close_body:
-        ; no zeropage
+        ; zeropage only when closing a written file (backed up there)
         clc
         lda #$00
         ;sta status_byte  ; don'k kill the status on close
@@ -733,7 +757,9 @@
         bit internal_state  ; we check for bit 7/6 == 1/1
         bpl @next  ; branch if bit 7 is clear
         bvc @next  ; branch if bit 6 is clear
+        jsr backup_zeropage
         jsr rom_filesave_chrin_close
+        jsr restore_zeropage_keep_ac
 
       @next:
         lda #$00
