@@ -32,7 +32,7 @@ CC65FLAGS=-t $(TARGET) -O
 #LD65FLAGS=
 
 .SUFFIXES: .prg .s .c
-.PHONY: clean all testef testprg libefs mrproper
+.PHONY: clean all testef testprg libefs mrproper test
 
 EF_MENU_FILES=build/ef/menu.o build/ef/util.o build/ef/efs-wrapper.o build/ef/version.o
 EF_DIREFS_FILES=build/prg/direfs.o
@@ -63,6 +63,11 @@ build/%.s: src/%.c
 build/%.o: build/%.s
 	@mkdir -p ./build/lib ./build/ef
 	$(CA65) $(CA65FLAGS) -D BANKMODE=$(BANKMODE_VALUE) -g -o $@ $<
+
+# regression tests in VICE (needs x64sc, cartconv, the C64 ROMs and xvfb-run
+# without a display); see tests/vice/run.py
+test: build/test-libefs.crt
+	tests/vice/run.py $(TESTFLAGS)
 
 clean:
 	rm -rf build/lib
@@ -132,7 +137,7 @@ build/ef/efs.dir.prg build/ef/efs.files.prg: build/ef/files.list build/ef/menu.p
 	tools/mkefs.py -v -m lh -u -s 507904 -l ./build/ef/files.list -f . -d ./build/ef
 
 # test files (the menu is added last, hidden)
-build/ef/files.list: build/ef/menu.prg
+build/ef/files.list: build/ef/menu.prg Makefile
 	@mkdir -p ./build/files
 	rm -f ./build/ef/files.list
 	./tools/mkdata.py -f build/files/data1.prg -a 0x4000 -s 1 >> build/ef/files.list
@@ -159,7 +164,7 @@ build/ef/efs-rw.dir.prg build/ef/efs-rw.files.prg: build/ef/files-rw.list Makefi
 	tools/mkefs.py -v -u -s 256000 -o 6144 -m $(BANKMODE) -b 32 -n efs-rw -l ./build/ef/files-rw.list -f . -d ./build/ef
 
 # test files rw
-build/ef/files-rw.list:
+build/ef/files-rw.list: Makefile
 	@mkdir -p ./build/files
 	rm -f ./build/ef/files-rw.list
 	./tools/mkdata.py -f build/files/delme15.prg -a 0x4000 -s 15 >> build/ef/files-rw.list
