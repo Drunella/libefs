@@ -69,6 +69,7 @@ section; for fixed items they refer to the original code.
 | S15 | minor | **fixed** | `@` in save ignored a failed scratch |
 | S16 | minor | **fixed** | Directory held 254 files instead of 255 |
 | S17 | minor | **fixed** | Garbage error code after the post-defragment check |
+| S19 | minor | **fixed** | `EFS_init_eapi` ignored EAPIInit's result |
 | S12 | minor | **fixed** | Verify end address of a file without data (with S8) |
 | S10-S22 | minor | see section | Exact-fit save, dir `chrin` X/Y, verify end address, name consumed, parser bounds, `@` handling, 254 files, geometry assumptions, commit marker, API nits |
 | S23 | doc | – | Callback and memory rules, activity indication, comment list |
@@ -1185,7 +1186,7 @@ flags `$7f`):
   on a nearly full area fails with "disk full". *By code.*
 - **S19 – `EFS_init_eapi` ignores EAPIInit's result** (`lib-efs.s:376-377`,
   unconditional `clc`): an unsupported flash is reported as success;
-  only the `eapi` signature is checked. *By code.*
+  only the `eapi` signature is checked. *By code.* **Fixed** (by code): C set from EAPIInit is passed on.
 - **S20 – API nits** (*by code* unless noted): `?` matches the NUL
   padding, so `DATA?` matches `DATA` (`lib-efs.s:2040-2056`);
   `setlfs`/`setnam` return `$02` while a channel is open, the KERNAL
@@ -1327,6 +1328,7 @@ Fixed on `main`, each verified in VICE:
 | "Report a failed scratch of the @ overwrite command" | S15 |
 | "Allow 255 directory entries" | S16 |
 | "Return disk full when the post-defragment check fails" | S17 |
+| "Pass on the result of EAPIInit" | S19 |
 
 Most of the critical items were one-instruction branch or flag errors
 (`bne` instead of `bcc`, `beq` instead of `bne`, `plp` restoring the

@@ -374,6 +374,7 @@
         lda #$14  ; low
         sta efs_generic_command + @dest - 1
         jsr efs_generic_command  ; init eapi
+        bcs @leave               ; .C set: eapi reports an unsupported flash
         clc
       @leave:
         pla
