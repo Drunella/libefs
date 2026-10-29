@@ -64,6 +64,7 @@ section; for fixed items they refer to the original code.
 | S9 | major | **fixed** | Type `$1f` entries: terminator for search/dirlist, live file for space/save/defragment |
 | S10 | minor | **fixed** | Exact-fit save was refused |
 | S11 | minor | **fixed** | Directory `chrin` destroyed X and Y |
+| S13 | minor | **fixed** | `EFS_save` consumed the file name (and, since the S6 fix, its pointer) |
 | S12 | minor | **fixed** | Verify end address of a file without data (with S8) |
 | S10-S22 | minor | see section | Exact-fit save, dir `chrin` X/Y, verify end address, name consumed, parser bounds, `@` handling, 254 files, geometry assumptions, commit marker, API nits |
 | S23 | doc | – | Callback and memory rules, activity indication, comment list |
@@ -1129,6 +1130,22 @@ flags `$7f`):
   names > 16). A second `EFS_save` without `setnam` fails with `$08`;
   with `rom_command_begin` also moving `filename_address` (m7), a
   program must call `setnam` before every call. *By code.*
+
+  **Fixed**: the name loop compares Y with `filename_length` instead of
+  decrementing it. While testing this, the S6 fix turned out to have
+  introduced the same problem for the name *pointer*: `rom_save_body`
+  reused `filename_address`/`filename_length` for the entry position, so
+  a second save without `setnam` wrote an entry with a garbage name
+  (`"...T...A.......H"`). The save now keeps the name on the stack during
+  the data transfer and restores it. (After `open(1)` … `close` the name
+  still has to be set again; the chrout path needs the storage between
+  calls.)
+  
+  *VICE* (`work/s13test.s`): save `DUP`, save again without `setnam` →
+  `$3f` file exists, no second entry; a 20-character name is stored as its
+  first 16 characters and loads by that name. Before: the second save
+  created a garbage-named entry. The S6 error path still scratches the
+  entry (`work/s6btest.s`).
 - **S14 – command parser reads past short names.** `rom_command_begin`
   (`lib-efs.s:1538-1570`) inspects name bytes 1-2 regardless of
   `filename_length` and decrements the length Y+1 times without a lower
@@ -1288,6 +1305,7 @@ Fixed on `main`, each verified in VICE:
 | "Treat partially written directory entries consistently" | S9 |
 | "Accept a save that exactly fills the free space" | S10 |
 | "Preserve X and Y in directory chrin" | S11 |
+| "Keep the file name across EFS_save" | S13 |
 
 Most of the critical items were one-instruction branch or flag errors
 (`bne` instead of `bcc`, `beq` instead of `bne`, `plp` restoring the

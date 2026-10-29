@@ -402,6 +402,13 @@
         jsr rom_filesave_transfer_dir
         jsr rom_filesave_transfer_dir_size
 
+        lda filename_length  ; keep the name for a following call: the
+        pha                  ; entry position is kept in its place during
+        lda filename_address + 1  ; the data transfer (error path, S6)
+        pha
+        lda filename_address
+        pha
+
         clc  ; remember the entry (size field, bank) for the error path
         lda efs_readef_low
         adc #21
@@ -413,6 +420,13 @@
         sta filename_length
 
         jsr rom_filesave_transfer_data
+
+        pla  ; restore the name (pla keeps .C; the result is in error_byte)
+        sta filename_address
+        pla
+        sta filename_address + 1
+        pla
+        sta filename_length
         
       @leave:
         php  ; save carry
@@ -1518,17 +1532,17 @@
         lda filename_address + 1
         sta zp_var_xe + 1
 
-        ; write name
+        ; write name (at most 16 characters, padded with 0); the name
+        ; and its length are left untouched for a following call
         ldy #$00  ; filename length
       @loop:
         cpy #16
         beq @done
-        lda filename_length
-        beq @namedone
+        cpy filename_length
+        bcs @namedone  ; y >= length: pad
         lda (zp_var_xe), y
         jsr efs_io_byte
         iny
-        dec filename_length
         jmp @loop
       @namedone:
         lda #$00
