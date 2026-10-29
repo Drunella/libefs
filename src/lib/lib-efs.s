@@ -1568,11 +1568,19 @@
         bne @nomatch
 
       @next1:        
-        ; check for ':'
+        ; check for 'X:' (needs at least 2 characters)
+        lda filename_length
+        cmp #$02
+        bcc @nomatch
         iny
         lda #$3a    ; ':'
         cmp (zp_var_xe), y
         beq @match
+
+        ; check for 'Xn:' (needs at least 3 characters)
+        lda filename_length
+        cmp #$03
+        bcc @nomatch
 
         ; check for a drive number: $30 (0) <= x <= $39 (9)
         lda (zp_var_xe), y

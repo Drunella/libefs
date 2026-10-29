@@ -65,6 +65,7 @@ section; for fixed items they refer to the original code.
 | S10 | minor | **fixed** | Exact-fit save was refused |
 | S11 | minor | **fixed** | Directory `chrin` destroyed X and Y |
 | S13 | minor | **fixed** | `EFS_save` consumed the file name (and, since the S6 fix, its pointer) |
+| S14 | minor | **fixed** | Command parser read past short names |
 | S12 | minor | **fixed** | Verify end address of a file without data (with S8) |
 | S10-S22 | minor | see section | Exact-fit save, dir `chrin` X/Y, verify end address, name consumed, parser bounds, `@` handling, 254 files, geometry assumptions, commit marker, API nits |
 | S23 | doc | – | Callback and memory rules, activity indication, comment list |
@@ -1151,7 +1152,13 @@ flags `$7f`):
   `filename_length` and decrements the length Y+1 times without a lower
   bound: a 2-character name followed by `:` in memory becomes a command
   with `filename_length` = `$ff` (m1 desync, possibly scratching a wrong
-  file); a length of 0 or 1 can pick up stale `0:`. *By code.*
+  file); a length of 0 or 1 can pick up stale `0:`. *By code.* **Fixed**:
+  `rom_command_begin` requires a name of at least 2 (`X:`) or 3 (`Xn:`)
+  characters before it looks at those positions. *VICE*
+  (`work/s14test.s`): empty name with `0:` following in memory →
+  `$08` missing filename (before: `$1e`, parsed as a command); `"S0"`
+  with `:DELME15` following → `$04`, `DELME15` untouched; the M4 prefix
+  tests pass.
 - **S15 – `@` in save ignores the scratch result.**
   `rom_command_save_process` (`rw.s:1687-1696`) falls through regardless
   of C; `@0:X` with X in area 0 ends as `FILE_EXISTS` instead of
@@ -1306,6 +1313,7 @@ Fixed on `main`, each verified in VICE:
 | "Accept a save that exactly fills the free space" | S10 |
 | "Preserve X and Y in directory chrin" | S11 |
 | "Keep the file name across EFS_save" | S13 |
+| "Check the name length before parsing a command prefix" | S14 |
 
 Most of the critical items were one-instruction branch or flag errors
 (`bne` instead of `bcc`, `beq` instead of `bne`, `plp` restoring the
