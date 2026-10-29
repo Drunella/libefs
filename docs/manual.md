@@ -35,7 +35,11 @@ recommended usage is to store small files, eg savegames.
 # Configuration
 
 The configuration describes where the directories and the read/write area
-can be found. It also contains the vectors for defragmentation indication.
+can be found. Limits: the directory and the files of a read/write area
+must start in the same bank and at the same address (the files follow the
+directory, offset $1800); the size of a read/write area must be a multiple
+of 8 (llll, hhhh) or 16 (lhlh) 8k banks; both read/write areas must have
+the same size. The configuration is not validated. It also contains the vectors for defragmentation indication.
 Defragmentation can take a long time, so it is helpful to show some
 progress. In the example the border color flashes.
 
@@ -64,11 +68,19 @@ progress. In the example the border color flashes.
 | 32        | number of banks of area 2 used (must be divisible by 8) |
 | 33        | banking mode of area 2 ($d0: lhlh, $b0: llll, $d4: hhhh) |
 | 34        | call function on defragmentation (1: yes, 0: no) |
-| 35,36     | vector to update defragmentation warning; must be callable while EasyFlash is banked in |
-| 37,38     | vector to the defragmentation all clear function; must be callable while EasyFlash is banked in |
+| 35,36     | vector to update defragmentation warning; see below |
+| 37,38     | vector to the defragmentation all clear function; see below |
 | 39-3f     | unused |
 
 See src/ef/efs-config.s as example.
+
+The defragmentation callbacks are called while the EasyFlash is banked in
+(bank 0, 16k mode, $01 = $37) and must
+* preserve X and Y (A may be changed),
+* not use the zero page $35-$3f,
+* not call any libefs function (not even EFS_readst: its code is used as
+  temporary storage during defragmentation),
+* return with rts.
 
 
 # Initialize
@@ -319,10 +331,37 @@ Error Codes:
 
 # Usage
 
+## Memory access
+
+EFS_save and verify read the C64 memory with the memory configuration
+($01) of the caller: data under the BASIC or KERNAL ROM can only be
+saved or verified with $01 = $35 or $36; the I/O area must stay visible.
+EFS_load writes with $01 = $37: loading into $d000-$dfff writes to the
+I/O registers (and destroys libefs' own variables at $df00), loading
+under the ROMs works.
+
+The file name (EFS_setnam) is kept across EFS_load and EFS_save. After a
+file was written with EFS_open/EFS_chrout/EFS_close the name must be
+set again. EFS_setnam and EFS_util return "file open" ($02) while a
+channel is open; close it first. EFS_load and EFS_save rejected with
+"file open" return X and Y unchanged.
+
+"@0:name" on EFS_save checks the free space before the old file is
+scratched, so an overwrite that would not fit fails with "disk full"
+and keeps the old file.
+
+The build option SHOW_INDICATE_ACTIVITY in src/lib/config.i (default 1)
+changes the border colour on every byte loaded, saved or searched. Set
+it to 0 for a release build.
+
 ## Interrupts
 
-Libefs does not use sei. You have to take care of your interrupts
-beforehand. EAPI uses sei but restores the interrupt flag with plp.
+Libefs does not disable interrupts (except for a few cycles while reading
+the configuration). You have to take care of your interrupts
+beforehand. RUN/STOP+RESTORE during a libefs call (minutes during a
+defragmentation) makes the KERNAL NMI handler jump through ($a002),
+which is the cartridge ROM at that moment: disable the NMI or make sure
+it cannot be triggered. EAPI uses sei but restores the interrupt flag with plp.
 You can block interrupts by calling sei and cli before and after calling
 libefs functions.
 

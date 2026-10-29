@@ -72,8 +72,9 @@ section; for fixed items they refer to the original code.
 | S19 | minor | **fixed** | `EFS_init_eapi` ignored EAPIInit's result |
 | S20 | minor | **partly fixed** | API nits: `?` vs padding, `@0:` on read, blocks free fixed; the rest documented |
 | S12 | minor | **fixed** | Verify end address of a file without data (with S8) |
+| S18, S21, S22 | minor | documented | `@` space check order, geometry limits, commit marker: design decisions, stated in the manual |
 | S10-S22 | minor | see section | Exact-fit save, dir `chrin` X/Y, verify end address, name consumed, parser bounds, `@` handling, 254 files, geometry assumptions, commit marker, API nits |
-| S23 | doc | – | Callback and memory rules, activity indication, comment list |
+| S23 | doc | **done** | Callback and memory rules, activity indication, comment list |
 | T1-T12 | various | see section | Tools (`tools/*.py`), Makefile and test cartridge |
 
 ---
@@ -1184,7 +1185,10 @@ flags `$7f`):
 - **S18 – `@` overwrite checks the space before scratching.**
   `rom_save_body` runs the conditions before the `@` scratch, so the
   file about to be replaced still counts as used: replacing a large file
-  on a nearly full area fails with "disk full". *By code.*
+  on a nearly full area fails with "disk full". *By code.* **Not
+  changed**: checking before the scratch means the old file is only
+  removed when the new one is known to fit (otherwise a failing
+  overwrite would lose the old file, M10). Documented in the manual.
 - **S19 – `EFS_init_eapi` ignores EAPIInit's result** (`lib-efs.s:376-377`,
   unconditional `clc`): an unsupported flash is reported as success;
   only the `eapi` signature is checked. *By code.* **Fixed** (by code): C set from EAPIInit is passed on.
@@ -1212,14 +1216,21 @@ flags `$7f`):
   `$80`/`$a0`. Correct for the three test layouts, wrong for
   `files_bank ≠ dir_bank`, lhlh with `files_high = $a0`, or an lhlh size
   that is not a multiple of 16. Sizes and modes are never validated.
-  *By code.*
+  *By code.* **Not changed**: these are configuration limits; the
+  manual now states them (directory and files of a r/w area in the same
+  bank and at the same address, sizes multiples of 8 / 16).
 - **S22 – no commit marker.** `EFS_save` writes the complete entry
   before the data; a power loss during the data leaves an entry that
   looks valid with `$ff` data, which nothing can detect later (also the
   reason S6 is possible). A marker bit cleared last would make such
-  entries recognisable. *Design.*
+  entries recognisable. *Design, not changed.*
 
 ### Documentation and comments (S23)
+
+**Done** (commit "Document callback, memory and configuration rules"):
+the manual has the rules below; the listed comments are corrected;
+`SHOW_INDICATE_ACTIVITY` is still 1 in `config.i` (a release build
+should set it to 0, see the manual).
 
 - The manual must state for the defragment callbacks: preserve X and Y
   (M11), do not use `$35-$3f`, and do not call any libefs function —

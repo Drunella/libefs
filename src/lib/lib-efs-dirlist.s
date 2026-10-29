@@ -701,7 +701,7 @@
     rom_compare16:
         ; A: high value
         ; X: low value
-        ; val1(X/A) >= Val2(f8/f9) => C set
+        ; val1(X/A) < Val2(f8/f9) => C set, else C clear
         ; https://codebase64.org/doku.php?id=base:16-bit_comparison
         ; a            ; Val1 high
         cmp zp_var_x9        ; Val2 high
@@ -712,10 +712,10 @@
         ;beq Equal     ; Val1 = Val2
         bcs @GrtEqu    ; loVal1 >= loVal2 --> Val1 >= Val2
       @LsThan:
-        sec
+        sec  ; .C set: val1 < val2
         rts
       @GrtEqu:
-        clc
+        clc  ; .C clear: val1 >= val2
         rts
 
     rom_dirload_sm_sizehigh:

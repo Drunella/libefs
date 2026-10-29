@@ -1294,7 +1294,7 @@
     rom_filesave_blockedspace:
         ; space blocked by real and deleted files
         ; config must be set, directory is set properly
-        ; returns free space in 3b/3c/fd (low/mid/high)
+        ; returns the blocked space (live and deleted files) in 3b/3c/3d
         lda efs_readef_low
         pha
         lda efs_readef_high
@@ -1849,7 +1849,7 @@
 ; return:
 
     rom_command_save_process:
-        ; .C set: error (.Z set) or stop processing (.Z clear)
+        ; .C set: stop processing; A = 0: no error, A <> 0: error
         ; .C clear: no error and continue
         ; error_byte: error code
         ; commands in save can continue

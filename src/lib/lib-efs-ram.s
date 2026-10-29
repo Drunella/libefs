@@ -15,7 +15,7 @@
 ; ----------------------------------------------------------------------------
 
 ; call $8000 (EFS_init) to initialize
-; you need to bank in bank 0 at least in 8k mode
+; you need to bank in bank 0 in 16k mode (EFS_init_eapi reads ROMH)
 ; init code
 ;   lda #$37
 ;   sta $01
@@ -165,7 +165,7 @@
     EFS_readst:  ; @ $DF30
         ; parameter: none
         ; return:
-        ;    A: status code ($10: verify mismatch; $40: EOF; $80: device not present)
+        ;    A: status code ($10: verify mismatch; $40: EOF; $80: file in r/w area)
     status_byte = * + 1
         lda #$00
         rts

@@ -129,7 +129,7 @@ EASYFLASH_IO_BANK = $de00
 ;
 ; =============================================================================
 EAPISetBank_body:
-        sta EAPI_SHADOW_BANK    ; EAPIWriteFlashInc will go here, no immediate negative effect
+        sta EAPI_SHADOW_BANK    ; EAPIWriteFlashInc ($df95) lands here: it sets the bank to the data byte (writes are refused by libefs)
         sta EASYFLASH_IO_BANK   ; EAPISetSlot will go here, no immediate negative effect
         rts                     ; EAPIGetSlot will go herer, no negative effect
 

@@ -208,7 +208,7 @@
         ; space by real active files
         ; config must be set correct
         ; directory is set properly
-        ; returns free space in 3b/3c/3d (low/mid/high)
+        ; returns the used space (live files) in 3b/3c/3d (low/mid/high)
         lda efs_readef_low
         pha
         lda efs_readef_high

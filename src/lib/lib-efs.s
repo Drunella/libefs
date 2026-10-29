@@ -782,7 +782,7 @@
 
     rom_load_body:
         ; return: X/Y: end address
-        ; no internal state will be set
+        ; internal_state is only used during a "$" load
         ; a file is open: report it without touching the state of that file
         ; (io_start_address/io_end_address are in use by chrout/dirlist)
         pha
@@ -1625,7 +1625,7 @@
 
 
     rom_command_process:
-        ; .C set: error (.Z set) or stop processing (.Z clear)
+        ; .C set: stop processing; A = 0: no error, A <> 0: error
         ; .C clear: no error and continue
         ; error_byte: error code
         ; commands in load can continue
@@ -1689,7 +1689,7 @@
 
 
     rom_command_load_process:
-        ; .C set: error (.Z set) or stop processing (.Z clear)
+        ; .C set: stop processing; A = 0: no error, A <> 0: error
         ; .C clear: no error and continue
         ; error_byte: error code
         ; commands in load can continue
@@ -2042,7 +2042,7 @@
 
 
     rom_dirsearch_filedata:
-        ; position is at flags, bank is the next data to load
+        ; position is after the flags, bank is the next data to load
         ; all zp variables are free and can be used
         jsr efs_readef_read_and_inc  ; efs_io_byte  ; bank
         sta zp_var_x8
