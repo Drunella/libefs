@@ -3,9 +3,10 @@
 Review of libefs 1.0.0 (commit `ff7d2d4`). How the code works is described
 in [architecture.md](./architecture.md).
 
-Last re-evaluation: after the fixes up to commit `ae9949a` (C1-C8, M7).
-Line numbers of open items refer to that state; for fixed items they
-refer to the original code.
+Last re-evaluation: after the fixes up to commit `ae9949a` (C1-C8, M7);
+second full review after commit `dc8a186` (M1-M9), see "Second review"
+below. Line numbers of open items refer to the state named in their
+section; for fixed items they refer to the original code.
 
 **Status**:
 
@@ -52,6 +53,17 @@ refer to the original code.
 | m6 | minor | confirmed | LOAD returns the last address, not last + 1 like the KERNAL |
 | m7 | minor | partly confirmed | Various smaller API inconsistencies (see list) |
 | D1 | doc | – | Documentation mismatches |
+| S1 | critical | confirmed | Defragment copies size+1 bytes per file; the next save fails on the stray byte |
+| S2 | critical | confirmed | Defragment has no bounds checks: a `$ffffff` entry programs bank 0 and the whole cartridge |
+| S3 | critical | confirmed | `EFS_format` with an open file: next `chrin` erases banks 0-7 (read) / a later file gets a corrupt size (write) |
+| S4 | critical | confirmed | `EFS_open` while a write channel is full clears the status; the next `chrout` writes into bank 0 |
+| S5 | critical | confirmed | `EFS_save` of ≥ 64 KB passes the space check and writes past the area into bank 0 |
+| S6 | major | confirmed | A failed save leaves a live, corrupt directory entry |
+| S7 | major | by code | Write/erase errors ignored in defragment, erase and close |
+| S8 | major | confirmed | `chrin` signals EOF one byte late (KERNAL difference) |
+| S9 | major | by code | Type `$1f` entries: terminator for search/dirlist, live file for space/save/defragment |
+| S10-S22 | minor | see section | Exact-fit save, dir `chrin` X/Y, verify end address, name consumed, parser bounds, `@` handling, 254 files, geometry assumptions, commit marker, API nits |
+| S23 | doc | – | Callback and memory rules, activity indication, comment list |
 | T1-T12 | various | see section | Tools (`tools/*.py`), Makefile and test cartridge |
 
 ---
@@ -772,6 +784,312 @@ helpers.
 
 ---
 
+## Second review (after the fixes, commit `dc8a186`)
+
+A second full pass over the library after C1-C8 and M1-M9 were fixed:
+my own re-read of all modules plus two independent reviews of
+(a) `lib-efs.s`/`lib-efs-ram.s` and (b) `lib-efs-rw.s`, `-space.s`,
+`-dirlist.s`, `-minieapi.s`. Everything marked *VICE* was reproduced on
+the test cartridge with the programs in `work/r2*test.s`; flash damage
+was measured by letting VICE write the flash back and comparing it with
+`work/crtbanks.py`. Line numbers are those of commit `dc8a186`.
+
+### Critical
+
+#### S1 – Defragment copies one byte too many per file
+
+`src/lib/lib-efs-rw.s:755-763` (`rom_defragment_copy_data`). The loop
+is write → increment → `rom_filesave_decrease_size`; the counter
+returns "done" only when it is already 0 *before* the decrement, so a
+file of size S is copied as S+1 bytes and the destination pointer
+advances S+1 times. `rom_filesave_transfer_data` (`:1568`) knows this
+and decrements once "ahead"; the defragment loop does not.
+
+Consequences: every copied file is followed by one stray byte (the byte
+that followed it in the old area, i.e. the first byte of the next entry's
+data, or `$ff`); the next save is placed by `rom_filesave_nextentry` at
+`offset + size`, exactly on that stray byte; the space accounting counts
+ΣS while the area really holds ΣS + N, so after many defragments a save
+that passes the check can run past the area end (into bank 0 for an
+area ending at bank 63; `EFS_save` has no bank check).
+
+*VICE* (`work/r2ftest.s`): after a defragment the new directory reads
+`DELME15 off $1800 size 17`, `DELME384 off $1812` (= 6161 + **1**),
+`DELME640 off $1995` (+1), … Then: save `A1` (300 bytes from `$4000`),
+save `B1` (load address `$4000`, first byte `$00`), scratch `B1`,
+defragment, save `C1` from `$0801` → **`$19` write error** (the `$01`
+cannot be programmed over the stray `$00`); see S6 for what is left.
+
+*Fix*: one `jsr rom_filesave_decrease_size` before the loop, like
+`transfer_data`.
+
+#### S2 – Defragment has no bounds checks: a corrupt size programs bank 0 and the whole cartridge
+
+`src/lib/lib-efs-rw.s:640-648`, `:744-763`, `:777-823`. The copy trusts
+the size field of every live entry and increments the destination bank
+without limit. An entry with size `$ffffff` — a write file never closed
+because of a reset or power loss between `open(1)` and `close` (M10),
+or a power loss during the first bytes of an `EFS_save` — makes the copy
+run for 16.7 million bytes. After the destination area the bank counter
+passes 63; the hardware maps bank 64 to bank 0. For an `hhhh`
+destination that is ROMH of bank 0 (area 0 directory, EAPI, the libefs
+configuration, the startup code), then banks 1, 2, … (area 0 files);
+for an `llll` destination it is ROML of bank 0, libefs itself, and the
+running copy loop crashes after about 3.8 KB. Flash programming only
+clears bits, so this is unrecoverable without reflashing. `EFS_defragment`
+is exactly what the manual recommends for recovery, and the automatic
+defragment in save/open reaches the same code.
+
+*VICE* (`work/r2btest.s`): `open(1) "UNCL"`, three `chrout`, then
+`internal_state` cleared (as after a reset), `EFS_defragment`. After 15
+minutes the copy was still running; the flash write-back shows **bank 0
+ROMH: 7,737 bytes changed, banks 1-3 ROMH: ~8,100 each, bank 4 ROMH:
+4,653** besides the destination area.
+
+*Fix*: in `rom_defragment_copy` treat an entry whose `offset + size`
+exceeds the area as corrupt (skip it, report it), clamp the destination
+to the area end, and stop on write errors (S7).
+
+#### S3 – `EFS_format` with an open file erases libefs or corrupts a later file
+
+`src/lib/lib-efs-rw.s:200-214` (`rom_format_body`) does not check
+`internal_state` (`rom_defragment_body:178-181` does).
+
+(a) File open for reading: the format leaves `efs_io_byte` patched to
+`jsr EAPIEraseSector` (`efs_init_eapierasesector`, called by
+`rom_defragment_erasearea`). The next `EFS_chrin` (`lib-efs.s:624-636`)
+calls `efs_io_byte` with A = 0 (from `lda status_byte / and #$40`) and
+the caller's Y: `EAPIEraseSector(bank 0, Y)`. With Y = `$80` the 64 KB
+sector of ROML banks 0-7 is erased: libefs and the first area 0 files.
+
+*VICE* (`work/r2dtest.s`): `open(0) "DATA1"`, `EFS_format` → returns 0,
+`chrin` with Y = `$80` → machine dead; write-back shows **bank 0 ROML:
+6,042 bytes changed (erased), banks 1-7 ROML: ~8,160 each**.
+
+(b) File open for writing: the format erases its directory entry; the
+following `close` still programs the three size bytes into the erased
+slot. The slot looks empty (flags `$ff`), a later save reuses it and
+its size field is ANDed with the stale bytes.
+
+*VICE* (`work/r2atest.s`): `open(1) "OP"` (slot 7), three `chrout`,
+`EFS_format` (0), `close` (0), eleven saves of 300 bytes: the eighth
+file `N7` is listed with **0 blocks** (size `302 & 3 = 2`).
+
+*Fix*: refuse the format with `ERROR_FILE_OPEN` while a channel is open;
+additionally re-initialise `efs_io_byte` to `EAPIReadFlashInc` at the
+end of format and defragment.
+
+#### S4 – `EFS_open` while a write channel is full clears the status; the next `chrout` writes into bank 0
+
+`src/lib/lib-efs.s:671-681` (`rom_open_body`) zeroes `status_byte` and
+`error_byte` *before* checking `internal_state`, and the "file open"
+path leaves with status 0. `rom_chrout_body` (`lib-efs-rw.s:231-237`)
+refuses further writes only via `status_byte & $40`, so the EOF/disk
+full protection (C5) is undone by any rejected `open`. For an area
+ending at bank 63 the next byte goes to EAPI bank 64 = hardware bank 0
+ROML (libefs). M8 fixed this for `load`/`save`; `open` was missed.
+
+*VICE* (`work/r2ctest.s`): `chrout` until disk full (`readst` `$40`),
+`open(0) "DATA1"` → `$02`, `readst` now **0**, `chrout` → written:
+write-back shows **bank 0 ROML: 1 byte changed** (`$8000`).
+
+*Fix*: check `internal_state` before touching the status, as in
+`rom_load_body:779-787`.
+
+#### S5 – `EFS_save` of 64 KB or more passes the space check
+
+`src/lib/lib-efs-rw.s:1058-1064` (`rom_filesave_addsize`) adds the 2
+address bytes to the 16-bit size and drops the carry out of the high
+byte: end − start = `$fffe` or `$ffff` gives a size of 0 for the checks.
+`rom_filesave_begin` then computes the real size (`$010000`) and
+`transfer_data` writes 65,538 bytes with no bank check.
+
+*VICE* (`work/r2gtest.s`): fill the area with `chrout` until 30,000 bytes
+are free, then `save` `$0001-$fffe` → the save is accepted and the
+machine crashes; write-back shows **bank 0 ROML: 5,434 bytes changed**
+(libefs overwritten).
+
+*Fix*: compute the size once in 24 bits (or reject end − start ≥ `$fffe`).
+
+### Major
+
+#### S6 – A failed save leaves a live, corrupt directory entry
+
+`src/lib/lib-efs-rw.s:372-374`: name, flags `$61`, bank, offset and
+size are written before the data. A write error in
+`rom_filesave_transfer_data` (`:1595-1599`) returns `$19` with the
+entry live: the listing shows it, `load` returns `$ff` data, the name is
+taken (`FILE_EXISTS`). The library could always repair this, because
+programming `$61` → `$60` (scratch) only clears a bit.
+
+*VICE* (S1 scenario): after the failed save of `C1`, `load "C1"` →
+A = 0, end `$512b` (full size), first data byte `$ff`.
+
+*Fix*: scratch the entry in the error paths of `transfer_data` and of
+`rom_filesave_chrin_close` (S7).
+
+#### S7 – Write and erase errors are ignored in defragment, erase and close
+
+- `src/lib/lib-efs-rw.s:759` (`;bcs @error ignore errors :(`): the copy
+  continues after a failed write, and `rom_defragment_body` then erases
+  the only good copy. With a non-blank destination (interrupted earlier
+  defragment, M10) or worn flash this is silent data loss.
+- `rom_defragment_erasearea` (`:491-493`, `:540-542`) never tests C from
+  `EAPIEraseSector` and returns success; a failed erase leaves both areas
+  populated (M10 state).
+- `rom_filesave_transfer_dir_finish` (`:1469-1477`) ignores C of the
+  three size writes; `close` returns 0 while the size stays `$ffffff`
+  (the precondition of S2).
+
+*By code.* The copy should stop at the first error and leave the source
+alone; close should scratch the entry when the size cannot be written.
+
+#### S8 – `chrin` signals EOF one byte late (differs from the KERNAL)
+
+`src/lib/lib-efs.s:636-641`. EOF is set only when `EAPIReadFlashInc`
+returns C set, which (EAPI and MiniEAPI alike) happens on the (N+1)th
+read for a length of N. The KERNAL sets status `$40` together with the
+last real byte. The common idiom "chrin, store, readst, loop while 0"
+stores one extra `$00` byte with libefs.
+
+*VICE* (`work/r2etest.s`, `DATA1` = 2 address bytes + 1 data byte):
+`chrin` ×3 → bytes `$00 $30 $64` with C clear and `readst` 0; 4th
+`chrin` → A = 0, C set, `readst` `$40`. (`docs/todo.txt` lists this as
+"no"; it should at least be documented in the manual.)
+
+#### S9 – Entries with type `$1f` are a terminator for some code and a file for other code
+
+`efs_directory_search` (`lib-efs.s:2085-2087`) and the dirlist
+(`dirlist.s:457`) stop at `flags & $1f == $1f`; `rom_space_usedspace`
+(`space.s:237-240`), `rom_filesave_blockedspace` (`:1191`),
+`rom_filesave_freedirentries` (`:943`), `rom_filesave_nextentry`
+(`:1641`) and `rom_defragment_copy` (`:617-621`) stop only at `$ff` and
+treat such an entry as a live file. A partially programmed flags byte
+(power loss during a save) is therefore invisible to `load` and `$`,
+but is counted, copied verbatim by defragment (after which everything
+behind it disappears for `load`), and if its size is `$ffffff` triggers
+S2. *By code.* One shared "is terminator / is live" test is needed.
+
+### Minor
+
+- **S10 – exact-fit save refused.** `rom_filesave_checksize`
+  (`rw.s:997`) treats used + new ≥ max as full; a file ending exactly at
+  the area end is valid (chrout accepts it, C4 test). *VICE*
+  (`work/r2atest.s`): 100 bytes free, save of 98 data bytes → `$48`;
+  97 → OK.
+- **S11 – `chrin` on a directory destroys X and Y** (`dirlist.s:228`,
+  `:309-312`); file `chrin` preserves them, the KERNAL always does.
+  *VICE*: X `$5a`/Y `$a5` → `$ff`/`$00` after a directory `chrin`,
+  unchanged after a file `chrin`.
+- **S12 – verify of a file without data bytes returns a wrong end
+  address.** `efs_init_readmem` (`lib-efs.s:411`) leaves Y = `$ff`;
+  `rom_fileload_verify` sets Y = 0 only after the first successful read.
+  *VICE* (`work/r2etest.s`): file `E0` (size 2): verify → X/Y =
+  `$50fe`, load → `$4fff`.
+- **S13 – `EFS_save` consumes the file name.** `rom_filesave_transfer_dir`
+  (`rw.s:1420`) decrements `filename_length` to 0 (or the remainder for
+  names > 16). A second `EFS_save` without `setnam` fails with `$08`;
+  with `rom_command_begin` also moving `filename_address` (m7), a
+  program must call `setnam` before every call. *By code.*
+- **S14 – command parser reads past short names.** `rom_command_begin`
+  (`lib-efs.s:1538-1570`) inspects name bytes 1-2 regardless of
+  `filename_length` and decrements the length Y+1 times without a lower
+  bound: a 2-character name followed by `:` in memory becomes a command
+  with `filename_length` = `$ff` (m1 desync, possibly scratching a wrong
+  file); a length of 0 or 1 can pick up stale `0:`. *By code.*
+- **S15 – `@` in save ignores the scratch result.**
+  `rom_command_save_process` (`rw.s:1687-1696`) falls through regardless
+  of C; `@0:X` with X in area 0 ends as `FILE_EXISTS` instead of
+  "write protected". *By code.*
+- **S16 – the directory holds 254 files.** `rom_filesave_freedirentries`
+  (`rw.s:935-947`) reports "full" when entries 0-253 are used although
+  slot 254 is free (255 is the terminator). *By code.*
+- **S17 – garbage error code after a failed post-defragment check.**
+  `rom_filesave_conditions:899-903` branches to `@error` with A = a size
+  byte (same pattern as M7); hard to reach. *By code.*
+- **S18 – `@` overwrite checks the space before scratching.**
+  `rom_save_body` runs the conditions before the `@` scratch, so the
+  file about to be replaced still counts as used: replacing a large file
+  on a nearly full area fails with "disk full". *By code.*
+- **S19 – `EFS_init_eapi` ignores EAPIInit's result** (`lib-efs.s:376-377`,
+  unconditional `clc`): an unsupported flash is reported as success;
+  only the `eapi` signature is checked. *By code.*
+- **S20 – API nits** (*by code* unless noted): `?` matches the NUL
+  padding, so `DATA?` matches `DATA` (`lib-efs.s:2040-2056`);
+  `setlfs`/`setnam` return `$02` while a channel is open, the KERNAL
+  never rejects them (`:570`, `:597`); `@0:` is a syntax error for read
+  open and load, a 1541 ignores it (`:1629`); `EFS_util` mode 0 is
+  accepted as setlfs although the comment says 1-15; `EFS_util` `$10`
+  returns the chrout byte counter while a write channel is open;
+  `load`/`save` rejected with "file open" return X/Y unchanged;
+  "blocks free" is one block low (`space.s:170-178` subtracts a block
+  although max is a multiple of 256: 186,664 free bytes = 729 blocks,
+  shown as 728 — *VICE*, M9 table).
+- **S21 – area geometry assumptions** (extends m4/m5): the chrout end
+  bank is `dir_bank + size` (`rw.s:1495-1516`), erase and copy_dir use
+  fixed `$80`/`$a0`, the offset reduction assumes `files_high` =
+  `$80`/`$a0`. Correct for the three test layouts, wrong for
+  `files_bank ≠ dir_bank`, lhlh with `files_high = $a0`, or an lhlh size
+  that is not a multiple of 16. Sizes and modes are never validated.
+  *By code.*
+- **S22 – no commit marker.** `EFS_save` writes the complete entry
+  before the data; a power loss during the data leaves an entry that
+  looks valid with `$ff` data, which nothing can detect later (also the
+  reason S6 is possible). A marker bit cleared last would make such
+  entries recognisable. *Design.*
+
+### Documentation and comments (S23)
+
+- The manual must state for the defragment callbacks: preserve X and Y
+  (M11), do not use `$35-$3f`, and do not call any libefs function —
+  `EFS_readst` in particular is not executable during a defragment,
+  because its `lda #` opcode and its `rts` are used as temporary
+  variables (`efs_temp_var1/2`, `lib-efs.s:538-546`); an IRQ handler
+  calling `$df30` has the same problem.
+- RUN/STOP+RESTORE during any libefs call (minutes during a defragment)
+  makes the KERNAL NMI handler jump through `($a002)`, which is the
+  cartridge's ROMH at that moment.
+- Memory rules: `EFS_save` and verify read C64 memory with the caller's
+  `$01` (data under BASIC/KERNAL ROM needs `$35`/`$36`, I/O must stay
+  visible); `EFS_load` writes with `$01 = $37`, so loading into
+  `$d000-$dfff` writes to I/O and to the library's own RAM.
+- `src/lib/config.i:18`: `SHOW_INDICATE_ACTIVITY = 1` flashes `$d020`
+  on every byte; a release build should have it off.
+- Comments that contradict the code: `lib-efs.s:1601`/`:1665` (".C set:
+  error (.Z set) or stop (.Z clear)" is reversed), `:776` ("no internal
+  state will be set": a `$` load sets `$01` until the transfer ends),
+  `:1704` (`rom_fileload_chrout_prepare` prepares the chrin channel),
+  `:1968` ("position is at flags": one past), `lib-efs-ram.s:18` ("8k
+  mode": `EFS_init_eapi` needs 16k), `:72` ("01-15"), `:165` ("`$80`:
+  device not present" is `STATUS_RW`), `manual.md:316` ("does not use
+  sei": `rom_config_get_value` does, harmlessly), `dirlist.s:680-698`
+  (`rom_compare16` comment says ≥ ⇒ C set, code is the opposite; the
+  three call-site comments too), `dirlist.s:438-439` (state numbers),
+  `rw.s:553`, `:929`, `:1172`, `:1226`/`:1239`, `space.s:218`,
+  `minieapi.s:132`, `lib-efs.i:25` (`01:0:1FFF` → `01:0:0000`).
+
+### Checked and found clean
+
+The `$df00` trampolines and the `efs_setstartbank_ext` patch window,
+`efs_init_eapi_body` stack arithmetic, `rom_config_get_value`, the
+callback return-address push, the `efs_readef_*` pointer arithmetic,
+`rom_filesave_begin`'s bank/offset conversion for all three modes (and
+the C6 fix), the chrout 24-bit counter and end-bank detection (C4), the
+`internal_state` decoding in `chrin`/`chrout`/`close` including
+`STATE_COMMAND_DONE`, the M8 entry checks, the automatic defragment's
+re-derivation of area flags and config, the defragment pointer swap and
+source-mode use (C3), the dirlist state machine's counter reuse, and
+MiniEAPI's slot layout and `ReadFlashInc` semantics.
+
+### Suggested order
+
+1. S3, S4, S5, S2 (flash corruption of the library itself; S3/S4 are
+   one-line guards).
+2. S1 (every defragment corrupts the layout) together with S6/S7.
+3. S8 (API contract), S9, then the minor items and the documentation.
+
+---
+
 ## Tools, Makefile and test cartridge
 
 These are from a separate review of `tools/`, `src/ef/` and `src/prg/`.
@@ -826,16 +1144,10 @@ Most of the critical items were one-instruction branch or flag errors
 (`bne` instead of `bcc`, `beq` instead of `bne`, `plp` restoring the
 wrong flags).
 
-Suggested order for the remaining items:
-
-1. M1, M2, M3, M4, M8: small, local fixes in the command and load/save
-   entry code. M3 can scratch the wrong file.
-2. M5 (zero page) and M6 (MiniEAPI writes): API contract.
-3. M9 and the `chrout` return value / X register (m7).
-4. M11 (save X/Y around the callbacks), then robustness (M10:
-   `EFS_validate`, recovery after an interrupted defragment).
-5. Remaining minor items, documentation (D1), tools and test cartridge
-   (T1-T12).
+Suggested order for the remaining items: see "Suggested order" at the
+end of the second review (S3/S4/S5/S2 first, then S1 with S6/S7, then
+S8/S9, then the minor items, M10/M11, documentation, tools and test
+cartridge).
 
 ## How the findings were verified
 
@@ -849,15 +1161,19 @@ in the gitignored `work/` folder use only the Python standard library:
   menu, starts it with `g`, waits for its "done" flag and reads back its
   result bytes.
 
-The test programs are `work/c4test.s` … `work/c8test.s` for the fixes,
-and `work/reeval.s` for the re-evaluation of the open items. Each fix
-was compared against a build without the fix (control).
+The test programs are `work/c4test.s` … `work/c8test.s` and
+`work/m1test.s` … `work/m10test.s` for the fixes, `work/reeval.s` for
+the re-evaluation of the open items, and `work/r2[a-g]test.s` for the
+second review. Each fix was compared against a build without the fix
+(control). `work/mkcarts.sh` builds the fix/control cartridges,
+`work/runtest.sh` runs a test on both.
 
 Pitfall: VICE writes the flash contents back into the `.crt` on exit
 (EasyFlash write-back). The drivers therefore run a throwaway copy with
 `+easyflashcrtwrite`. For the C8 test, write-back was used on purpose and
 the written cartridge was compared with the original by
-`work/crtdiff.py`.
+`work/crtdiff.py` (byte list) and `work/crtbanks.py` (changed bytes
+per bank), which is how the flash damage of S2-S5 was measured.
 
 **Initial review (historical).** The first round of findings was
 reproduced with a one-off Python emulator built for the review:
