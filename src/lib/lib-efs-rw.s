@@ -49,6 +49,7 @@
 .export rom_save_body
 .export rom_defragment_body
 .export rom_format_body
+.export rom_validate_body
 .export rom_filesave_chrin_prepare
 .export rom_filesave_chrin_close
 ;.export rom_filesave_blocksfree
@@ -69,6 +70,7 @@
 .import rom_flags_set_area_active_file
 .import rom_flags_get_area_active_file
 .import rom_config_rw_available
+.import rom_config_checkarea
 .import rom_config_get_value
 .import rom_config_prepare_config
 .import rom_config_get_area_bank
@@ -629,6 +631,10 @@
         pla  ; old area
         jsr rom_flags_set_area
 
+        ; mark the source: "copy started" (slot 255, byte 0 of its directory),
+        ; so that EFS_validate can tell the areas apart after a power loss
+        jsr rom_defragment_mark_source
+
         jsr rom_config_get_area_dirbank    ; defragment is not file based
         sta efs_readef_bank
 
@@ -747,6 +753,9 @@
         jmp @loop
 
       @leave:
+        ; mark the destination: "copy complete" (slot 255, byte 1)
+        jsr rom_defragment_mark_dest
+
         jsr rom_config_call_defragment_allclear  ; defragment finished
         jsr efs_finish_tempvars
         lda efs_defragment_skipped
@@ -766,6 +775,196 @@
         jsr rom_flags_set_area
         lda #ERROR_DIRECTORY_ERROR
         sec
+        rts
+
+
+    rom_defragment_mark_source:
+        ; programs byte 0 of directory slot 255 of the current area to $00
+        ; slot 255 must stay blank (terminator); its name bytes are unused
+        jsr rom_config_get_area_dirbank
+        pha
+        jsr rom_config_get_area_dirhigh
+        ldx #$00
+        jmp rom_defragment_mark
+
+    rom_defragment_mark_dest:
+        ; programs byte 1 of directory slot 255 of the other area to $00
+        jsr rom_config_get_area_dirbank_invert
+        pha
+        jsr rom_config_get_area_dirhigh_invert
+        ldx #$01
+    rom_defragment_mark:
+        ; stack: bank; A: directory high byte; X: byte index
+        clc
+        adc #>(DIRECTORY_SIZE - 24)  ; slot 255: $17e8
+        tay
+        txa
+        clc
+        adc #<(DIRECTORY_SIZE - 24)
+        tax
+        pla
+        jsr efs_setstartbank_ext
+        jsr efs_init_eapiwriteinc
+        lda #$d0  ; mode: irrelevant for a single byte
+        jsr EAPISetPtr
+        lda #$00
+        jmp efs_io_byte
+
+
+    rom_validate_read_marker:
+        ; A: byte index (0: source started, 1: destination complete)
+        ; X: 0: current area, else: the other area
+        ; returns the byte ($ff: not set)
+        pha
+        cpx #$00
+        bne @invert
+        jsr rom_config_get_area_dirbank
+        sta efs_readef_bank
+        jsr rom_config_get_area_dirhigh
+        jmp @addr
+      @invert:
+        jsr rom_config_get_area_dirbank_invert
+        sta efs_readef_bank
+        jsr rom_config_get_area_dirhigh_invert
+      @addr:
+        clc
+        adc #>(DIRECTORY_SIZE - 24)
+        sta efs_readef_high
+        pla
+        clc
+        adc #<(DIRECTORY_SIZE - 24)
+        sta efs_readef_low
+        jmp efs_readef
+
+
+    rom_validate_body:
+        ; checks the read/write part:
+        ; - both areas in use (defragmentation interrupted by a reset or
+        ;   power loss): erases the stale one, using the markers written
+        ;   by rom_defragment_copy
+        ; - entries with an impossible size (write file never closed) or
+        ;   partially written flags: scratched
+        ; returns A = 0: nothing found; A = 1: repaired; .C clear
+        ; A = $47, .C set: both areas in use without markers: call
+        ; EFS_defragment (it copies the active area into the other one)
+        jsr rom_config_prepare_config
+        jsr rom_config_rw_available
+        bcc :+
+        jmp @clean       ; read only: nothing to check
+      : jsr rom_check_writable
+        bcc :+
+        jmp @clean       ; minieapi: cannot repair
+      :
+        lda #$00
+        sta efs_defragment_skipped  ; counts repairs
+
+        lda #libefs_config::area_1
+        jsr rom_config_checkarea
+        bcc @single
+        lda #libefs_config::area_2
+        jsr rom_config_checkarea
+        bcc @single
+
+        ; both areas in use; the current area is area 1 (prepare_config)
+        lda #$01         ; "destination complete" of the current area?
+        ldx #$00
+        jsr rom_validate_read_marker
+        cmp #$ff
+        beq :+
+        jmp @erase_other ; yes: the other area is the stale source
+      : lda #$01         ; "destination complete" of the other area?
+        ldx #$01
+        jsr rom_validate_read_marker
+        cmp #$ff
+        beq :+
+        jmp @erase_current
+      : lda #$00         ; no complete copy: "copy started" of the current?
+        ldx #$00
+        jsr rom_validate_read_marker
+        cmp #$ff
+        beq :+
+        jmp @erase_other ; the current area is the source, the other one
+      : lda #$00         ;   holds an incomplete copy
+        ldx #$01
+        jsr rom_validate_read_marker
+        cmp #$ff
+        beq :+
+        jmp @erase_current
+      : lda #ERROR_DIRECTORY_ERROR  ; no markers: cannot tell
+        sec
+        rts
+
+      @erase_other:
+        jsr rom_flags_get_area_invert
+        jmp @erase
+      @erase_current:
+        jsr rom_flags_get_area
+      @erase:
+        jsr rom_defragment_erasearea
+        bcs @fail
+        inc efs_defragment_skipped
+        jsr rom_config_prepare_config  ; the remaining area is active now
+
+      @single:
+        ; scan the active directory for invalid entries
+        jsr efs_init_readef
+        jsr rom_space_setdirstart
+        lda #16          ; at the flags of entry 0
+        jsr efs_readef_pointer_advance
+      @loop:
+        jsr rom_config_get_area_dirhigh
+        jsr efs_readef_dirboundary
+        bcs @done
+        jsr efs_readef   ; flags
+        cmp #$ff
+        beq @done
+        and #$1f
+        beq @next        ; deleted
+        cmp #$1f
+        beq @bad         ; partially written flags
+        lda #7           ; size high byte
+        jsr efs_readef_pointer_advance
+        jsr efs_readef
+        pha
+        lda #7
+        jsr efs_readef_pointer_reverse
+        jsr rom_config_get_area_size
+        lsr a
+        lsr a
+        lsr a            ; high byte of the area size
+        sta efs_temp_byte
+        pla
+        cmp efs_temp_byte
+        bcc @next        ; size high < area: plausible
+      @bad:
+        ; scratch the entry: program its flags (at the pointer) to $60
+        jsr rom_config_get_area_dirbank
+        jsr efs_setstartbank_ext
+        jsr efs_init_eapiwriteinc
+        ldx efs_readef_low
+        ldy efs_readef_high
+        jsr rom_config_get_area_mode
+        jsr EAPISetPtr
+        lda #$60
+        jsr efs_io_byte
+        inc efs_defragment_skipped
+      @next:
+        lda #24
+        jsr efs_readef_pointer_advance
+        jmp @loop
+
+      @done:
+        lda efs_defragment_skipped
+        beq @clean
+        lda #ERROR_FILE_SCRATCHED  ; 1: repaired
+        clc
+        rts
+      @clean:
+        lda #$00
+        clc
+        rts
+      @fail:
+        sec              ; erase error, A = error code
         rts
 
 

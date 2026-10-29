@@ -43,7 +43,7 @@ section; for fixed items they refer to the original code.
 | M7 | major | **fixed** | Zero-length save returns a garbage error code (low byte of the end address) |
 | M8 | major | **fixed** | `EFS_save`/`EFS_load` while a file is open return "file open" but close or corrupt that file |
 | M9 | major | **fixed** | "Blocks free" is garbage for read-only configurations and full areas |
-| M10 | major | **partly fixed** | No recovery from an interrupted defragment or an unclosed write file (open); `EFS_validate` stub returned C unchanged (fixed: returns A = 0, C clear) |
+| M10 | major | **fixed** | Recovery from an interrupted defragment and from unclosed write files: `EFS_validate` implemented |
 | M11 | major | **fixed** | Defragment callbacks must preserve Y (and should preserve X), which is not documented or enforced |
 | m1 | minor | **fixed** | Names longer than 16 characters can desynchronise the directory scan |
 | m2 | minor | **fixed** | Directory bounds are not checked for deleted entries; dirlist uses a hard-coded `$b8` bound |
@@ -683,11 +683,36 @@ listing again), on the test cartridge and on a variant with `areas = 1`:
   written. If the save then fails (disk full after the scratch, write
   error), the old file is lost.
 
-**Partly fixed** (the `EFS_validate` part): until validation is
-implemented, the stub returns A = 0 and C clear ("nothing found"),
-independent of C at call time. That way programs that follow the manual
-do not defragment on every start. `docs/manual.md` describes this. The
-recovery issues above remain open.
+**Fixed** in two steps. First the stub was made to return A = 0 and
+C clear. Then `EFS_validate` was implemented together with two markers
+that `rom_defragment_copy` programs into directory slot 255 (which must
+stay blank as the terminator; its name bytes are unused): byte 0 of the
+source directory = "copy started", byte 1 of the destination directory
+= "copy complete" (written after the copy, before the source is erased).
+`EFS_validate`:
+
+- both areas in use: erases the stale one — the source if a
+  destination carries "copy complete", else the area without "copy
+  started" (the incomplete destination); without any marker it returns
+  `$47` with C set (call `EFS_defragment`);
+- scratches entries with an impossible size (`$ffffff` of a file never
+  closed) or partially written flags;
+- returns A = 1 (C clear) when it repaired something, 0 otherwise;
+  with MiniEAPI it only returns 0 (cannot write).
+
+*VICE* (`work/m10test.s` on five prepared images; each run ends with
+validate again, a defragment, a verify and the listing):
+
+| image | validate | afterwards |
+| ----- | -------- | ---------- |
+| incomplete copy (source marked, destination holds a partial copy) | 1 | second call 0; all 7 files listed, defragment + verify OK |
+| complete copy, source erase interrupted (both marked) | 1 | same |
+| both areas populated, no markers (foreign/old image) | `$47`, C set | defragment copies over identical data, then everything OK |
+| unclosed write file (size `$ffffff`) | 1 | `UNCL` gone, 7 files, OK |
+| clean cartridge | 0 | OK |
+
+The `@` overwrite order (old file scratched only when the new one fits,
+S18) and the missing commit marker for data (S22) remain as documented.
 
 Verified in VICE (`work/m10test.s`):
 
@@ -1369,6 +1394,7 @@ Fixed on `main`, each verified in VICE:
 | "Pass on the result of EAPIInit" | S19 |
 | "Fix ? matching, @ on read, and the blocks free count" | S20 (part) |
 | "Preserve X and Y across the defragment callbacks" | M11 |
+| "Implement EFS_validate with defragment markers" | M10 |
 | "Truncate file names to 16 characters" | m1 |
 | "Preserve X/Y in chrout and return the disk full error code" | m7 (part) |
 | "Check the directory end for listings and deleted entries" | m2 |

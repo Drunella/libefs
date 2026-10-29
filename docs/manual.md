@@ -88,7 +88,7 @@ The defragmentation callbacks are called while the EasyFlash is banked in
 To initialize libefs, EAPI or MiniEAPI you need to call the functions
 EFS_init and EFS_init_eapi or EFS_init_minieapi while bank 0 must
 be banked in as 16k cartridge. You should also call EFS_validate on every
-start. Call EFS_defragment if EFS_validate returns an error.
+start. Call EFS_defragment if EFS_validate returns .C set.
 
 ```
 EFS_init ($8000):
@@ -152,13 +152,18 @@ Parameter: none
 Returns:
   A: error code or 0
   .C: set if efs is corrupted
-Call this to check if there are any corruptions in the writeable part of the
-efs. The function returns .C set if any corruptions are found. The function
-will delete corrupted files. Call EFS_defragment to repair the remaining
-files. It will also check and erase all unused banks prior to usage. Some
-hardware and older software implementations will not clear unused areas.
-(eg older VICE, Kung Fu Flash)
-Not yet implemented: always returns A = 0 and .C clear (nothing found).
+Call this on every start to check the writeable part of the efs:
+* If both read/write areas are in use (a defragmentation was interrupted
+  by a reset or power loss), the stale area is erased: libefs marks the
+  source and the destination of a defragmentation in the last directory
+  slot, so it can tell them apart. Without these markers (image written
+  by another tool) A = $47 is returned with .C set; call EFS_defragment
+  in that case.
+* Entries with an impossible size (a file that was being written when
+  the power was lost) or partially written flags are scratched.
+A = 1 with .C clear reports that something was repaired, A = 0 that
+nothing was found. With MiniEAPI nothing can be repaired; A = 0 is
+returned. Unused banks are not checked or erased.
 ```
 
 You can use the following code to bank in before calling an init function:

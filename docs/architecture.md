@@ -297,6 +297,15 @@ bytes written, and the all-clear callback at the end. Then
 `rom_defragment_erasearea` erases the old area sector by sector
 (size/8 sectors of 64K). `EFS_format` erases both r/w areas.
 
+Before the copy starts, byte 0 of directory slot 255 of the source is
+programmed to `$00` ("copy started"); after the copy, byte 1 of slot 255
+of the destination ("copy complete"). Slot 255 must stay blank as the
+terminator (at most 255 entries are used), so its name bytes are free
+for these markers, and they disappear with the erase of the area.
+`EFS_validate` (`rom_validate_body`) uses them to erase the stale area
+when both areas are in use after an interrupted defragmentation, and
+scratches entries with impossible sizes or half-written flags.
+
 ### 5.9 Directory listing
 
 `lib-efs-dirlist.s` generates a BASIC-program-like listing byte by byte.

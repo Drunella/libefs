@@ -57,6 +57,7 @@
 .import rom_dirload_chrin
 
 .import rom_format_body
+.import rom_validate_body
 .import rom_defragment_body
 .import rom_chrout_body
 .import rom_save_body
@@ -122,6 +123,7 @@
 .import rom_scratch_process
 
 .export rom_config_call_defragment_allclear
+.export rom_config_checkarea
 .export rom_config_call_defragment_warning
 
 .macro indicate_load
@@ -178,8 +180,10 @@
     EFS_validate: ; @ $800f
         ; parameter: none
         ; return:
-        ;    .C set if problems occured (defragmentation necessary)
-        jmp rom_validate_body
+        ;    A: 0: ok; 1: repaired (stale area erased, invalid entries
+        ;       scratched); $47 with .C set: both areas in use and no
+        ;       markers, call EFS_defragment
+        jmp efs_validate_entry
 
     ; unused call
     ; @ $8012
@@ -269,6 +273,17 @@
     efs_format_entry:
         jsr backup_zeropage
         jsr rom_format_body
+        jmp restore_zeropage_keep_ac
+
+
+    efs_validate_entry:
+        jsr backup_zeropage
+        jsr rom_validate_body
+        php
+        pha
+        jsr efs_init_eapireadinc  ; leave efs_io_byte as "read"
+        pla
+        plp
         jmp restore_zeropage_keep_ac
 
 
@@ -397,16 +412,6 @@
       .if (@codeend - @code) > GENERIC_COMMAND_SIZE
       .error "dynamic code initeapi to large"
       .endif
-
-
-    rom_validate_body:
-        ; ### todo implement ###
-        ; return 0: everything is fine
-        ; return 1: deleted invalid files; defragmentation necessary
-        ; not implemented yet: report "nothing found" (A = 0, .C clear)
-        lda #$00
-        clc
-        rts
 
 
     efs_init_readmem:
