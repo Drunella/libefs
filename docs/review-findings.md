@@ -54,7 +54,7 @@ section; for fixed items they refer to the original code.
 | m7 | minor | partly confirmed | Various smaller API inconsistencies (see list) |
 | D1 | doc | – | Documentation mismatches |
 | S1 | critical | confirmed | Defragment copies size+1 bytes per file; the next save fails on the stray byte |
-| S2 | critical | confirmed | Defragment has no bounds checks: a `$ffffff` entry programs bank 0 and the whole cartridge |
+| S2 | critical | **fixed** | Defragment has no bounds checks: a `$ffffff` entry programs bank 0 and the whole cartridge |
 | S3 | critical | **fixed** | `EFS_format` with an open file: next `chrin` erases banks 0-7 (read) / a later file gets a corrupt size (write) |
 | S4 | critical | **fixed** | `EFS_open` while a write channel is full clears the status; the next `chrout` writes into bank 0 |
 | S5 | critical | **fixed** | `EFS_save` of ≥ 64 KB passes the space check and writes past the area into bank 0 |
@@ -850,6 +850,34 @@ ROMH: 7,737 bytes changed, banks 1-3 ROMH: ~8,100 each, bank 4 ROMH:
 exceeds the area as corrupt (skip it, report it), clamp the destination
 to the area end, and stop on write errors (S7).
 
+**Fixed**: `rom_defragment_copy` now
+
+- drops an entry whose size is not smaller than the source area
+  (`size high byte ≥ area size >> 3`), counts it in
+  `efs_defragment_skipped`, and returns A = 1 (`ERROR_FILE_SCRATCHED`,
+  C clear) if any entry was dropped;
+- computes the first bank after the destination area
+  (`efs_defragment_endbank`, dir bank + size, size/2 for lhlh) and
+  checks the destination bank before every byte;
+- stops at the first write error (S7, copy part);
+- on either abort, erases the partially written destination again (so
+  the source stays the only valid area), restores the area flags and
+  returns `ERROR_DIRECTORY_ERROR` (`$47`, C set). `rom_defragment_body`
+  and the automatic defragment in `rom_filesave_conditions` propagate
+  the error.
+
+Two of the five unused IO2 bytes are used for the two new variables.
+
+*VICE* (`work/r2btest.s`, `work/r2b2test.s`, flash write-back):
+
+| | fixed | before the fix |
+| - | ----- | -------------- |
+| `UNCL` (size `$ffffff`) + `EFS_defragment` | returns A = 1, C clear after 9 s; no flash change outside the two areas; listing shows the 7 `DELME` files, `UNCL` gone, 728 blocks free; `DELME17K` loads | still copying after 15 min; bank 0 ROMH and banks 1-4 ROMH overwritten |
+| normal defragment (`work/m5test.s`) | A = 0; files load back | – |
+
+The abort path (destination full / write error) is verified by code only;
+no input to the current layout reaches it before S1 is fixed.
+
 #### S3 – `EFS_format` with an open file erases libefs or corrupts a later file
 
 `src/lib/lib-efs-rw.s:200-214` (`rom_format_body`) does not check
@@ -1172,6 +1200,7 @@ Fixed on `main`, each verified in VICE:
 | "Refuse EFS_format while a channel is open" | S3 |
 | "Keep the channel status when EFS_open is rejected" | S4 |
 | "Fix space check for saves of 64 KB or more" | S5 |
+| "Guard defragment against corrupt sizes and destination overflow" | S2, S7 (copy) |
 
 Most of the critical items were one-instruction branch or flag errors
 (`bne` instead of `bcc`, `beq` instead of `bne`, `plp` restoring the

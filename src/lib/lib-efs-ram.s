@@ -56,6 +56,8 @@
 .export io_end_address
 .export efs_io_byte
 .export efs_generic_command
+.export efs_defragment_endbank
+.export efs_defragment_skipped
 .export efs_enter_pha
 .export efs_bankout
 .export efs_bankout_end
@@ -261,5 +263,10 @@
     io_end_address:
         .word $0000
 
+    efs_defragment_endbank:  ; first bank after the destination area
+        .byte $00
+    efs_defragment_skipped:  ; number of invalid entries dropped
+        .byte $00
+
     unused:
-        .byte $00, $00, $00, $00, $00
+        .byte $00, $00, $00

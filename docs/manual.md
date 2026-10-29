@@ -118,6 +118,11 @@ Returns:
 Defragments the writable part of the efs. This process can take several
 minutes depending on the size of writable part and used files. While
 defragmenting a progress function can be called to indicate the process.
+Directory entries with an impossible size (e.g. of a file that was never
+closed because of a reset) are dropped; A = 1 with .C clear reports that
+this happened. If the copy fails (write error, destination full), the
+destination area is erased again, the source area stays valid and
+A = $47 (directory error) is returned with .C set.
 ```
 
 ```

@@ -125,6 +125,8 @@
 .import efs_finish_tempvars
 .import efs_temp_var1
 .import efs_temp_var2
+.import efs_defragment_endbank
+.import efs_defragment_skipped
 .import rom_config_call_defragment_allclear
 .import rom_config_call_defragment_warning
 
@@ -186,12 +188,14 @@
         jsr rom_flags_get_area_invert
         tay
         jsr rom_defragment_copy
+        bcs @error       ; copy failed, destination erased again, A = error
+        pha              ; 0, or 1 if invalid entries were dropped
 
         jsr rom_flags_get_area
         jsr rom_defragment_erasearea
 
         jsr efs_init_eapireadinc  ; leave efs_io_byte as "read" (erase was patched in)
-        lda #$00
+        pla
         clc
         rts
 
@@ -619,6 +623,19 @@
         ;lda #BANKING_MODE
         sta zp_var_x7
 
+        ; first bank after the destination area: dir bank + size
+        ; (size / 2 for lhlh, two 8k banks per bank number); may be 64
+        jsr rom_config_get_area_size_invert
+        ldx zp_var_x7
+        cpx #$d0
+        bne :+
+        lsr a
+      : clc
+        adc efs_temp_var2
+        sta efs_defragment_endbank
+        lda #$00
+        sta efs_defragment_skipped
+
         ; start iterating through source directory
       @loop:
         jsr rom_config_get_area_dirhigh           ; defragment is not file based
@@ -660,13 +677,27 @@
         jsr efs_readef
         sta zp_var_xd
 
+        ; an entry larger than the whole area is corrupt (e.g. size $ffffff
+        ; of a write file that was never closed): drop it instead of
+        ; copying 16 MB over the cartridge
+        jsr rom_config_get_area_size  ; source area, in 8k banks
+        lsr a
+        lsr a
+        lsr a                         ; high byte of the area size in bytes
+        cmp zp_var_xd
+        bcc @invalid                  ; area < size high
+        beq @invalid                  ; equal: size >= area (directory takes space)
+
         jsr rom_config_call_defragment_warning  ; defragment warning
 
         ; copy directory
         jsr rom_defragment_copy_dir
         jsr rom_defragment_copy_data
+        bcs @abort                    ; write error or destination area full
         jmp @loop
 
+      @invalid:
+        inc efs_defragment_skipped
       @skip:
         lda #24    ; next entry
         jsr efs_readef_pointer_advance
@@ -675,7 +706,23 @@
       @leave:
         jsr rom_config_call_defragment_allclear  ; defragment finished
         jsr efs_finish_tempvars
-        clc
+        lda efs_defragment_skipped
+        beq :+
+        lda #ERROR_FILE_SCRATCHED  ; invalid entries were dropped
+      : clc
+        rts
+
+      @abort:
+        ; the copy failed: erase the (partially written) destination again
+        ; so that the source area stays the only valid one
+        jsr rom_config_call_defragment_allclear
+        jsr efs_finish_tempvars
+        jsr rom_flags_get_area_invert
+        jsr rom_defragment_erasearea  ; selects the destination area
+        jsr rom_flags_get_area_invert ; back to the source area
+        jsr rom_flags_set_area
+        lda #ERROR_DIRECTORY_ERROR
+        sec
         rts
 
 
@@ -767,9 +814,12 @@
         ; copy data
         ldy #$00
       @loop:
+        lda zp_var_x8    ; destination bank
+        cmp efs_defragment_endbank
+        beq @error       ; destination area is full
         jsr efs_readef
         jsr efs_io_byte  ; use eapiwriteflash without inc?
-        ;bcs @error ignore errors :(
+        bcs @error       ; write error
         jsr rom_defragment_copy_data_sourceinc  ; unroll ?
         jsr rom_defragment_copy_data_destinc  ; unroll ?
         jsr rom_filesave_decrease_size  ; unroll ?
@@ -784,6 +834,11 @@
         jsr efs_setstartbank_ext
 
         clc
+        rts
+
+      @error:
+        jsr efs_readef_swap
+        sec
         rts
 
 
@@ -896,6 +951,7 @@
         jsr rom_flags_get_area_invert
         tay
         jsr rom_defragment_copy
+        bcs @error       ; copy failed, A = error code
         jsr rom_flags_get_area
         jsr rom_defragment_erasearea
 
