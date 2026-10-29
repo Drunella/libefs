@@ -56,6 +56,7 @@
 .import rom_space_setdirstart
 .import rom_space_subtractsize_blocks
 .import rom_config_rw_available
+.import efs_temp_byte
 .import rom_space_maxspace
 .import rom_space_usedspace
 
@@ -226,6 +227,12 @@
 
 
     rom_dirload_chrin:
+        ; returns the next byte in A; X and Y are preserved (as the kernal
+        ; chrin does), .C set with the last byte
+        txa
+        pha
+        tya
+        pha
         jsr backup_zeropage
         lda internal_state
         and #$3f  ; remove the upper bits
@@ -243,13 +250,18 @@
         cmp #sm_end ; next state is the end: this is the last byte
         beq @eof    ;   -> deliver it with .C set
         jsr restore_zeropage
-        tya
         clc
-        rts
+        bcc @exit
       @eof:
         jsr restore_zeropage
-        tya
         sec
+      @exit:
+        sty efs_temp_byte  ; keep .C, restore X and Y, return the byte
+        pla
+        tay
+        pla
+        tax
+        lda efs_temp_byte
         rts
 
 

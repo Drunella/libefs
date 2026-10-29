@@ -63,6 +63,7 @@ section; for fixed items they refer to the original code.
 | S8 | major | **fixed** | `chrin` signals EOF one byte late (KERNAL difference) |
 | S9 | major | **fixed** | Type `$1f` entries: terminator for search/dirlist, live file for space/save/defragment |
 | S10 | minor | **fixed** | Exact-fit save was refused |
+| S11 | minor | **fixed** | Directory `chrin` destroyed X and Y |
 | S12 | minor | **fixed** | Verify end address of a file without data (with S8) |
 | S10-S22 | minor | see section | Exact-fit save, dir `chrin` X/Y, verify end address, name consumed, parser bounds, `@` handling, 254 files, geometry assumptions, commit marker, API nits |
 | S23 | doc | – | Callback and memory rules, activity indication, comment list |
@@ -1115,7 +1116,9 @@ flags `$7f`):
 - **S11 – `chrin` on a directory destroys X and Y** (`dirlist.s:228`,
   `:309-312`); file `chrin` preserves them, the KERNAL always does.
   *VICE*: X `$5a`/Y `$a5` → `$ff`/`$00` after a directory `chrin`,
-  unchanged after a file `chrin`.
+  unchanged after a file `chrin`. **Fixed**: `rom_dirload_chrin` saves and
+  restores X and Y. *VICE* (`work/s11test.s`): X/Y unchanged after every
+  directory `chrin`; before: `$ff`/`$01`.
 - **S12 – verify of a file without data bytes returns a wrong end
   address.** `efs_init_readmem` (`lib-efs.s:411`) leaves Y = `$ff`;
   `rom_fileload_verify` sets Y = 0 only after the first successful read.
@@ -1284,6 +1287,7 @@ Fixed on `main`, each verified in VICE:
 | "Report end of file together with the last byte" | S8, S12 |
 | "Treat partially written directory entries consistently" | S9 |
 | "Accept a save that exactly fills the free space" | S10 |
+| "Preserve X and Y in directory chrin" | S11 |
 
 Most of the critical items were one-instruction branch or flag errors
 (`bne` instead of `bcc`, `beq` instead of `bne`, `plp` restoring the
