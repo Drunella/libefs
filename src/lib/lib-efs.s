@@ -665,20 +665,24 @@
     rom_open_body:
         ; parameters: A: 0: read; 1: write
         ; returns A, .C
+        ; a file is open: report it without touching the status of that
+        ; file (status_byte holds the eof/disk full state of a write channel)
+        pha  ; save read/write
+        lda internal_state  ; check if file open
+        beq :+
+        pla
+        lda #ERROR_FILE_OPEN
+        sta error_byte
+        sec
+        jmp efs_bankout  ; ends with rts
+      : pla
+
         pha  ; save read/write
         jsr backup_zeropage
 
         lda #$00         ; reset state and error
         sta status_byte
         sta error_byte
-
-        lda internal_state  ; check if file open
-        beq @loadsavecheck
-        pla
-        lda #ERROR_FILE_OPEN
-        sta error_byte
-        sec
-        bne @leave
 
       @loadsavecheck:
         ; set load/save

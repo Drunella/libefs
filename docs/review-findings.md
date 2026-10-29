@@ -56,7 +56,7 @@ section; for fixed items they refer to the original code.
 | S1 | critical | confirmed | Defragment copies size+1 bytes per file; the next save fails on the stray byte |
 | S2 | critical | confirmed | Defragment has no bounds checks: a `$ffffff` entry programs bank 0 and the whole cartridge |
 | S3 | critical | **fixed** | `EFS_format` with an open file: next `chrin` erases banks 0-7 (read) / a later file gets a corrupt size (write) |
-| S4 | critical | confirmed | `EFS_open` while a write channel is full clears the status; the next `chrout` writes into bank 0 |
+| S4 | critical | **fixed** | `EFS_open` while a write channel is full clears the status; the next `chrout` writes into bank 0 |
 | S5 | critical | confirmed | `EFS_save` of ≥ 64 KB passes the space check and writes past the area into bank 0 |
 | S6 | major | confirmed | A failed save leaves a live, corrupt directory entry |
 | S7 | major | by code | Write/erase errors ignored in defragment, erase and close |
@@ -908,6 +908,16 @@ write-back shows **bank 0 ROML: 1 byte changed** (`$8000`).
 *Fix*: check `internal_state` before touching the status, as in
 `rom_load_body:779-787`.
 
+**Fixed**: `rom_open_body` checks `internal_state` first and returns
+`ERROR_FILE_OPEN` without touching `status_byte`/`error_byte`.
+
+*VICE* (`work/r2ctest.s`, flash write-back):
+
+| step | fixed | before the fix |
+| ---- | ----- | -------------- |
+| `open(0)` during a full write channel | `$02`; `readst` stays `$40` | `$02`; `readst` becomes 0 |
+| next `chrout` | `$19`, C set, nothing written | writes: bank 0 ROML, 1 byte changed |
+
 #### S5 – `EFS_save` of 64 KB or more passes the space check
 
 `src/lib/lib-efs-rw.s:1058-1064` (`rom_filesave_addsize`) adds the 2
@@ -1152,6 +1162,7 @@ Fixed on `main`, each verified in VICE:
 | "Fix blocks free for read-only and full areas" | M9 |
 | "Make the EFS_validate stub return a defined result" | M10 (part) |
 | "Refuse EFS_format while a channel is open" | S3 |
+| "Keep the channel status when EFS_open is rejected" | S4 |
 
 Most of the critical items were one-instruction branch or flag errors
 (`bne` instead of `bcc`, `beq` instead of `bne`, `plp` restoring the
