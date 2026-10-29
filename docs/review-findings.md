@@ -47,7 +47,7 @@ section; for fixed items they refer to the original code.
 | M11 | major | **fixed** | Defragment callbacks must preserve Y (and should preserve X), which is not documented or enforced |
 | m1 | minor | **fixed** | Names longer than 16 characters can desynchronise the directory scan |
 | m2 | minor | **fixed** | Directory bounds are not checked for deleted entries; dirlist uses a hard-coded `$b8` bound |
-| m3 | minor | by code | `rom_filesave_blockedspace` uses the stale "active file" area |
+| m3 | minor | **fixed** | `rom_filesave_blockedspace` uses the stale "active file" area |
 | m4 | minor | by code | `rom_defragment_erasearea` with size < 8 erases 256 sectors |
 | m5 | minor | by code | Hard-coded `$80`/`$a0` file base and dir bank used as files bank |
 | m6 | minor | confirmed | LOAD returns the last address, not last + 1 like the KERNAL |
@@ -749,7 +749,7 @@ defragment then verify `DELME17K` → OK (`$40`); before: mismatch
   (`lib-efs-rw.s:1163`) uses `rom_config_get_area_dirhigh_active_file`, but
   during `rom_filesave_conditions` the file-area bits still describe the
   previously opened file. It should use `rom_config_get_area_dirhigh`.
-  This only affects the bounds check.
+  This only affects the bounds check. **Fixed** (by code; save regression test passes).
 - **m4 – erase count.** `rom_defragment_erasearea` (`lib-efs-rw.s:430`) uses `size >> 3` as
   the loop counter. A configured size below 8 gives 0, and the loop then
   runs 256 times (erasing everything from the area start through the

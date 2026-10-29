@@ -1310,8 +1310,8 @@
         sta zp_var_xd
 
       @loop:
-        jsr rom_config_get_area_dirhigh_active_file  ; file based
-        jsr efs_readef_dirboundary
+        jsr rom_config_get_area_dirhigh  ; the area being scanned (the
+        jsr efs_readef_dirboundary       ; "active file" bits may be stale)
         bcs @leave  ; directory out of bounds
         jsr efs_readef
         cmp #$ff
