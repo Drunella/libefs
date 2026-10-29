@@ -46,7 +46,7 @@ section; for fixed items they refer to the original code.
 | M10 | major | **partly fixed** | No recovery from an interrupted defragment or an unclosed write file (open); `EFS_validate` stub returned C unchanged (fixed: returns A = 0, C clear) |
 | M11 | major | **fixed** | Defragment callbacks must preserve Y (and should preserve X), which is not documented or enforced |
 | m1 | minor | **fixed** | Names longer than 16 characters can desynchronise the directory scan |
-| m2 | minor | by code | Directory bounds are not checked for deleted entries; dirlist uses a hard-coded `$b8` bound |
+| m2 | minor | **fixed** | Directory bounds are not checked for deleted entries; dirlist uses a hard-coded `$b8` bound |
 | m3 | minor | by code | `rom_filesave_blockedspace` uses the stale "active file" area |
 | m4 | minor | by code | `rom_defragment_erasearea` with size < 8 erases 256 sectors |
 | m5 | minor | by code | Hard-coded `$80`/`$a0` file base and dir bank used as files bank |
@@ -739,6 +739,12 @@ defragment then verify `DELME17K` → OK (`$40`); before: mismatch
   file data. `rom_dirload_checkboundary` (`lib-efs-dirlist.s:427`)
   hard-codes `$b8`, which is only correct for directories at `$a000`.
   The r/w directories at `$8000` end at `$9800`.
+  **Fixed**: the listing keeps the end of the current directory in a
+  spare IO2 byte (`efs_dirload_boundary`), and the search checks the
+  bound before looking at the type. *VICE* (`work/m2test.s`, image with
+  all 256 slots used): the listing ends after 256 entries (end
+  `$82d7`); before it ran into the file data (end `$8820`, garbage
+  entries).
 - **m3 – stale "active file" area.** `rom_filesave_blockedspace`
   (`lib-efs-rw.s:1163`) uses `rom_config_get_area_dirhigh_active_file`, but
   during `rom_filesave_conditions` the file-area bits still describe the
@@ -1362,6 +1368,10 @@ Fixed on `main`, each verified in VICE:
 | "Preserve X and Y across the defragment callbacks" | M11 |
 | "Truncate file names to 16 characters" | m1 |
 | "Preserve X/Y in chrout and return the disk full error code" | m7 (part) |
+| "Check the directory end for listings and deleted entries" | m2 |
+| "Use the current area in the blocked-space scan" | m3 |
+| "Reject an area size below one sector in the erase" | m4 |
+| "Use the configured file address in the defragment copy" | m5 |
 
 Most of the critical items were one-instruction branch or flag errors
 (`bne` instead of `bcc`, `beq` instead of `bne`, `plp` restoring the

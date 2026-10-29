@@ -2212,13 +2212,13 @@
         jsr efs_readef_read_and_inc  ; efs_io_byte    ; load next char
         jsr rom_dirsearch_is_terminator
         bcs @error4    ; terminator, file not found
-        cmp #$00       ; compare for invalid
-        beq @nomatch   ; file not valid
+        pha            ; type
         jsr rom_config_get_area_dirhigh  ; no active file present
         jsr efs_readef_dirboundary
-;        bcs @leave  ; directory out of bounds
-;        jsr rom_dirsearch_checkboundary
-        bcs @error4    ; over bounds, file not found
+        pla
+        bcs @error4    ; over bounds (also for deleted entries), file not found
+        cmp #$00       ; compare for invalid
+        beq @nomatch   ; file not valid
         jmp @next
       @error4:
         lda #ERROR_FILE_NOT_FOUND  ; file not found: status=0, C

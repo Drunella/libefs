@@ -57,6 +57,7 @@
 .import rom_space_subtractsize_blocks
 .import rom_config_rw_available
 .import efs_temp_byte
+.import efs_dirload_boundary
 .import rom_space_maxspace
 .import rom_space_usedspace
 
@@ -186,6 +187,9 @@
         ldy dirload_temp_var_zp
         lda (zp_var_x5), y  ; at libefs_config::libefs_area::high_dir
         sta efs_readef_high
+        clc
+        adc #>DIRECTORY_SIZE  ; end of this directory
+        sta efs_dirload_boundary
 
 ;        inc dirload_temp_var_zp
 ;        ldy dirload_temp_var_zp
@@ -445,7 +449,7 @@
         ; .C set if out of bounds
         ; ### correct boundary configuration
         lda efs_readef_high
-        cmp #$b8
+        cmp efs_dirload_boundary  ; .C set: at or beyond the end of the directory
         rts
 
     rom_dirload_sm_linenend:

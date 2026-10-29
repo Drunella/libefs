@@ -59,6 +59,7 @@
 .export efs_defragment_endbank
 .export efs_defragment_skipped
 .export efs_temp_byte
+.export efs_dirload_boundary
 .export efs_enter_pha
 .export efs_bankout
 .export efs_bankout_end
@@ -270,6 +271,8 @@
         .byte $00
     efs_temp_byte:           ; directory chrin: the byte to return
         .byte $00
+    efs_dirload_boundary:    ; directory listing: high byte of the dir end
+        .byte $00
 
     unused:
-        .byte $00, $00
+        .byte $00
