@@ -51,7 +51,7 @@ section; for fixed items they refer to the original code.
 | m4 | minor | by code | `rom_defragment_erasearea` with size < 8 erases 256 sectors |
 | m5 | minor | by code | Hard-coded `$80`/`$a0` file base and dir bank used as files bank |
 | m6 | minor | confirmed | LOAD returns the last address, not last + 1 like the KERNAL |
-| m7 | minor | partly confirmed | Various smaller API inconsistencies (see list) |
+| m7 | minor | **partly fixed** | Various smaller API inconsistencies (see list) |
 | D1 | doc | – | Documentation mismatches |
 | S1 | critical | **fixed** | Defragment copies size+1 bytes per file; the next save fails on the stray byte |
 | S2 | critical | **fixed** | Defragment has no bounds checks: a `$ffffff` entry programs bank 0 and the whole cartridge |
@@ -773,10 +773,10 @@ defragment then verify `DELME17K` → OK (`$40`); before: mismatch
   - `EFS_chrin` after EOF returns C set with A = 0 and no error code.
   - `EFS_chrout` destroys X (`rom_chrout_body`, `lib-efs-rw.s:202`,
     starts with `tax`); the KERNAL `CHROUT` preserves X and Y.
-    *Confirmed in VICE* (X = `$5a` before, `$00` after `chrout $00`).
+    *Confirmed in VICE* (X = `$5a` before, `$00` after `chrout $00`). **Fixed** (`work/m7test.s`).
   - On "disk full", `EFS_chrout` returns A = `$40` (the status value,
     `lib-efs-rw.s:252`) instead of the error code `$48`; `error_byte` is
-    correct. *Confirmed in VICE* (C4 test).
+    correct. *Confirmed in VICE* (C4 test). **Fixed**: returns `$48`.
   - Open for writing reserves `$2000` + 2 bytes (`lib-efs-rw.s:381`). With less free space
     `open` fails ("disk full") even for small files. Larger files can be
     written as long as the area has room.
@@ -1361,6 +1361,7 @@ Fixed on `main`, each verified in VICE:
 | "Fix ? matching, @ on read, and the blocks free count" | S20 (part) |
 | "Preserve X and Y across the defragment callbacks" | M11 |
 | "Truncate file names to 16 characters" | m1 |
+| "Preserve X/Y in chrout and return the disk full error code" | m7 (part) |
 
 Most of the critical items were one-instruction branch or flag errors
 (`bne` instead of `bcc`, `beq` instead of `bne`, `plp` restoring the

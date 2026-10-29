@@ -127,6 +127,7 @@
 .import efs_temp_var2
 .import efs_defragment_endbank
 .import efs_defragment_skipped
+.import efs_temp_byte
 .import rom_config_call_defragment_allclear
 .import rom_config_call_defragment_warning
 
@@ -247,9 +248,9 @@
 
 
     rom_chrout_body:
-        ; character in a
+        ; character in a; X and Y are preserved (as the kernal does)
         ; no zeropage usage
-        tax
+        sta efs_temp_byte
         lda internal_state
         bne @next1
         sec
@@ -271,7 +272,7 @@
         bpl @error  ; branch if bit 7 is clear
         bvc @error  ; branch if bit 6 is clear
 
-        txa
+        lda efs_temp_byte
         jsr efs_io_byte  ; write byte
         ; size field pointer in filename_address and filename_length(bank)
         ; size in io_start_address, io_end_address low
@@ -294,10 +295,10 @@
         beq @done
 
       @overflow:
-        lda #ERROR_DISK_FULL
-        sta error_byte
         lda #STATUS_EOF
         sta status_byte
+        lda #ERROR_DISK_FULL  ; returned in a, .C is set (cmp equal)
+        sta error_byte
         bne @done
 
       @writeerror:
