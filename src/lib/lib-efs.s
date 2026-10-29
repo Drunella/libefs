@@ -1656,7 +1656,7 @@
         lda internal_state
         and #%11000000
         cmp #%11000000
-        bne @next3  ; only for save
+        bne @continue  ; reading: '@' has no meaning, ignore it (as a 1541 does)
         jsr efs_directory_search
         bcs :+      ; not found, ignore
         jsr rom_scratch_process
@@ -1705,6 +1705,13 @@
         rts
 
       @next1:
+        lda zp_var_x8
+        cmp #$40    ; '@': no meaning for load, ignore it (as a 1541 does)
+        bne @next2
+        clc         ; continue with the file name
+        rts
+
+      @next2:
         ; next command
 
         lda #ERROR_SYNTAX_ERROR_30
@@ -2108,8 +2115,12 @@
         cmp (zp_var_xe), y   ; character in name is '*', we have a match
         beq @match
         lda #$3f             ; '?'
-        cmp (zp_var_xe), y   ; character in name is '?', the char fits
-        beq @fit
+        cmp (zp_var_xe), y   ; character in name is '?', any char fits
+        bne :+
+        lda zp_var_xb        ;   except the 0 padding after a short name
+        bne @fit
+        beq @next
+      :
         lda (zp_var_xe), y   ; compare character with character in entry
         cmp zp_var_xb        ; if not equal nextname
         bne @next

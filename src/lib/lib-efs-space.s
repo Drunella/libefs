@@ -167,16 +167,9 @@
         sbc zp_var_xd
         sta zp_var_xd
 
-        lda #$00
+        lda #$00   ; whole blocks: drop the low byte (round down)
         sta zp_var_xb
-        sec ; round down
-        lda zp_var_xc
-        sbc #$01
-        sta zp_var_xc
-        lda zp_var_xd
-        sbc #$00
-        sta zp_var_xd
-        
+
         clc
         rts
 

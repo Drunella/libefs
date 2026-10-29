@@ -520,8 +520,12 @@
         cmp (zp_var_x8), y   ; character in name is '*', we have a match
         beq @match
         lda #$3f             ; '?'
-        cmp (zp_var_x8), y   ; character in name is '?', the char fits
-        beq @fit
+        cmp (zp_var_x8), y   ; character in name is '?', any char fits
+        bne :+
+        lda zp_var_xb        ;   except the 0 padding after a short name
+        bne @fit
+        beq @nomatch
+      :
         lda (zp_var_x8), y   ; compare character with character in entry
         cmp zp_var_xb        ; if not equal nextname
         bne @nomatch

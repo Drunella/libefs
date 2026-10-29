@@ -70,6 +70,7 @@ section; for fixed items they refer to the original code.
 | S16 | minor | **fixed** | Directory held 254 files instead of 255 |
 | S17 | minor | **fixed** | Garbage error code after the post-defragment check |
 | S19 | minor | **fixed** | `EFS_init_eapi` ignored EAPIInit's result |
+| S20 | minor | **partly fixed** | API nits: `?` vs padding, `@0:` on read, blocks free fixed; the rest documented |
 | S12 | minor | **fixed** | Verify end address of a file without data (with S8) |
 | S10-S22 | minor | see section | Exact-fit save, dir `chrin` X/Y, verify end address, name consumed, parser bounds, `@` handling, 254 files, geometry assumptions, commit marker, API nits |
 | S23 | doc | – | Callback and memory rules, activity indication, comment list |
@@ -1198,6 +1199,13 @@ flags `$7f`):
   "blocks free" is one block low (`space.s:170-178` subtracts a block
   although max is a multiple of 256: 186,664 free bytes = 729 blocks,
   shown as 728 — *VICE*, M9 table).
+  **Fixed** (`work/s20test.s`): `?` does not match the padding
+  (`DATA1?` → `$04`, `DATA?` still matches `DATA1`); `@0:` is ignored
+  for read open and load (→ 0, before `$1e`); blocks free is 729; the
+  `EFS_util` comment says 00-15. Not changed: `setlfs`/`setnam` are
+  still rejected while a channel is open (the name storage is in use by
+  a write channel), `EFS_util` `$10` during a write channel, and the
+  X/Y of a rejected load/save — all three are documented in the manual.
 - **S21 – area geometry assumptions** (extends m4/m5): the chrout end
   bank is `dir_bank + size` (`rw.s:1495-1516`), erase and copy_dir use
   fixed `$80`/`$a0`, the offset reduction assumes `files_high` =
@@ -1329,6 +1337,7 @@ Fixed on `main`, each verified in VICE:
 | "Allow 255 directory entries" | S16 |
 | "Return disk full when the post-defragment check fails" | S17 |
 | "Pass on the result of EAPIInit" | S19 |
+| "Fix ? matching, @ on read, and the blocks free count" | S20 (part) |
 
 Most of the critical items were one-instruction branch or flag errors
 (`bne` instead of `bcc`, `beq` instead of `bne`, `plp` restoring the

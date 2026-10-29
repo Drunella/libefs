@@ -72,7 +72,7 @@
 
     EFS_util:  ; @ $DF00
         ; parameter:
-        ;    A: utility mode (01-15: setlfs; 16: loadaddress)
+        ;    A: utility mode (00-15: setlfs; 16: loadaddress)
         ;    Y: setlfs: secondary address (0: relocate, 1: use prg)
         ;    X: 
         ; return:
