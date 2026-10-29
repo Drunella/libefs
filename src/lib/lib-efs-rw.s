@@ -1097,8 +1097,8 @@
     rom_filesave_checksize:
         ; checks used file in 3b/3c/3d 
         ; against available size in 38/39/3a
-        ; val1 >= Val2
-        ; 3b/3c/3d >= 38/39/3a
+        ; val1 > Val2 (equal: fits exactly)
+        ; 3b/3c/3d > 38/39/3a
         lda zp_var_xd  ; Val1 +2    ; high bytes
         cmp zp_var_xa  ; Val2 +2
         bcc @LsThan    ; hiVal1 < hiVal2 --> Val1 < Val2
@@ -1109,8 +1109,8 @@
         bne @GrtEqu    ; hiVal1 != hiVal2 --> Val1 > Val2
         lda zp_var_xb  ; Val1       ; low bytes
         cmp zp_var_x8  ; Val2
-        ;beq @Equal     ; Val1 = Val2
-        bcs @GrtEqu     ; loVal1 >= loVal2 --> Val1 >= Val2
+        beq @LsThan     ; Val1 = Val2: the file ends exactly at the area end, ok
+        bcs @GrtEqu     ; loVal1 > loVal2 --> Val1 > Val2
       @LsThan:
         clc
         rts

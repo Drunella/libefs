@@ -62,6 +62,7 @@ section; for fixed items they refer to the original code.
 | S7 | major | **fixed** | Write/erase errors ignored in defragment, erase and close |
 | S8 | major | **fixed** | `chrin` signals EOF one byte late (KERNAL difference) |
 | S9 | major | **fixed** | Type `$1f` entries: terminator for search/dirlist, live file for space/save/defragment |
+| S10 | minor | **fixed** | Exact-fit save was refused |
 | S12 | minor | **fixed** | Verify end address of a file without data (with S8) |
 | S10-S22 | minor | see section | Exact-fit save, dir `chrin` X/Y, verify end address, name consumed, parser bounds, `@` handling, 254 files, geometry assumptions, commit marker, API nits |
 | S23 | doc | – | Callback and memory rules, activity indication, comment list |
@@ -1107,7 +1108,10 @@ flags `$7f`):
   (`rw.s:997`) treats used + new ≥ max as full; a file ending exactly at
   the area end is valid (chrout accepts it, C4 test). *VICE*
   (`work/r2atest.s`): 100 bytes free, save of 98 data bytes → `$48`;
-  97 → OK.
+  97 → OK. **Fixed**: `rom_filesave_checksize` treats "equal" as fitting.
+  *VICE* (`work/s10test.s`): 100 bytes free → save of 98 data bytes
+  OK and loads back (end `$5061`), a further 97-byte save → `$48`;
+  before: 98 → `$48`, 97 → OK.
 - **S11 – `chrin` on a directory destroys X and Y** (`dirlist.s:228`,
   `:309-312`); file `chrin` preserves them, the KERNAL always does.
   *VICE*: X `$5a`/Y `$a5` → `$ff`/`$00` after a directory `chrin`,
@@ -1279,6 +1283,7 @@ Fixed on `main`, each verified in VICE:
 | "Scratch the entry when a save or the size write at close fails" | S6, S7 |
 | "Report end of file together with the last byte" | S8, S12 |
 | "Treat partially written directory entries consistently" | S9 |
+| "Accept a save that exactly fills the free space" | S10 |
 
 Most of the critical items were one-instruction branch or flag errors
 (`bne` instead of `bcc`, `beq` instead of `bne`, `plp` restoring the
