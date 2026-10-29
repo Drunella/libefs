@@ -35,7 +35,7 @@ def main(argv):
     args = p.parse_args()
 
     filepath = args.filename
-    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    os.makedirs(os.path.dirname(filepath) or ".", exist_ok=True)
     address = int(args.address, 0)
     size = int(args.size, 0)
     
@@ -44,15 +44,15 @@ def main(argv):
     binary_file[0] = address & 0xff
     binary_file[1] = (address & 0xff00) >> 8
     
-    binary_file[2:] = random.randbytes(size)
+    binary_file[2:] = os.urandom(size)  # random.randbytes needs Python 3.9
     name = os.path.splitext(os.path.basename(filepath))
     
     counter = 0
     for c in name[0]:
-        binary_file[2 + counter] = ord(c)
-        counter += 1
         if (counter >= size):
             break;
+        binary_file[2 + counter] = ord(c)
+        counter += 1
     if (counter < size):
         binary_file[2 + counter] = 0
     

@@ -56,6 +56,8 @@ def bin_initialize():
 
 
 def bin_placedata(data, bank, address, size, start, mode):
+    if bank > 63:
+        raise Exception("bank " + str(bank) + " is beyond the 64 banks of the cartridge")
     global binary_file
     if address < 0x8000 or address >= 0xC000:
         raise Exception("address outside allowed range: 0x{0:04x}".format(address))    
@@ -94,22 +96,22 @@ def bin_write(filename):
         f.write(binary_file)
 
 
-# format map file
-# bank f filename address [value] [length] [start]
-# bank a address addr value
+# format of a map file line (4 or 7 fields):
+#   bank f filename address [length start mode]
+#   bank a value    address [length start mode]
 #
-# f: writes filename at prg address (if *.prg) or given address
-# a: writes addreass at given address in lo/hi format
+# f: writes the file at the address (0: use the prg load address)
+# a: writes the 16 bit value at the address in lo/hi format
 #
-# address: destination address in bin file (prg is ignored) (required for non prg)
-#          all start addresses must be in range of 0x8000 to 0xbfff (lo-hi area)
-#          or must be changed with addr
-# length: the number of bytes to transfer, 0 for complete file
-# start: start address in the file
+# address: destination address in the bank, 0x8000-0xbfff
+# length:  the number of bytes to transfer, 0 for the complete file
+# start:   start offset in the file
+# mode:    lh (write through low and high), ll (low halves only),
+#          hh (high halves only, the address is shifted by 0x2000),
+#          var (the -m command line option)
 # example
-# 0 f eapi-am29f040.prg 0xb800 0 0
-# 0 f directory.data.prg 0xa000 0 0
-# 0 a 0x6ca8 addr 0x9601
+# 0 f eapi-am29f040.prg 0xb800 0 0 lh
+# 0 f efs.dir.prg       0xa000
 #
 
 def process(e):
@@ -143,6 +145,8 @@ def process(e):
             value = remove_prg(data)
             if address == 0:
                 address = value
+                if mode == "hh":
+                    address += 0x2000
         else:
             if address == 0:
                 raise Exception("must give address for non prg file")

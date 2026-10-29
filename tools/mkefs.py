@@ -45,13 +45,10 @@ def efs_makefileentry(data, maxsize):
     global data_directory, data_files, data_files_pointer, data_directory_pointer, data_files_pointer_offset
     global data_files_pointer_offset, data_files_startbank, data_files_bankingmode
     global entries_directory, entries_files
-    hash = hashlib.sha256(data);
-    if hash in entries_files:
-        # if file already created, simple return
-        return entries_files[hash]
-    # create new entry
+    # every file gets its own copy: libefs places the next written file
+    # behind the last entry's data, so entries must not share data
     size = len(data)
-    if (data_files_pointer + size >= maxsize):
+    if (data_files_pointer + size > maxsize):
         raise Exception("files data (" + str(data_files_pointer + size) +") exceeds maximum size (" + str(maxsize) + ")")
     offset = data_files_pointer
     data_files_pointer += size
@@ -72,7 +69,6 @@ def efs_makefileentry(data, maxsize):
     entry["bank"] = int(offset2 // divisor + data_files_startbank) # size of one bank
     entry["startoffset"] = startaddr + int(offset2 % divisor)
     entry["filesize"] = size
-    entries_files[hash] = entry
     #pprint.pprint(entry)
     #pprint.pprint((offset, data_files_pointer))
     return entry
@@ -83,7 +79,8 @@ def efs_makedirentry(dir, file):
     global data_files_pointer_offset, data_files_startbank, data_files_bankingmode
     global entries_directory, entries_files
     if dir["name"] in entries_directory:
-        raise Exception("directory entry " + dir + " has already bin added")
+        raise Exception("directory entry " + dir["name"] + " has already been added")
+    entries_directory[dir["name"]] = True
     content = bytearray(24)
     efs_writepaddedstring(content, 0, dir["name"])
     efs_writebyte(content, 16, dir["type"])
@@ -91,8 +88,8 @@ def efs_makedirentry(dir, file):
     efs_writebyte(content, 18, 0)  # bank high stays empty
     efs_writeword(content, 19, file["startoffset"])
     efs_writeextended(content, 21, file["filesize"])
-    if data_directory_pointer >= 6144:
-        raise Exception("too many files in directory")
+    if data_directory_pointer >= 6144 - 24:
+        raise Exception("too many files in directory (at most 255, the last slot is the terminator)")
     data_directory[data_directory_pointer:data_directory_pointer+24] = content
     data_directory_pointer += 24    
         
@@ -151,8 +148,10 @@ def efs_write(dirname, dataname):
 def load_files_directory(filename):
     directory = dict()
     with open(filename) as f:
-        result = [line.split(',') for line in f]
+        result = [line.split(',') for line in f if line.strip() != '']
         for l in result:
+            if len(l) < 2:
+                raise Exception("list line needs 'path, type[, hidden]': " + ','.join(l))
             #pprint.pprint(l)
             directory[l[0]] = dict();
             directory[l[0]]["name"] = l[0].strip()
@@ -223,10 +222,10 @@ def main(argv):
         name = dict()
         n = os.path.splitext(os.path.basename(value["name"]))
         
-        hidden = int(value["hidden"], 0)
+        hidden = int(value["hidden"], 10)
         if hidden != 0:
             hidden = 0x80
-        type = int(value["type"], 0)
+        type = int(value["type"], 10)
         if type > 0x1e:
             raise Exception("invalid type " + value["type"] + " of file " + value["name"])
 
