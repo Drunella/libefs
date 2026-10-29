@@ -66,6 +66,7 @@ section; for fixed items they refer to the original code.
 | S11 | minor | **fixed** | Directory `chrin` destroyed X and Y |
 | S13 | minor | **fixed** | `EFS_save` consumed the file name (and, since the S6 fix, its pointer) |
 | S14 | minor | **fixed** | Command parser read past short names |
+| S15 | minor | **fixed** | `@` in save ignored a failed scratch |
 | S12 | minor | **fixed** | Verify end address of a file without data (with S8) |
 | S10-S22 | minor | see section | Exact-fit save, dir `chrin` X/Y, verify end address, name consumed, parser bounds, `@` handling, 254 files, geometry assumptions, commit marker, API nits |
 | S23 | doc | – | Callback and memory rules, activity indication, comment list |
@@ -1162,7 +1163,10 @@ flags `$7f`):
 - **S15 – `@` in save ignores the scratch result.**
   `rom_command_save_process` (`rw.s:1687-1696`) falls through regardless
   of C; `@0:X` with X in area 0 ends as `FILE_EXISTS` instead of
-  "write protected". *By code.*
+  "write protected". *By code.* **Fixed**: the scratch result is
+  checked and the save stops with that error. *VICE* (`work/s15test.s`):
+  `@0:DATA1` → `$1a` (before: `$3f`); `@0:DELME15` overwrites as
+  before.
 - **S16 – the directory holds 254 files.** `rom_filesave_freedirentries`
   (`rw.s:935-947`) reports "full" when entries 0-253 are used although
   slot 254 is free (255 is the terminator). *By code.*
@@ -1314,6 +1318,7 @@ Fixed on `main`, each verified in VICE:
 | "Preserve X and Y in directory chrin" | S11 |
 | "Keep the file name across EFS_save" | S13 |
 | "Check the name length before parsing a command prefix" | S14 |
+| "Report a failed scratch of the @ overwrite command" | S15 |
 
 Most of the critical items were one-instruction branch or flag errors
 (`bne` instead of `bcc`, `beq` instead of `bne`, `plp` restoring the

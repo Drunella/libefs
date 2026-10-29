@@ -1851,9 +1851,15 @@
         jsr efs_directory_search
         bcs :+      ; not found, ignore
         jsr rom_scratch_process
+        bcs @failed ; write protected (area 0) or write error
       : lda #$00    ; no error
         sta error_byte
         clc         ; continue after
+        rts
+
+      @failed:
+        lda error_byte  ; set by rom_scratch_process
+        sec         ; stop with error
         rts
 
       @next1:
