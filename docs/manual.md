@@ -243,6 +243,9 @@ Return:
   X: end address low
   Y: end address high
   .C: set if error
+X/Y hold the address of the last byte written (the kernal returns the
+address after the last byte; add 1 for kernal-style code). A verify
+mismatch returns .C set with A = 0; EFS_readst then shows $10.
 Supported commands:
   "$0:[filename]" will load the directory
 ```
@@ -256,7 +259,11 @@ Return:
   .C: set if error
 Supported commands (only with chrin):
   "$0:[filename]" will load the directory
-  "S0:[filename]" will delete a file
+  "S0:[filename]" will delete a file (the first match of a pattern; after
+  the open only EFS_close is valid)
+Opening a file for writing needs room for at least $2002 bytes in the
+read/write area ("disk full" otherwise); the file may become larger as
+long as the area has room.
 ```
 
 ```
@@ -277,7 +284,7 @@ Return:
   .C: set if error
 The last byte of a file (or of a directory listing) is delivered with
 the status $40 (EOF) set, as the kernal does. Reading beyond it returns
-A = 0 with .C set.
+A = 0 with .C set and no error code.
 ```
 
 ```

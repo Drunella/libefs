@@ -50,9 +50,9 @@ section; for fixed items they refer to the original code.
 | m3 | minor | **fixed** | `rom_filesave_blockedspace` uses the stale "active file" area |
 | m4 | minor | **fixed** | `rom_defragment_erasearea` with size < 8 erases 256 sectors |
 | m5 | minor | **partly fixed** | Hard-coded `$80`/`$a0` file base and dir bank used as files bank |
-| m6 | minor | confirmed | LOAD returns the last address, not last + 1 like the KERNAL |
+| m6 | minor | documented | LOAD returns the last address, not last + 1 like the KERNAL |
 | m7 | minor | **partly fixed** | Various smaller API inconsistencies (see list) |
-| D1 | doc | – | Documentation mismatches |
+| D1 | doc | **done** | Documentation mismatches |
 | S1 | critical | **fixed** | Defragment copies size+1 bytes per file; the next save fails on the stray byte |
 | S2 | critical | **fixed** | Defragment has no bounds checks: a `$ffffff` entry programs bank 0 and the whole cartridge |
 | S3 | critical | **fixed** | `EFS_format` with an open file: next `chrin` erases banks 0-7 (read) / a later file gets a corrupt size (write) |
@@ -827,13 +827,14 @@ defragment then verify `DELME17K` → OK (`$40`); before: mismatch
   `actcall`/`actvector` there (marked "not implemented").
 - (Done) `docs/manual.md`, `EFS_validate`: now states what the stub
   returns (see M10).
-- `docs/memory.txt` still shows the old `LIB`/`EFS` configuration layout
-  and old zero page notes.
+- (Done) `docs/memory.txt` rewritten (zero page, IO2, states, directory
+  format, memory map).
 - `lib-efs.i:85`: comment "bit 5 and 6" for `LIBEFS_FLAGS_FILE_AREA0` is
   wrong (bits 4 and 5).
-- `docs/manual.md` does not describe the end address convention of
-  `EFS_load` (m6), the new "command done" channel state after a scratch
-  (C8), or the `$1e` error of `EFS_save` for invalid ranges (C7).
+- (Done) `docs/manual.md` now describes the end address convention of
+  `EFS_load` (m6), the channel state after a scratch (C8), the verify
+  result, the chrin result after EOF and the space needed by `open(1)`
+  (m7).
 - (Done) PR #1's wrong explanation in `lib-efs.s` was removed with the C1
   fix.
 

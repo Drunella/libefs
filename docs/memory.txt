@@ -1,106 +1,69 @@
 Zeropage Usage
 ==============
 
-$35
-$36
-$37
-$38
-$39
-$3a
-$3b
-$3c
-$3d
-$3e
-$3f
+$35 - $3f (11 bytes), saved and restored by every call that uses them.
+Defragmentation callbacks must not use them.
 
 
-Internal States
-===============
+IO2 RAM ($df00 - $dfff)
+=======================
 
-$00: file not open
-$01: file read/verify operation
-$02: directory operation 
-$80: other operation in progress that does not supprt chrin
+$df00 - $df7f  libefs: jump table, bank in/out code, generic command,
+               variables (see docs/architecture.md)
+$df80 - $dfff  EAPI jump table (EFS_init_eapi) or MiniEAPI
 
 
-Memory Configuration
-====================
+Internal States (internal_state)
+================================
 
-$DF00:  (libefs jumptable and in/out code; variables)
-$DF80:  (eapi) or minieapi
+$00: no channel open
+$01: a command (scratch) finished; only EFS_close is valid
+$80 | state: file open for reading
+$c0 | state: file open for writing
+$40 | state: directory open for reading (state = dirlist state)
 
 
 Configuration
 =============
 
-Configuration starts at 00:1:1b18
-
-00:1:1bxx: 
-00-17:    [ef name]
-18,19,1a  LIB ($4c, $49, $42)
-1b,1c,1d  EFS ($45, $46, $53)
-1e,1f,20  $00, $00, $00
-21:       1:only one area (default read only); 3:two additional read/write areas
-22,23,24,25: start of area 0 directory and files: bank, low/high (usually 00:2000)
-26:       number of banks (every bank, low and high must count) (can be empty)
-27:       banking mode according to eapi ($d0=lhlh, $b0=llll, $d4=hhhh)
-28,29,2a,2b: start of area 1 directory: bank, low/high; this must start at an erase area
-2c:       number of banks used (must be divisible by 8)
-2d:       banking mode
-2e,2f,30,31: start of area 2 directory
-32:       number of banks used (must be divisible by 8)
-33:       banking mode
-34:       call rom function on defragmentation
-35,36:    low/high address of rom function in memory ($8000 - $bfff), must be in bank 0
-          to start and update defragmentation warning
-37,38:    low/high address of rom function in memory 
-          to finish defragmentation warning
-39-3f:    empty
+Configuration starts at 00:1:1b18, see docs/manual.md ("Configuration")
+and the struct libefs_config in src/lib/lib-efs.i.
 
 
-Cartridge Memory Map
-====================
+Directory
+=========
 
-00:0:0000      efs rom
-00:1:0000      efs directory
-     ...       efs directory
-     1700      efs directory
+256 entries of 24 bytes per area ($1800 bytes):
+  00-15  name, padded with $00
+  16     flags: bits 0-4 type ($1f: unused), bit 7 hidden; $ff: blank
+  17     bank
+  18     reserved
+  19-20  offset, relative to the files address of the area
+  21-23  size (24 bit), including the 2 byte load address
+At most 255 entries are used; slot 255 stays blank (terminator). Its
+name bytes 0 and 1 hold the defragmentation markers "copy started"
+(source) and "copy complete" (destination), see docs/architecture.md.
+
+
+Cartridge Memory Map (test cartridge)
+=====================================
+
+00:0:0000      libefs
+00:1:0000      area 0 directory
+     ...
+     1700      area 0 directory
      1800      EAPI
-     1900      EAPI       
+     1900      EAPI
      1A00      EAPI
-     1B00      easycart name & efs configuration
+     1B00      easycart name & libefs configuration
      1C00      loader
      1D00      loader
      1E00      loader
      1F00      startup code & reset vector
-01:0:0000      [efs files]
-01:1:0000      [efs files]
-02:0:0000      [efs files]
-02:1:0000      [efs files]
-03:0:0000      [efs files]
-03:1:0000      [efs files]
-04:0:0000      [efs files]
-04:1:0000      [efs files]
-05:0:0000      [efs files]
-05:1:0000      [efs files]
-06:0:0000      [efs files]
-06:1:0000      [efs files]
-07:0:0000      [efs files]
-07:1:0000      [efs files]
+01:0:0000      [area 0 files]
+01:1:0000      [area 0 files]
+     ...
+31:1:0000      [area 0 files]
 
-08-15:0:0000   [efs files]
-08-15:1:0000   [efs files]
-16-23:0:0000   [efs files]
-16-23:1:0000   [efs files]
-24-31:0:0000   [efs files]
-24-31:1:0000   [efs files]
-
-32-39:0:0000   [low rw dir&files chip]
-40-47:0:0000   [low rw files chip]
-48-55:0:0000   [low rw files chip]
-56-63:0:0000   [low rw files chip]
-
-32-39:1:0000   [high rw dir&files chip]
-40-47:1:0000   [high rw files chip]
-48-55:1:0000   [high rw files chip]               
-56-63:1:0000   [high rw files chip]
+32-63:0:0000   area 1 (BANKMODE=ll) or area 1/2 (BANKMODE=lh)
+32-63:1:0000   area 2 (BANKMODE=ll) or area 1/2 (BANKMODE=lh)
