@@ -5,8 +5,9 @@ in [architecture.md](./architecture.md).
 
 Last re-evaluation: after the fixes up to commit `ae9949a` (C1-C8, M7);
 second full review after commit `dc8a186` (M1-M9), see "Second review"
-below. Line numbers of open items refer to the state named in their
-section; for fixed items they refer to the original code.
+below; all items of that review were then fixed or documented (see the
+fix history). Line numbers in the items refer to the code at the time
+the item was written; for fixed items the fix is described in place.
 
 **Status**:
 
