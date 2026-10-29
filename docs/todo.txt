@@ -4,17 +4,41 @@ ToDo
 - implement copy file utility as prg
   + use the one from codc-easyflash
 
-- implement EFS_validate
-- check for corrupt files (size of 0xffffff)
-  -> delete file and (recommend) defragment
-
 - rename command (next version)
-- support open with "command0:filaname,w,p" notation; support the w for
+- support open with "command0:filename,w,p" notation; support the w for
   write, r for read; p only for prg type (next version)
+
+- commit marker for file data: a save interrupted by a power loss leaves
+  a directory entry that looks valid with a $ff tail; a marker bit
+  written last would make such entries recognisable (EFS_validate could
+  then scratch them); see docs/review-findings.md S22
+
+- EFS_validate does not check or erase unused banks (some hardware and
+  older software implementations do not clear them)
+
+- validate the configuration at EFS_init (area sizes, same bank/address
+  for directory and files of an area; see the limits in docs/manual.md)
+
+- faster load loop: a dedicated banked read loop in non-bankable RAM
+  instead of EAPIReadFlashInc per byte could roughly halve load times
+  (about 190 cycles per byte now); SHOW_INDICATE_ACTIVITY costs another
+  ~18 cycles per byte and should be 0 for a release build
+
+- "@0:" overwrite: the space check runs before the old file is scratched,
+  so replacing a large file on a nearly full area fails although it
+  would fit afterwards (kept on purpose: a failing overwrite never loses
+  the old file); see S18
 
 
 Done
 ====
+
+- (ok) implement EFS_validate (stale area after an interrupted
+  defragmentation, unclosed write files, partially written entries)
+- (ok) check for corrupt files (size of 0xffffff) -> scratched by
+  EFS_validate, dropped by EFS_defragment
+- (ok) code review 2026-10: see docs/review-findings.md (critical,
+  major and minor findings fixed, regression tests in tests/vice)
 
 - (ok) check defragment conditions, there seems to be an overflow in certain
   conditions (config bug)
@@ -35,11 +59,11 @@ Done
   + when full, the defragment process starts
     copy all files to other location and erase previous location
   + calculate free size of used area by subtracting the active files
-  
+
 - (ok) calculate size of rw area
 
-- (no) readst must indicate eof(eoi) before the last byte will be read
-  (is this really a practical problem? readst is mostly done afte reading
+- (ok) readst indicates eof together with the last byte (as the kernal
+  does), see S8
 
 - (ok) reading of file w/o eapi
   small code in $DF80 with an optimized loop (well, not optimized)
@@ -70,9 +94,9 @@ Done
 - (ok) chrin implementation
 
 - (ok) save
-  + (ok) commands: scratch, 
+  + (ok) commands: scratch,
   + (ok) validate (defragment)
-  + (ok) additional errors: 
+  + (ok) additional errors:
     26:write protected
     72:disk full
     63:file exists -> scratch before write
@@ -83,45 +107,3 @@ Done
   + these start with xx:0:0000 - xx:0:17ff as directory, followed by data
   + these can wrap in LL, HH or LH
   + saving can fail due to fragmentation
-
-
-Directory listing
-=================
-
-01 04 address
-addr   line   headline
-01 01  00 00  12 22 41 53 53 20 50 52 45 53 45 4E 54 53 3A 20 20 20 22 20 20 20 20 20 31 00 
-
-       size space (4)   "name(16)"                                                type $ mod (6 chars)
-01 01  34 00  20 20     22 54 48 45 59 20 53 54 4F 4C 45 20 41 20 4D 2E 2B 22 20  50 52 47 20 20 20 00 
-01 01  43 00  20 20     22 43 4F 44 45 22 20 20 20 20 20 20 20 20 20 20 20 20 20  50 52 47 20 20 20 00 
-01 01  09 00  20 20 20  22 4D 41 50 31 22 20 20 20 20 20 20 20 20 20 20 20 20 20  50 52 47 20 20 00 
-01 01  09 00  20 20 20  22 4D 41 50 32 22 20 20 20 20 20 20 20 20 20 20 20 20 20  50 52 47 20 20 00 
-01 01  09 00  20 20 20  22 4D 41 50 33 22 20 20 20 20 20 20 20 20 20 20 20 20 20  50 52 47 20 20 00 
-01 01  0A 00  20 20     22 4D 41 50 34 22 20 20 20 20 20 20 20 20 20 20 20 20 20  50 52 47 20 20 20 00 
-01 01  0B 00  20 20     22 4D 41 50 35 22 20 20 20 20 20 20 20 20 20 20 20 20 20  50 52 47 20 20 20 00 
-01 01  52 00  20 20     22 4D 45 4E 55 22 20 20 20 20 20 20 20 20 20 20 20 20 20  50 52 47 20 20 20 00 
-
-addr   blocks b  l  o  c  k  s     f  r  e  e  .  13 spaces
-01 01  9F 01  42 4C 4F 43 4B 53 20 46 52 45 45 2E 20 20 20 20 20 20 20 20 20 20 20 20 20 00 
-00 00  00 (end)
-
-state machines needs variables:
-variable for name: 16 bytes) (not necessary if pointer can move backwards, which it can)
-counter for name and sizes (1 byte)
-variable for storing size for later filling (1 byte)
-variable for storing the free size in blocks (2 bytes)
-
-
-state machine (appr 33 states):
-address low, address high, addr dummy, addr dummy, line dummy, line dummy,
-reverse on, quotation mark, disk name (16), quotation mark, disk id(?),
-terminator,
-
-addr dummy, addr dummy, size low(x), size high(x), size filler(x), quotation mark, name(16,x2), quotation mark,
-fill up(-16, x), type, fillup(x), terminator,
-
-addr dummy, addr dumma, size low(x), size high(x), blocksfree(25), terminator
-terminator, terminator, terminator
-
-eof
