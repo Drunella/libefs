@@ -1451,10 +1451,22 @@ cartridge).
 
 ## How the findings were verified
 
-**VICE (current method).** The test cartridge (`make
-build/test-libefs.crt`) is run in VICE 3.9 (`x64sc`, warp mode, headless
-via `xvfb-run`) and controlled through the remote monitor. Two drivers
-in the gitignored `work/` folder use only the Python standard library:
+**Regression tests (in the repository).** Every fix is covered by a
+test in `tests/vice/` that `make test` runs in VICE; see the README for
+the requirements and options. The test names carry the finding they
+cover (`c5_chrout_overflow`, `s8_eof`, `m10_validate_*`, ...). The
+expected result bytes in `tests/vice/run.py` are the values the fixed
+library produces; a build without the fix gives the "bug" values
+quoted in the items above.
+
+**Ad-hoc drivers (during the review).** The per-item evidence below
+names programs in a `work/` folder. That folder is gitignored scratch
+space and is not part of the repository; the test programs were
+rewritten as the regression tests above, which supersede them. The
+drivers are described here so that the evidence can be read: the test
+cartridge (`make build/test-libefs.crt`) is run in VICE 3.9 (`x64sc`,
+warp mode, headless via `xvfb-run`) and controlled through the remote
+monitor. Two drivers in `work/` use only the Python standard library:
 
 - `work/vrun.py` types keys into the test menu and takes screenshots.
 - `work/vprg.py` loads a small ca65 test program into the running
