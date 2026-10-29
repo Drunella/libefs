@@ -48,7 +48,7 @@ section; for fixed items they refer to the original code.
 | m1 | minor | **fixed** | Names longer than 16 characters can desynchronise the directory scan |
 | m2 | minor | **fixed** | Directory bounds are not checked for deleted entries; dirlist uses a hard-coded `$b8` bound |
 | m3 | minor | **fixed** | `rom_filesave_blockedspace` uses the stale "active file" area |
-| m4 | minor | by code | `rom_defragment_erasearea` with size < 8 erases 256 sectors |
+| m4 | minor | **fixed** | `rom_defragment_erasearea` with size < 8 erases 256 sectors |
 | m5 | minor | by code | Hard-coded `$80`/`$a0` file base and dir bank used as files bank |
 | m6 | minor | confirmed | LOAD returns the last address, not last + 1 like the KERNAL |
 | m7 | minor | **partly fixed** | Various smaller API inconsistencies (see list) |
@@ -753,7 +753,7 @@ defragment then verify `DELME17K` → OK (`$40`); before: mismatch
 - **m4 – erase count.** `rom_defragment_erasearea` (`lib-efs-rw.s:430`) uses `size >> 3` as
   the loop counter. A configured size below 8 gives 0, and the loop then
   runs 256 times (erasing everything from the area start through the
-  wrapped bank numbers, including bank 0). Sizes are not validated.
+  wrapped bank numbers, including bank 0). Sizes are not validated. **Fixed** (by code): a size below 8 is refused with `$05`.
 - **m5 – hard-coded bases.** `rom_defragment_copy_dir` (`lib-efs-rw.s:687`) stores
   `offset_high = pointer − $80` (or `− $a0` for hhhh) instead of
   `pointer − files_high`. `rom_filesave_begin` uses the directory bank as

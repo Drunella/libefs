@@ -538,7 +538,8 @@
         lsr a
         lsr a
         lsr a
-        tax
+        tax                              ; number of 64k sectors
+        beq @error                       ; size below one sector: invalid config
 
       @loop:
         lda zp_var_x8        
