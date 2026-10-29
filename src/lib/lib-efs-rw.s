@@ -1046,19 +1046,26 @@
         lda efs_readef_high
         pha
 
-        ldx #$ff  ; 255 free entries
-        lda #16
+        ldx #$00  ; entries checked; 255 may be used, the last one
+        lda #16   ; (index 255) must stay blank as terminator
         jsr efs_readef_pointer_advance
 
       @loop:
-        dex
-        beq @leave
+        cpx #255
+        beq @full
         jsr efs_readef
         cmp #$ff
-        beq @leave
+        beq @free
         lda #24
         jsr efs_readef_pointer_advance
+        inx
         jmp @loop
+
+      @full:
+        ldx #$00
+        beq @leave
+      @free:
+        ldx #$01
 
         ; reset directory
       @leave:
@@ -1068,12 +1075,12 @@
         sta efs_readef_low
 
         txa
-        bne @error
+        bne @ok
 
         lda #ERROR_DISK_FULL
         sec
         rts
-      @error:
+      @ok:
         lda #$00
         clc
         rts

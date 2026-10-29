@@ -67,6 +67,7 @@ section; for fixed items they refer to the original code.
 | S13 | minor | **fixed** | `EFS_save` consumed the file name (and, since the S6 fix, its pointer) |
 | S14 | minor | **fixed** | Command parser read past short names |
 | S15 | minor | **fixed** | `@` in save ignored a failed scratch |
+| S16 | minor | **fixed** | Directory held 254 files instead of 255 |
 | S12 | minor | **fixed** | Verify end address of a file without data (with S8) |
 | S10-S22 | minor | see section | Exact-fit save, dir `chrin` X/Y, verify end address, name consumed, parser bounds, `@` handling, 254 files, geometry assumptions, commit marker, API nits |
 | S23 | doc | – | Callback and memory rules, activity indication, comment list |
@@ -1169,7 +1170,11 @@ flags `$7f`):
   before.
 - **S16 – the directory holds 254 files.** `rom_filesave_freedirentries`
   (`rw.s:935-947`) reports "full" when entries 0-253 are used although
-  slot 254 is free (255 is the terminator). *By code.*
+  slot 254 is free (255 is the terminator). *By code.* **Fixed**: the loop
+  counts checked entries from 0 and allows 255 used entries. *VICE*
+  (`work/s16test.s`): 248 new files on top of the 7 existing ones
+  (before: 247); the next save fails with `$47` after an automatic
+  defragment.
 - **S17 – garbage error code after a failed post-defragment check.**
   `rom_filesave_conditions:899-903` branches to `@error` with A = a size
   byte (same pattern as M7); hard to reach. *By code.*
@@ -1319,6 +1324,7 @@ Fixed on `main`, each verified in VICE:
 | "Keep the file name across EFS_save" | S13 |
 | "Check the name length before parsing a command prefix" | S14 |
 | "Report a failed scratch of the @ overwrite command" | S15 |
+| "Allow 255 directory entries" | S16 |
 
 Most of the critical items were one-instruction branch or flag errors
 (`bne` instead of `bcc`, `beq` instead of `bne`, `plp` restoring the
