@@ -803,7 +803,7 @@ defragment then verify `DELME17K` → OK (`$40`); before: mismatch
   - `S` scratches only the first match of a wildcard name.
   - `EFS_format` does not check or reset `internal_state`.
   - The dirlist type table (`dirlist.s:380-392`) has 12 entries. Type
-    values `$10-$1e` index past it.
+    values `$10-$1e` index past it. **Fixed**: unknown types show the last entry.
   - `EFS_chrin` after EOF returns C set with A = 0 and no error code.
   - `EFS_chrout` destroys X (`rom_chrout_body`, `lib-efs-rw.s:202`,
     starts with `tax`); the KERNAL `CHROUT` preserves X and Y.
@@ -1395,6 +1395,7 @@ Fixed on `main`, each verified in VICE:
 | "Fix ? matching, @ on read, and the blocks free count" | S20 (part) |
 | "Preserve X and Y across the defragment callbacks" | M11 |
 | "Implement EFS_validate with defragment markers" | M10 |
+| "Bound the file type table of the listing" | m7 (part) |
 | "Truncate file names to 16 characters" | m1 |
 | "Preserve X/Y in chrout and return the disk full error code" | m7 (part) |
 | "Check the directory end for listings and deleted entries" | m2 |

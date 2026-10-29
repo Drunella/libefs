@@ -411,6 +411,7 @@
         .byte " xba"
         .byte " xba"
         .byte " xba"
+        rom_dirload_types_count = (* - rom_dirload_types_text) / 4
 
 
     rom_dirload_sm_writeprot:
@@ -807,7 +808,10 @@
         sbc #$01
         asl a
         asl a
-        sta dirload_state_var
+        cmp #rom_dirload_types_count * 4  ; unknown type: show the last entry
+        bcc :+
+        lda #(rom_dirload_types_count - 1) * 4
+      : sta dirload_state_var
 
         lda #8  ; advance pointer to begin of next name
         jsr efs_readef_pointer_advance
