@@ -635,10 +635,12 @@
         bvs @dirop  ; branch if bit 6 is set
         jsr efs_io_byte  ; read file
         bcc @done
+        pha              ; last byte: deliver it with the eof status set
         lda #STATUS_EOF
         sta status_byte
-        lda #$00
-        beq @done
+        pla
+        clc
+        bcc @done
 
       @dirop:
         bit internal_state  ; we check for bit 7/6 == 1/0
@@ -647,10 +649,12 @@
 
         jsr rom_dirload_chrin  ; read dir
         bcc @done
+        pha              ; last byte: deliver it with the eof status set
         lda #STATUS_EOF
         sta status_byte
-        lda #$00
-        beq @done
+        pla
+        clc
+        bcc @done
 
       @error:
         sec
@@ -839,6 +843,7 @@
 
         jsr rom_fileload_begin
         jsr rom_fileload_address
+        bcs @nodata  ; file ends within the address bytes
 
         lda efs_flags
         and #LIBEFS_FLAGS_VERIFY  ; set: verify, clear: load
@@ -849,6 +854,15 @@
 
       @fileloadverify:
         jsr rom_fileload_verify
+        jmp @leave
+
+      @nodata:
+        lda efs_flags
+        and #LIBEFS_FLAGS_VERIFY
+        bne :+
+        jsr rom_fileload_transfer_eof  ; end address = start - 1, eof
+        jmp @leave
+      : jsr rom_fileload_verify_eof
 
       @leave:
         php  ; save carry
@@ -1737,9 +1751,29 @@
         ;lda #BANKING_MODE
         jsr EAPISetPtr
 
-        ldx zp_var_xb  ; efs_directory_entry + efs_directory::size_low
-        ldy zp_var_xc  ; efs_directory_entry + efs_directory::size_high
-        lda zp_var_xd  ; efs_directory_entry + efs_directory::size_upper
+        ; length = size - 1: EAPIReadFlashInc returns .C set when the
+        ; length is already 0, so the read that returns .C set delivers the
+        ; last valid byte (eof together with the last byte, as the kernal
+        ; does). size 0 (corrupt entry): length 0, nothing is valid.
+        lda zp_var_xb  ; efs_directory_entry + efs_directory::size_low
+        ora zp_var_xc  ; efs_directory_entry + efs_directory::size_high
+        ora zp_var_xd  ; efs_directory_entry + efs_directory::size_upper
+        beq @zero
+        sec
+        lda zp_var_xb
+        sbc #$01
+        tax
+        lda zp_var_xc
+        sbc #$00
+        tay
+        lda zp_var_xd
+        sbc #$00
+        jmp @setlen
+      @zero:
+        ldx #$00
+        ldy #$00
+        lda #$00
+      @setlen:
         jsr EAPISetLen
 
         lda zp_var_x8  ; efs_directory_entry + efs_directory::bank
@@ -1774,10 +1808,20 @@
 
 
     rom_fileload_address:
+        ; returns .C set if the file ends within the address bytes (size <= 2)
         jsr efs_io_byte ; load address
         sta zp_var_xe
+        php
         jsr efs_io_byte
         sta zp_var_xf
+        bcs :+
+        plp
+        bcs :++
+        clc
+        bcc :++
+      : plp
+        sec
+      :
         ;lda efs_secondary  ; 0=load to X/Y, 1=load to prg address
         lda #LIBEFS_FLAGS_RELOCATE
         bit efs_flags
@@ -1803,7 +1847,7 @@
         indicate_load
 .endif
         jsr efs_io_byte
-        bcs @eof
+        bcs @last
         ldy #$00
         sta (zp_var_xe), y
         inc zp_var_xe
@@ -1811,7 +1855,16 @@
         inc zp_var_xf
         jmp @loop
 
-      @eof:
+      @last:
+        ldy #$00
+        sta (zp_var_xe), y  ; the read with .C set is the last valid byte
+        inc zp_var_xe
+        bne rom_fileload_transfer_eof2
+        inc zp_var_xf
+
+    rom_fileload_transfer_eof:  ; also used when the file has no data bytes
+        ldy #$00
+    rom_fileload_transfer_eof2:
         clc
         tya
         adc zp_var_xe
@@ -1837,36 +1890,40 @@
 
     rom_fileload_verify:
         jsr efs_init_readmem  ; prepare verify command
+        ldy #$00
       @loop:
 .if SHOW_INDICATE_ACTIVITY = 1
         indicate_load
 .endif
         jsr efs_io_byte
-        bcs @eof  ; eof
+        php  ; .C set: last valid byte
         sta zp_var_x7
         ldy #$00
         jsr efs_generic_command
         cmp zp_var_x7
-        bne @mismatch
+        bne rom_fileload_verify_mismatch
         inc zp_var_xe
-        bne @loop
+        bne :+
         inc zp_var_xf
-        jmp @loop
+      : plp
+        bcc @loop
 
-      @eof:
+    rom_fileload_verify_eof:  ; also used when the file has no data bytes
+        ldy #$00
         lda #STATUS_EOF
         sta status_byte
         lda zp_var_xe  ; verify successful, reduce address by one
         bne :+
         dec zp_var_xf
       : dec zp_var_xe
-        jmp @leave
+        jmp rom_fileload_verify_leave
 
-      @mismatch:
+    rom_fileload_verify_mismatch:
+        plp
         lda #STATUS_MISMATCH
         sta status_byte
         
-      @leave:
+    rom_fileload_verify_leave:
         clc
         tya
         adc zp_var_xe

@@ -258,6 +258,9 @@ Parameter:
 Return:
   A: character or error code
   .C: set if error
+The last byte of a file (or of a directory listing) is delivered with
+the status $40 (EOF) set, as the kernal does. Reading beyond it returns
+A = 0 with .C set.
 ```
 
 ```

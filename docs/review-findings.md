@@ -60,8 +60,9 @@ section; for fixed items they refer to the original code.
 | S5 | critical | **fixed** | `EFS_save` of ≥ 64 KB passes the space check and writes past the area into bank 0 |
 | S6 | major | **fixed** | A failed save leaves a live, corrupt directory entry |
 | S7 | major | **fixed** | Write/erase errors ignored in defragment, erase and close |
-| S8 | major | confirmed | `chrin` signals EOF one byte late (KERNAL difference) |
+| S8 | major | **fixed** | `chrin` signals EOF one byte late (KERNAL difference) |
 | S9 | major | by code | Type `$1f` entries: terminator for search/dirlist, live file for space/save/defragment |
+| S12 | minor | **fixed** | Verify end address of a file without data (with S8) |
 | S10-S22 | minor | see section | Exact-fit save, dir `chrin` X/Y, verify end address, name consumed, parser bounds, `@` handling, 254 files, geometry assumptions, commit marker, API nits |
 | S23 | doc | – | Callback and memory rules, activity indication, comment list |
 | T1-T12 | various | see section | Tools (`tools/*.py`), Makefile and test cartridge |
@@ -1052,6 +1053,25 @@ stores one extra `$00` byte with libefs.
 `chrin` → A = 0, C set, `readst` `$40`. (`docs/todo.txt` lists this as
 "no"; it should at least be documented in the manual.)
 
+**Fixed**: `rom_fileload_begin` sets the EAPI length to size − 1, so the
+read that returns C set carries the last valid byte. `EFS_chrin`
+delivers that byte with status `$40`; the next call returns A = 0 with
+C set as before. Load and verify store/compare the last byte, and a
+file without data bytes (size ≤ 2, detected in `rom_fileload_address`)
+ends with the end address = start − 1 (this also fixes S12). The
+directory `chrin` flags its last byte the same way (state `sm_end`).
+
+*VICE* (`work/s8test.s`, KERNAL-style loop "chrin, store, readst, loop
+while 0"; `work/r2etest.s`):
+
+| case | fixed | before the fix |
+| ---- | ----- | -------------- |
+| `DATA1` (3 bytes) | 3 bytes, the third with `readst` `$40`; the next `chrin` → A = 0, C set | 4 bytes (an extra `$00`) |
+| directory via `chrin` | 810 bytes = exactly the listing loaded with `load "$"` | 811 bytes |
+| verify of `E0` (size 2) | end `$4fff` (S12) | `$50fe` |
+
+The load/save regression tests (`c6`, `m1`, `m8`) pass unchanged.
+
 #### S9 – Entries with type `$1f` are a terminator for some code and a file for other code
 
 `efs_directory_search` (`lib-efs.s:2085-2087`) and the dirlist
@@ -1080,7 +1100,7 @@ S2. *By code.* One shared "is terminator / is live" test is needed.
   address.** `efs_init_readmem` (`lib-efs.s:411`) leaves Y = `$ff`;
   `rom_fileload_verify` sets Y = 0 only after the first successful read.
   *VICE* (`work/r2etest.s`): file `E0` (size 2): verify → X/Y =
-  `$50fe`, load → `$4fff`.
+  `$50fe`, load → `$4fff`. **Fixed** with S8.
 - **S13 – `EFS_save` consumes the file name.** `rom_filesave_transfer_dir`
   (`rw.s:1420`) decrements `filename_length` to 0 (or the remainder for
   names > 16). A second `EFS_save` without `setnam` fails with `$08`;
@@ -1241,6 +1261,7 @@ Fixed on `main`, each verified in VICE:
 | "Guard defragment against corrupt sizes and destination overflow" | S2, S7 (copy) |
 | "Fix defragment copying one byte too many per file" | S1 |
 | "Scratch the entry when a save or the size write at close fails" | S6, S7 |
+| "Report end of file together with the last byte" | S8, S12 |
 
 Most of the critical items were one-instruction branch or flag errors
 (`bne` instead of `bcc`, `beq` instead of `bne`, `plp` restoring the

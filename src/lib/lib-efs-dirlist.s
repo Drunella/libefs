@@ -240,6 +240,8 @@
         lda dirload_temp_state_zp  ; check if state is zero
         beq @eof    ; state 0 means end
         bcs @again  ; C set, skip writing and repeat
+        cmp #sm_end ; next state is the end: this is the last byte
+        beq @eof    ;   -> deliver it with .C set
         jsr restore_zeropage
         tya
         clc
@@ -347,6 +349,7 @@
         .addr rom_dirload_sm_zero          ; 25
         .addr rom_dirload_sm_zero          ; 26
         .addr rom_dirload_sm_zero          ; 27
+        sm_end = 28
         .addr rom_dirload_sm_finish        ; 28
 
         sm_nextfile = 29
