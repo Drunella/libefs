@@ -85,6 +85,65 @@ void fail_tests_3(void)
     
 }
 
+// highest address a test load may reach: the EAPI copy starts at $cd00
+#define LOAD_LIMIT 0xcd00
+
+// Determines the load address and the size (in 256 byte blocks) of a file:
+// the address from its first two bytes (open/chrin), the blocks from a
+// pattern directory listing "$:name". Returns false if the file does not
+// exist.
+bool file_bounds(char* filename, uint16_t* address, uint16_t* blocks)
+{
+    static char pattern[20];
+    uint8_t lo, hi, retval;
+    char* listing = (char*)(ADDRESS);
+    char* p;
+
+    EFS_setnam_wrapper(filename, strlen(filename));
+    EFS_setlfs_wrapper(0);
+    if (EFS_open_wrapper(0) != 0) return false;
+    retval = EFS_chrin_wrapper(&lo);
+    if (retval == 0) retval = EFS_chrin_wrapper(&hi);
+    EFS_close_wrapper();
+    if (retval != 0) return false;
+    *address = lo | (hi << 8);
+
+    strcpy(pattern, "$:");
+    strncat(pattern, filename, 16);
+    EFS_setnam_wrapper(pattern, strlen(pattern));
+    EFS_setlfs_wrapper(0);
+    if (EFS_load_wrapper(listing, 0) != 0) return false;
+    p = listing;                 // header line: link, line number, text
+    p += 2;
+    p += 2;
+    while (*p != 0) p++;
+    p++;
+    if (p[0] == 0 && p[1] == 0) return false;   // no file line
+    *blocks = (uint8_t)p[2] | ((uint8_t)p[3] << 8);
+    return true;
+}
+
+// Checks that a load of the file fits between the test data area and the
+// EAPI copy; prints the reason if not.
+bool load_fits(char* filename, uint8_t secondary)
+{
+    uint16_t address, blocks;
+    uint32_t end;
+
+    if (!file_bounds(filename, &address, &blocks)) {
+        cprintf("file not found\n\r");
+        return false;
+    }
+    if (secondary == 0) address = ADDRESS;
+    end = (uint32_t)address + (uint32_t)blocks * 256;
+    if (address < ADDRESS || end > LOAD_LIMIT) {
+        cprintf("skipped: $%04x + %u blocks does not fit in $%04x-$%04x\n\r",
+                address, blocks, ADDRESS, LOAD_LIMIT);
+        return false;
+    }
+    return true;
+}
+
 void loadverify(char* filename, uint8_t verify, uint8_t secondary)
 {
     uint8_t retval, status;
@@ -94,6 +153,7 @@ void loadverify(char* filename, uint8_t verify, uint8_t secondary)
 
     menu_clear(CONSOLE_START_Y, 24);
     gotoxy(0, CONSOLE_START_Y);
+    if (!load_fits(filename, secondary)) return;
     EFS_setnam_wrapper(filename, strlen(filename));
     EFS_setlfs_wrapper(secondary);
     cprintf("start\n\r");
@@ -169,8 +229,13 @@ void readfile(void)
             header--;
             continue;
         }
+        if ((uint16_t)address >= LOAD_LIMIT) {
+            cprintf("stopped at $%04x\n\r", LOAD_LIMIT);
+            break;
+        }
         address[0] = data; address++;
         checksum += data;
+        if (EFS_readst_wrapper() != 0) break;   // last byte delivered
     }
 
     status = EFS_readst_wrapper();

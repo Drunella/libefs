@@ -190,7 +190,7 @@ def main(argv):
     p.add_argument("-l", dest="list", action="store", required=True, help="files list file.")
     p.add_argument("-f", dest="files", action="store", required=True, help="files directory.")
     p.add_argument("-d", dest="destination", action="store", required=True, help="destination directory.")
-    p.add_argument("-s", dest="maxsize", action="store", required=False, help="maximum data size.", default="1032192")
+    p.add_argument("-s", dest="maxsize", action="store", required=False, help="maximum data size (default: 63 banks of 16k for lh, of 8k for ll/hh).", default=None)
     p.add_argument("-u", dest="uppercase", action="store_true", required=False, help="uppercase name.", default=False)
     p.add_argument("-o", dest="offset", action="store", required=False, help="file start offset.", default='0')
     p.add_argument("-m", dest="mode", action="store", required=False, help="bank switching mode.", default="lh")
@@ -199,7 +199,10 @@ def main(argv):
     args = p.parse_args()
 
     verbose = args.verbose
-    maxsize = int(args.maxsize, 0)
+    if args.maxsize is None:
+        maxsize = 63 * (16384 if args.mode == 'lh' else 8192)
+    else:
+        maxsize = int(args.maxsize, 0)
     uppercase = args.uppercase
     offset = int(args.offset, 0)
     mode = args.mode

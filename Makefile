@@ -135,22 +135,22 @@ build/ef/efs.dir.prg build/ef/efs.files.prg: build/ef/files.list build/ef/menu.p
 build/ef/files.list: build/ef/menu.prg
 	@mkdir -p ./build/files
 	rm -f ./build/ef/files.list
-	./tools/mkdata.py -f build/files/data1.prg -a 0x3000 -s 1 >> build/ef/files.list
-	./tools/mkdata.py -f build/files/data256.prg -a 0x3000 -s 256 >> build/ef/files.list
-	./tools/mkdata.py -f build/files/data1023.prg -a 0x3000 -s 1023 >> build/ef/files.list
-	./tools/mkdata.py -f build/files/data1024.prg -a 0x3000 -s 1024 >> build/ef/files.list
-	./tools/mkdata.py -f build/files/data1025.prg -a 0x3000 -s 1025 >> build/ef/files.list
-	./tools/mkdata.py -f build/files/data24k.prg -a 0x3000 -s 24575 >> build/ef/files.list
+	./tools/mkdata.py -f build/files/data1.prg -a 0x4000 -s 1 >> build/ef/files.list
+	./tools/mkdata.py -f build/files/data256.prg -a 0x4000 -s 256 >> build/ef/files.list
+	./tools/mkdata.py -f build/files/data1023.prg -a 0x4000 -s 1023 >> build/ef/files.list
+	./tools/mkdata.py -f build/files/data1024.prg -a 0x4000 -s 1024 >> build/ef/files.list
+	./tools/mkdata.py -f build/files/data1025.prg -a 0x4000 -s 1025 >> build/ef/files.list
+	./tools/mkdata.py -f build/files/data24k.prg -a 0x4000 -s 24575 >> build/ef/files.list
 	./tools/mkdata.py -f build/files/data3k.prg -a 0xc000 -s 3328 >> build/ef/files.list
-	./tools/mkdata.py -f build/files/data567890123456.prg -a 0x3000 -s 257 >> build/ef/files.list
-	./tools/mkdata.py -f build/files/data56789012345.prg -a 0x3000 -s 1025 >> build/ef/files.list
+	./tools/mkdata.py -f build/files/data567890123456.prg -a 0x4000 -s 257 >> build/ef/files.list
+	./tools/mkdata.py -f build/files/data56789012345.prg -a 0x4000 -s 1025 >> build/ef/files.list
 	./tools/mkdata.py -f build/files/data8k.prg -a 0xa000 -s 8192 >> build/ef/files.list
 	./tools/mkdata.py -f build/files/data7k.prg -a 0xe000 -s 7936 >> build/ef/files.list
-	./tools/mkdata.py -f build/files/data9k.prg -a 0x3000 -s 2302 >> build/ef/files.list
-	./tools/mkdata.py -f build/files/data10k.prg -a 0x3000 -s 2303 >> build/ef/files.list
-	./tools/mkdata.py -f build/files/data99k.prg -a 0x3000 -s 25342 >> build/ef/files.list
-	./tools/mkdata.py -f build/files/data100k.prg -a 0x3000 -s 25343 >> build/ef/files.list
-	./tools/mkdata.py -f build/files/data1000k.prg -a 0x3000 -s 255998 >> build/ef/files.list
+	./tools/mkdata.py -f build/files/data9k.prg -a 0x4000 -s 2302 >> build/ef/files.list
+	./tools/mkdata.py -f build/files/data10k.prg -a 0x4000 -s 2303 >> build/ef/files.list
+	./tools/mkdata.py -f build/files/data99k.prg -a 0x4000 -s 25342 >> build/ef/files.list
+	./tools/mkdata.py -f build/files/data100k.prg -a 0x4000 -s 25343 >> build/ef/files.list
+	./tools/mkdata.py -f build/files/data1000k.prg -a 0x4000 -s 255998 >> build/ef/files.list
 	echo "./build/ef/menu.prg, 1, 1" >> ./build/ef/files.list
 
 
@@ -162,10 +162,10 @@ build/ef/efs-rw.dir.prg build/ef/efs-rw.files.prg: build/ef/files-rw.list Makefi
 build/ef/files-rw.list:
 	@mkdir -p ./build/files
 	rm -f ./build/ef/files-rw.list
-	./tools/mkdata.py -f build/files/delme15.prg -a 0x3000 -s 15 >> build/ef/files-rw.list
-	./tools/mkdata.py -f build/files/delme384.prg -a 0x3000 -s 384 >> build/ef/files-rw.list
-	./tools/mkdata.py -f build/files/delme640.prg -a 0x3000 -s 640 >> build/ef/files-rw.list
-	./tools/mkdata.py -f build/files/delme641.prg -a 0x3000 -s 641 >> build/ef/files-rw.list
-	./tools/mkdata.py -f build/files/delme642.prg -a 0x3000 -s 642 >> build/ef/files-rw.list
-	./tools/mkdata.py -f build/files/delme17k.prg -a 0x3000 -s 17000 >> build/ef/files-rw.list
-	./tools/mkdata.py -f build/files/delme50k.prg -a 0x3000 -s 50000 >> build/ef/files-rw.list
+	./tools/mkdata.py -f build/files/delme15.prg -a 0x4000 -s 15 >> build/ef/files-rw.list
+	./tools/mkdata.py -f build/files/delme384.prg -a 0x4000 -s 384 >> build/ef/files-rw.list
+	./tools/mkdata.py -f build/files/delme640.prg -a 0x4000 -s 640 >> build/ef/files-rw.list
+	./tools/mkdata.py -f build/files/delme641.prg -a 0x4000 -s 641 >> build/ef/files-rw.list
+	./tools/mkdata.py -f build/files/delme642.prg -a 0x4000 -s 642 >> build/ef/files-rw.list
+	./tools/mkdata.py -f build/files/delme17k.prg -a 0x4000 -s 17000 >> build/ef/files-rw.list
+	./tools/mkdata.py -f build/files/delme50k.prg -a 0x4000 -s 50000 >> build/ef/files-rw.list

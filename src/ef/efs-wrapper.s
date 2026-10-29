@@ -522,11 +522,15 @@
         RTS
 
       @getbyte:
+        ; returns the next byte with .C clear, .C set at the end
         JSR $FFB7      ; call READST (read status byte)
         BNE @end       ; read error or end of file
-        JMP $FFCF      ; call CHRIN (read byte from directory)
+        JSR $FFCF      ; call CHRIN (read byte from directory)
+        clc
+        rts
       @end:
-        JMP @exit
+        sec
+        rts
 
       @dirname:
         .byte "$"      ; filename used to access directory
