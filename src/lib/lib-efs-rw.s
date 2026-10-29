@@ -813,6 +813,8 @@
 
         ; copy data
         ldy #$00
+        jsr rom_filesave_decrease_size  ; decrease one ahead, as the count check
+        bcs @done                       ; is after writing (size 0: nothing to copy)
       @loop:
         lda zp_var_x8    ; destination bank
         cmp efs_defragment_endbank
@@ -829,6 +831,7 @@
         ;jsr EAPIGetBank
         ;sta zp_var_x8  ; redundant ?
 
+      @done:
         jsr efs_readef_swap
         lda efs_temp_var2  ; has the destination directory bank
         jsr efs_setstartbank_ext

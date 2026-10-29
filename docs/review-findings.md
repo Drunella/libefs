@@ -53,7 +53,7 @@ section; for fixed items they refer to the original code.
 | m6 | minor | confirmed | LOAD returns the last address, not last + 1 like the KERNAL |
 | m7 | minor | partly confirmed | Various smaller API inconsistencies (see list) |
 | D1 | doc | – | Documentation mismatches |
-| S1 | critical | confirmed | Defragment copies size+1 bytes per file; the next save fails on the stray byte |
+| S1 | critical | **fixed** | Defragment copies size+1 bytes per file; the next save fails on the stray byte |
 | S2 | critical | **fixed** | Defragment has no bounds checks: a `$ffffff` entry programs bank 0 and the whole cartridge |
 | S3 | critical | **fixed** | `EFS_format` with an open file: next `chrin` erases banks 0-7 (read) / a later file gets a corrupt size (write) |
 | S4 | critical | **fixed** | `EFS_open` while a write channel is full clears the status; the next `chrout` writes into bank 0 |
@@ -823,6 +823,18 @@ cannot be programmed over the stray `$00`); see S6 for what is left.
 *Fix*: one `jsr rom_filesave_decrease_size` before the loop, like
 `transfer_data`.
 
+**Fixed**: `rom_defragment_copy_data` decrements the counter once before
+the loop (and copies nothing for a size of 0), like
+`rom_filesave_transfer_data`.
+
+*VICE* (`work/r2ftest.s`):
+
+| | fixed | before the fix |
+| - | ----- | -------------- |
+| directory after defragment | `DELME384 off $1811` = previous end + 0, all files contiguous | every file + 1 |
+| save `C1` after scratch/defragment, load it | save 0, load OK | save `$19`, entry live with `$ff` data (S6) |
+| normal defragment (`work/m5test.s`) | OK | – |
+
 #### S2 – Defragment has no bounds checks: a corrupt size programs bank 0 and the whole cartridge
 
 `src/lib/lib-efs-rw.s:640-648`, `:744-763`, `:777-823`. The copy trusts
@@ -1201,6 +1213,7 @@ Fixed on `main`, each verified in VICE:
 | "Keep the channel status when EFS_open is rejected" | S4 |
 | "Fix space check for saves of 64 KB or more" | S5 |
 | "Guard defragment against corrupt sizes and destination overflow" | S2, S7 (copy) |
+| "Fix defragment copying one byte too many per file" | S1 |
 
 Most of the critical items were one-instruction branch or flag errors
 (`bne` instead of `bcc`, `beq` instead of `bne`, `plp` restoring the
