@@ -1,52 +1,76 @@
-# libefs 
+# libefs
 
-A library to access the EasyFlash Filesystem (efs) in the manner of the c64
-kernal routines for reading and writing files.
+A library to access the EasyFlash Filesystem (efs) in the manner of the C64
+KERNAL routines, for reading and writing files on an EasyFlash cartridge.
 
 ## Features
-* Reading and Writing to EasyFlash
-* kernal style functions for access
-* minieapi: readonly eapi without additional ram usage
+* Reading from the read-only efs and reading, writing and deleting files in
+  a writable part of the cartridge (two alternating flash areas, compacted
+  by a "defragmentation")
+* KERNAL style functions: setnam, load, verify, open, chrin, chrout, close,
+  readst, directory listings with patterns, scratch and overwrite commands
+* No RAM needed except 128 bytes in the IO2 area ($df00-$df7f) and the
+  zero page $35-$3f, which is saved and restored
+* EFS_validate repairs the writable part after a reset or power loss during
+  a defragmentation or while a file was being written
+* MiniEAPI: a read-only replacement for EAPI in the upper IO2 area, so that
+  reading needs no RAM at all
+
+## Status
+The code was reviewed in October 2026 and every critical, major and minor
+finding was fixed; see [docs/review-findings.md](./docs/review-findings.md)
+for the list, including the remaining design decisions. The fixes are
+covered by 36 regression tests that run the real cartridge in VICE
+(`make test`). The library is still meant for small files such as save
+games; see the limits in the manual.
 
 ## Building
-To build your own version you need the following:
-* cc65
-* Python 3.6 or greater
+You need:
+* cc65 (ca65, ld65, cc65)
+* Python 3.6 or later
 * GNU Make
-* C compiler
+* VICE (cartconv and c1541 for the test cartridge and the test disk, x64sc
+  for the tests)
 
-Then build with
+Build the library and the test cartridge with
 
 ```
 make
 ```
 
-Find the prg of libefs in the build sub-directory:
-`build/lib-efs.prg`.
+The library is `build/lib-efs.prg` (load address $8000, placed in bank 0
+ROML), the test cartridge `build/test-libefs.crt`. The banking mode of the
+writable areas of the test cartridge is selected with `BANKMODE` in the
+Makefile (`ll`, `lh` or `hh`).
 
+### Tests
+```
+make test
+```
+runs the regression tests in VICE (`tests/vice/run.py`). They need x64sc,
+cartconv, the C64 ROMs (VICE's own search path or the directory in
+`$VICE_ROMS`) and, without a display, `xvfb-run`. Each test is a small
+program that is loaded into the running test cartridge through VICE's
+remote monitor; some tests run on patched cartridge images and some check
+that the flash written back by VICE changed only where it should.
 
-
-# Manual
-
-Read more in [docs/manual.md](./docs/manual.md)
-
-
-
-# Other
+## Documentation
+* [docs/manual.md](./docs/manual.md): configuration, API and usage rules
+* [docs/architecture.md](./docs/architecture.md): how the library works
+  internally (memory layout, banking, directory format, each operation)
+* [docs/review-findings.md](./docs/review-findings.md): the code review,
+  what was fixed and how it was verified
+* [docs/memory.txt](./docs/memory.txt): zero page, IO2 and directory layout
+* [docs/todo.txt](./docs/todo.txt): open items
 
 ## Example
-See the testefs cartridge source code in ```src/ef``` as example. You can find 
-the build test cartridge in the build directory: ```build/test-libefs.crt```
-
-## Bugs
-
-I did not test the library thoroughly. There are some tests to
-validate the basic functions and a long running test thats reads, scratches
-and saves files repeatadly. But there are many cases that the simple tests
-do not cover. I consider the library "alpha" quality. The features 
-are there but largely untested. Use at your own risk. Some features have not
-been implemented yet: validating.
-
+The test cartridge in `src/ef` shows how to initialise and call the
+library: `init.s` boots the cartridge and loads the menu, `efs-wrapper.s`
+wraps the calls for cc65, `efs-config.s` is the configuration block and
+`menu.c` exercises every function (load, verify, open/chrin/chrout/close,
+directory, scratch, save, format, defragment and a long-running
+save/load/verify loop). The tools in `tools/` build the efs images and the
+cartridge binary; see the Makefile for how they are used.
 
 ## License and Copyright
 

@@ -14,8 +14,8 @@ write. The MiniEAPI sits in the upper IO2 area (df80 - dfff) and replaces
 the eapi jump table, code and variables there. No further ram space is
 needed.
 
-Libefs can be identified by the text LIBEFS (in PETSCII) at
-00:l:0010, followed by the version number in major.minor.patch.
+Libefs can be identified by the text "libefs" at 00:l:0018 (right after
+the jump table), followed by the version number in major.minor.patch.
 
 The configuration, which banks to use for the read/write part, resides
 right after the EasyFlash name at 0:1:1b18.
@@ -30,6 +30,11 @@ minutes, depending on the used space.
 
 The library is not suitable for storing large amount of data. Its
 recommended usage is to store small files, eg savegames.
+
+A reset or power loss during a defragmentation or while a file is being
+written leaves the writable part in an inconsistent state; EFS_validate,
+called at every start, repairs it (see "Initialize"). How the library
+works internally is described in docs/architecture.md.
 
 
 # Configuration
@@ -127,8 +132,9 @@ as 16k cartridge.
 EFS_defragment ($8009):
 Parameter: none
 Returns:
-  A: error code or 0
-  .C: set if error occurs
+  A: error code or 0 (1: invalid entries were dropped)
+  .C: set if error occurs ($02: a channel is open, $1a: MiniEAPI,
+      $47: the copy failed, $19: the erase failed)
 Defragments the writable part of the efs. This process can take several
 minutes depending on the size of writable part and used files. While
 defragmenting a progress function can be called to indicate the process.
@@ -144,8 +150,9 @@ EFS_format ($800c):
 Parameter: none
 Returns:
   A: error code or 0
-  .C: set if error occurs
-Formats the writeable part of the efs.
+  .C: set if error occurs ($02: a channel is open, $1a: MiniEAPI,
+      $19: the erase failed)
+Formats (erases) both writeable areas of the efs.
 ```
 
 ```
@@ -211,7 +218,8 @@ Parameter:
   A: $0x
   Y: secondary address (0: relocate, 1: load to loadaddress of file)
 Return:
-  none
+  none ($02 with .C set while a channel is open)
+Without a setlfs call files are loaded to their own load address.
 
 command: get load address ($10):
 Parameter:
@@ -228,10 +236,12 @@ Parameter:
   X: name address low
   Y: name address high
 Return:
-  none
+  none ($02 with .C set while a channel is open)
 Restrictions:
   The name must not be in memory areas where banking occurs: $8000 - $bfff
-  and $e000 - $ffff, as well as the memory below io area ($d000 - $dfff)
+  and $e000 - $ffff, as well as the memory below io area ($d000 - $dfff).
+  Names longer than 16 characters are truncated to 16. "*" and "?" in a
+  name are wildcards for load, open and the directory listing.
 ```
 
 ```
@@ -249,7 +259,8 @@ X/Y hold the address of the last byte written (the kernal returns the
 address after the last byte; add 1 for kernal-style code). A verify
 mismatch returns .C set with A = 0; EFS_readst then shows $10.
 Supported commands:
-  "$0:[filename]" will load the directory
+  "$0:[pattern]" will load the directory (as a BASIC program listing)
+  "@0:" is accepted and ignored
 ```
 
 ```
@@ -259,10 +270,12 @@ Parameter:
 Return:
   A: error code
   .C: set if error
-Supported commands (only with chrin):
-  "$0:[filename]" will load the directory
+Supported commands:
+  "$0:[pattern]" will open the directory listing for chrin
   "S0:[filename]" will delete a file (the first match of a pattern; after
-  the open only EFS_close is valid)
+  the open only EFS_close is valid; $1a for a file in the read only area)
+  "@0:[filename]" with A = 1 deletes an existing file before writing
+  "@0:" with A = 0 is accepted and ignored
 Opening a file for writing needs room for at least $2002 bytes in the
 read/write area ("disk full" otherwise); the file may become larger as
 long as the area has room.
@@ -297,9 +310,14 @@ Parameter:
   Y: end address (plus 1) high
 Return:
   A: error code
-  .C: set if error
+  .C: set if error ($1e if the end address is not above the start
+      address, $3f if the file exists, $48 if it does not fit, $47 if
+      the directory is full)
+The data are read with the memory configuration of the caller (see
+"Memory access"). If writing fails, the directory entry is removed again.
 Supported commands:
-  "@0:[filename]" will overwrite the file
+  "@0:[filename]" will overwrite the file (the old file is deleted only
+  after the space check, see "Memory access")
 ```
 
 ```
@@ -307,8 +325,12 @@ EFS_chrout ($df2a)
 Parameter:
   A: character to output
 Return:
+  A: error code
   .C: set if error
-Error
+X and Y are preserved. When the area is full the last byte is written
+and $48 is returned with .C set and the status $40; further calls return
+$19 without writing. EFS_close writes the size of the file; if that
+fails, the entry is removed again and close returns $19.
 ```
 
 ```
@@ -335,10 +357,11 @@ Error Codes:
   $07: no output file
   $08: missing filename
   $19: write error
-  $1a: write protected
-  $1e: command syntax error
+  $1a: write protected (file in the read only area, or MiniEAPI)
+  $1e: command syntax error (also: invalid address range for save)
   $3f: file exists
-  $47: directory error
+  $47: directory error (directory full after a defragmentation, copy
+       failed, or EFS_validate cannot tell the areas apart)
   $48: disk full
 ```
 
@@ -387,11 +410,12 @@ off before calling libefs functions.
 
 ## Allowed commands
 
-Not all acommands are allowed to be usesd in load, open and save.
+Not all commands are allowed to be used in load, open and save. The
+drive number is optional ("S:name" and "S0:name" are the same).
 
 ```
 S: scratch: open
-$: directory: open, load
-@: overwrite: save
+$: directory: open (read), load
+@: overwrite: save, open (write); ignored by load and open (read)
 ```
 
