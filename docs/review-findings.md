@@ -822,9 +822,8 @@ defragment then verify `DELME17K` → OK (`$40`); before: mismatch
 
 ## Documentation (D1)
 
-- `docs/manual.md` configuration table: bytes `39-3f` are "unused", but
-  the default config in `lib-efs.s:208-211` and `libefs_config` define
-  `actcall`/`actvector` there (marked "not implemented").
+- (Done) `docs/manual.md` configuration table now lists the activity
+  indicator bytes `39-3b` (not implemented).
 - (Done) `docs/manual.md`, `EFS_validate`: now states what the stub
   returns (see M10).
 - (Done) `docs/memory.txt` rewritten (zero page, IO2, states, directory

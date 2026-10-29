@@ -70,7 +70,9 @@ progress. In the example the border color flashes.
 | 34        | call function on defragmentation (1: yes, 0: no) |
 | 35,36     | vector to update defragmentation warning; see below |
 | 37,38     | vector to the defragmentation all clear function; see below |
-| 39-3f     | unused |
+| 39        | activity indicator (not implemented, keep 0) |
+| 3a,3b     | activity indicator vector (not implemented) |
+| 3c-3f     | unused |
 
 See src/ef/efs-config.s as example.
 
