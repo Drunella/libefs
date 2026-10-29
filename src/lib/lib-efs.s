@@ -2146,10 +2146,10 @@
         bne @next
       @fit:
         iny
+        cpy #$10             ; 16 characters compared: match (longer names
+        beq @match           ;   are truncated to 16, as a 1541 does)
         cpy filename_length  ; name length check
         bne @loop            ; more characters
-        cpy #$10             ; full name length reached
-        beq @match           ;   -> match
         jsr efs_readef_read_and_inc  ; load next char
         sta zp_var_xb
         inx

@@ -45,7 +45,7 @@ section; for fixed items they refer to the original code.
 | M9 | major | **fixed** | "Blocks free" is garbage for read-only configurations and full areas |
 | M10 | major | **partly fixed** | No recovery from an interrupted defragment or an unclosed write file (open); `EFS_validate` stub returned C unchanged (fixed: returns A = 0, C clear) |
 | M11 | major | **fixed** | Defragment callbacks must preserve Y (and should preserve X), which is not documented or enforced |
-| m1 | minor | by code | Names longer than 16 characters can desynchronise the directory scan |
+| m1 | minor | **fixed** | Names longer than 16 characters can desynchronise the directory scan |
 | m2 | minor | by code | Directory bounds are not checked for deleted entries; dirlist uses a hard-coded `$b8` bound |
 | m3 | minor | by code | `rom_filesave_blockedspace` uses the stale "active file" area |
 | m4 | minor | by code | `rom_defragment_erasearea` with size < 8 erases 256 sectors |
@@ -729,6 +729,10 @@ defragment then verify `DELME17K` → OK (`$40`); before: mismatch
   the 17-character name `DATA567890123456X` (first 16 characters match
   an existing file) returned "not found" without a crash. The skipped
   entries only matter when the wanted file comes after the mismatch.
+  **Fixed**: both name compares stop after 16 characters (longer names
+  are truncated to 16, as a 1541 does). *VICE* (`work/m1test.s`): the
+  17-character name loads the 16-character file and `$:` lists it;
+  before: not found.
 - **m2 – directory bounds.** `rom_dirsearch_find` only checks the
   directory boundary for non-deleted entries (`lib-efs.s:2060`ff). A
   directory filled to the end with deleted entries is scanned into the
@@ -1356,6 +1360,7 @@ Fixed on `main`, each verified in VICE:
 | "Pass on the result of EAPIInit" | S19 |
 | "Fix ? matching, @ on read, and the blocks free count" | S20 (part) |
 | "Preserve X and Y across the defragment callbacks" | M11 |
+| "Truncate file names to 16 characters" | m1 |
 
 Most of the critical items were one-instruction branch or flag errors
 (`bne` instead of `bcc`, `beq` instead of `bne`, `plp` restoring the
