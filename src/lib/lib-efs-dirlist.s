@@ -449,16 +449,18 @@
         lda #16
         jsr efs_readef_pointer_reverse  ; go back to begin of entry
         lda dirload_temp_var_zp
+        cmp #$ff
+        beq @areadone  ; blank entry: area done
         and #%00011111  ; mask out hidden and reserved flag fields
-        bne @notinvalid  ; is file invalid -> no
+        beq @invalid    ; deleted
+        cmp #$1f
+        bne @notinvalid ; type $1f in a non blank entry: corrupt, skip it
       @invalid:
         lda #24  ; -> yes, invalid
         jsr efs_readef_pointer_advance
         jmp rom_dirload_sm_linenend
 
       @notinvalid:
-        cmp #$1f
-        beq @areadone  ; terminator -> area done
         bit dirload_temp_var_zp
         bmi @invalid   ; hidden -> invalid
         jsr rom_dirload_checkname  ; check name

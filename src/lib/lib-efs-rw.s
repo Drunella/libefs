@@ -674,6 +674,8 @@
         and #$1f  ; only low 5 bits
         cmp #$00  ; file deleted
         beq @skip
+        cmp #$1f  ; not blank, type $1f: corrupt, drop it
+        beq @invalid
 
         ; copy file
         ldy #17  ;  bank
@@ -1291,6 +1293,9 @@
         jsr efs_readef
         cmp #$ff
         beq @leave  ; leave
+        and #$1f
+        cmp #$1f
+        beq @corrupt  ; not blank, type $1f: size not reliable
         lda #5  ; move to size
         jsr efs_readef_pointer_advance
         jsr efs_readef_read_and_inc
@@ -1306,6 +1311,11 @@
         lda #16
         jsr efs_readef_pointer_advance
 
+        jmp @loop
+
+      @corrupt:
+        lda #24
+        jsr efs_readef_pointer_advance
         jmp @loop
 
         ; reset directory
@@ -1769,6 +1779,9 @@
         jsr efs_readef_read_and_inc
         cmp #$ff
         beq @leave17
+        and #$1f
+        cmp #$1f
+        beq @corrupt  ; not blank, type $1f: position fields not reliable
         jsr efs_readef_read_and_inc  ; reads bank
         sta zp_var_x8
         jsr efs_readef_pointer_inc   ; reserved
@@ -1784,6 +1797,11 @@
         sta zp_var_xd
 
         lda #16    ; add by name 
+        jsr efs_readef_pointer_advance
+        jmp @loop
+
+      @corrupt:
+        lda #23    ; skip the rest of the entry
         jsr efs_readef_pointer_advance
         jmp @loop
 

@@ -61,7 +61,7 @@ section; for fixed items they refer to the original code.
 | S6 | major | **fixed** | A failed save leaves a live, corrupt directory entry |
 | S7 | major | **fixed** | Write/erase errors ignored in defragment, erase and close |
 | S8 | major | **fixed** | `chrin` signals EOF one byte late (KERNAL difference) |
-| S9 | major | by code | Type `$1f` entries: terminator for search/dirlist, live file for space/save/defragment |
+| S9 | major | **fixed** | Type `$1f` entries: terminator for search/dirlist, live file for space/save/defragment |
 | S12 | minor | **fixed** | Verify end address of a file without data (with S8) |
 | S10-S22 | minor | see section | Exact-fit save, dir `chrin` X/Y, verify end address, name consumed, parser bounds, `@` handling, 254 files, geometry assumptions, commit marker, API nits |
 | S23 | doc | – | Callback and memory rules, activity indication, comment list |
@@ -1085,6 +1085,22 @@ but is counted, copied verbatim by defragment (after which everything
 behind it disappears for `load`), and if its size is `$ffffff` triggers
 S2. *By code.* One shared "is terminator / is live" test is needed.
 
+**Fixed**: one rule everywhere. A blank entry (`$ff`) ends the
+directory; an entry with type bits `$1f` that is not blank is treated as
+deleted/corrupt: skipped by the search (`rom_dirsearch_is_terminator`),
+the listing, `rom_space_usedspace`, `rom_filesave_blockedspace` and
+`rom_filesave_nextentry` (its position fields are not trusted), and
+dropped by the defragment (counted, A = 1).
+
+*VICE* (`work/s9test.s`, image with entry 3 = `DELME641` patched to
+flags `$7f`):
+
+| | fixed | before the fix |
+| - | ----- | -------------- |
+| `load "$"` | 6 files (all but `DELME641`), 730 blocks free | 3 files (`DELME15`, `384`, `640`), 728 free |
+| `load "DELME642"` (behind the corrupt entry) | OK | `$04` not found |
+| `EFS_defragment`, then listing | A = 1 (dropped); 7 files incl. the new `N1` | A = 0; the corrupt entry is copied, still 3 files visible |
+
 ### Minor
 
 - **S10 – exact-fit save refused.** `rom_filesave_checksize`
@@ -1262,6 +1278,7 @@ Fixed on `main`, each verified in VICE:
 | "Fix defragment copying one byte too many per file" | S1 |
 | "Scratch the entry when a save or the size write at close fails" | S6, S7 |
 | "Report end of file together with the last byte" | S8, S12 |
+| "Treat partially written directory entries consistently" | S9 |
 
 Most of the critical items were one-instruction branch or flag errors
 (`bne` instead of `bcc`, `beq` instead of `bne`, `plp` restoring the

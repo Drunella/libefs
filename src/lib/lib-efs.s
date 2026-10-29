@@ -2138,17 +2138,23 @@
 
 
     rom_dirsearch_is_terminator:
-        ; A: value
-        ; returns C set if current entry is empty (terminator)
-        ; returns C clear if there are more entries
+        ; A: flags
+        ; returns C set if the current entry is blank ($ff): end of directory
+        ; returns C clear and A = type otherwise; a type of $1f in a non
+        ; blank entry (partially written) counts as deleted (A = 0)
         ; uses A, status
         ; must not use X
+        cmp #$ff
+        beq @blank
         and #$1f
         cmp #$1f
-        beq :+
+        bne @ok
+        lda #$00  ; corrupt entry: treat as deleted
+      @ok:
         clc  ; in use or deleted
         rts
-    :   sec  ; empty
+      @blank:
+        sec  ; empty
         rts
 
 

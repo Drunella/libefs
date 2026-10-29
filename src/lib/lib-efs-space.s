@@ -237,7 +237,9 @@
         cmp #$ff
         beq @leave
         and #$1f
-        beq @skip
+        beq @skip   ; deleted
+        cmp #$1f
+        beq @skip   ; corrupt (not blank, type $1f): size not reliable
         lda #5  ; move to size
         jsr efs_readef_pointer_advance
 
