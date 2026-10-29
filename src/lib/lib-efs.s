@@ -1180,6 +1180,11 @@
         txa
         sta zp_var_x5
 
+        txa  ; the callback may change X and Y
+        pha
+        tya
+        pha
+
         ; prepare return address
         lda #>(@return - 1)
         pha
@@ -1188,6 +1193,11 @@
 
         jmp (zp_var_x5)
       @return:
+
+        pla
+        tay
+        pla
+        tax
 
         pla
         sta zp_var_x5 + 1
@@ -1218,6 +1228,11 @@
         txa
         sta zp_var_x5
 
+        txa  ; the callback may change X and Y
+        pha
+        tya
+        pha
+
         ; prepare return address
         lda #>(@return - 1)
         pha
@@ -1226,6 +1241,11 @@
 
         jmp (zp_var_x5)
       @return:
+
+        pla
+        tay
+        pla
+        tax
 
         pla
         sta zp_var_x5 + 1

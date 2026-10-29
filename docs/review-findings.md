@@ -44,7 +44,7 @@ section; for fixed items they refer to the original code.
 | M8 | major | **fixed** | `EFS_save`/`EFS_load` while a file is open return "file open" but close or corrupt that file |
 | M9 | major | **fixed** | "Blocks free" is garbage for read-only configurations and full areas |
 | M10 | major | **partly fixed** | No recovery from an interrupted defragment or an unclosed write file (open); `EFS_validate` stub returned C unchanged (fixed: returns A = 0, C clear) |
-| M11 | major | by code | Defragment callbacks must preserve Y (and should preserve X), which is not documented or enforced |
+| M11 | major | **fixed** | Defragment callbacks must preserve Y (and should preserve X), which is not documented or enforced |
 | m1 | minor | by code | Names longer than 16 characters can desynchronise the directory scan |
 | m2 | minor | by code | Directory bounds are not checked for deleted entries; dirlist uses a hard-coded `$b8` bound |
 | m3 | minor | by code | `rom_filesave_blockedspace` uses the stale "active file" area |
@@ -709,6 +709,12 @@ preserve X and Y.
 *Fix*: save and restore X/Y around the `jmp (zp_var_x5)` in the callback
 helpers.
 
+**Fixed**: both helpers push X and Y before the return address and
+restore them after the callback. *VICE* (`work/m11test.s`, image with
+the warning callback patched to `ldx #$ff / ldy #$ff / inc $d020`):
+defragment then verify `DELME17K` → OK (`$40`); before: mismatch
+(`$10`).
+
 ---
 
 ## Minor
@@ -1349,6 +1355,7 @@ Fixed on `main`, each verified in VICE:
 | "Return disk full when the post-defragment check fails" | S17 |
 | "Pass on the result of EAPIInit" | S19 |
 | "Fix ? matching, @ on read, and the blocks free count" | S20 (part) |
+| "Preserve X and Y across the defragment callbacks" | M11 |
 
 Most of the critical items were one-instruction branch or flag errors
 (`bne` instead of `bcc`, `beq` instead of `bne`, `plp` restoring the
