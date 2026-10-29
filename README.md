@@ -49,10 +49,19 @@ make test
 ```
 runs the regression tests in VICE (`tests/vice/run.py`). They need x64sc,
 cartconv, the C64 ROMs (VICE's own search path or the directory in
-`$VICE_ROMS`) and, without a display, `xvfb-run`. Each test is a small
-program that is loaded into the running test cartridge through VICE's
-remote monitor; some tests run on patched cartridge images and some check
-that the flash written back by VICE changed only where it should.
+`$VICE_ROMS`) and, without a display, `xvfb-run` (an SDL build of VICE
+runs without it). Each test is a small program that is loaded into the
+running test cartridge through VICE's remote monitor; some tests run on
+patched cartridge images and some check that the flash written back by
+VICE changed only where it should.
+
+The runner starts half as many emulators as there are CPUs (at most 4)
+and scales the timeouts with the measured boot time, so slow machines
+such as a Raspberry Pi need no special settings; `make test
+TESTFLAGS="-j 1"` runs one emulator at a time, `-s 3` triples the
+timeouts. If VICE fails to start, the failure line shows its exit code and
+the end of its output (missing ROMs, no display, ...); `-v` keeps the log
+and the other temporary files of each test in `tests/vice/`.
 
 ## Documentation
 * [docs/manual.md](./docs/manual.md): configuration, API and usage rules

@@ -65,7 +65,7 @@ build/%.o: build/%.s
 	$(CA65) $(CA65FLAGS) -D BANKMODE=$(BANKMODE_VALUE) -g -o $@ $<
 
 # regression tests in VICE (needs x64sc, cartconv, the C64 ROMs and xvfb-run
-# without a display); see tests/vice/run.py
+# without a display); see tests/vice/run.py, e.g. make test TESTFLAGS="-j 1 -v"
 test: build/test-libefs.crt
 	tests/vice/run.py $(TESTFLAGS)
 

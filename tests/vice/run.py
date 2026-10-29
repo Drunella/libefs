@@ -12,12 +12,19 @@ areas changed.
 
 Requirements: a built cartridge (make), cc65 (ca65, ld65), VICE (x64sc,
 cartconv), the C64 ROMs (VICE's own search path or $VICE_ROMS), and
-xvfb-run when there is no display. Only the Python standard library is
-used.
+xvfb-run when there is no display (an SDL build of VICE runs with the
+dummy video driver instead). Only the Python standard library is used.
 
-usage: tests/vice/run.py [-k substring] [-j jobs] [-v]
+Slow machines: the timeouts are scaled with the measured boot time of the
+test menu, so a Raspberry Pi needs no options; -j 1 runs one emulator at
+a time (the default is half the CPUs, at most 4), -s 3 triples all
+timeouts on top. When VICE does not start, the failure line shows its
+exit code and the end of its log; -v keeps the log (vice.log) and the
+other temporary files of each test.
+
+usage: tests/vice/run.py [-k substring] [-j jobs] [-s factor] [-v]
 """
-import argparse, os, shutil, socket, struct, subprocess, sys, tempfile, time
+import argparse, os, re, shutil, socket, struct, subprocess, sys, tempfile, time
 from concurrent.futures import ThreadPoolExecutor
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -125,6 +132,32 @@ TESTS = {
 
 # ---------------------------------------------------------------- helpers
 
+X64 = os.environ.get('VICE_X64', 'x64sc')   # emulator binary
+PREFIX = []                                 # e.g. ['xvfb-run', '-a']
+ENV = dict(os.environ)
+SLOW = 1.0                                  # manual timeout factor (-s)
+MENU_READY = bytes([0x04, 0x05, 0x0c, 0x0d, 0x05, 0x33, 0x38, 0x34])  # "delme384" on screen
+
+def is_sdl_build(exe):
+    try:
+        out = subprocess.run(['ldd', shutil.which(exe)], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=30).stdout
+        return b'libSDL' in out
+    except Exception:
+        return False
+
+def setup_display():
+    """How to run the emulator: on the display, under xvfb-run, or with SDL's dummy driver."""
+    global PREFIX
+    if os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY'):
+        return 'display ' + (os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY'))
+    if shutil.which('xvfb-run'):
+        PREFIX = ['xvfb-run', '-a']
+        return 'xvfb-run'
+    if is_sdl_build(X64):
+        ENV['SDL_VIDEODRIVER'] = 'dummy'; ENV['SDL_AUDIODRIVER'] = 'dummy'
+        return 'SDL dummy video driver'
+    sys.exit('no display: run on a desktop (DISPLAY), install xvfb (xvfb-run), or use an SDL build of VICE')
+
 def roms():
     d = os.environ.get('VICE_ROMS')
     if not d:
@@ -158,25 +191,61 @@ def flash_changes_outside_rw(a, b):
         n += sum(1 for i in range(0x2000) if (da[i] if i < len(da) else 0xff) != (db[i] if i < len(db) else 0xff))
     return n
 
+class ViceError(Exception):
+    pass
+
 class Vice:
-    def __init__(self, crt, port, writeback):
+    """One emulator instance with the test cartridge, controlled through the remote monitor."""
+    def __init__(self, crt, port, writeback, log):
         self.port = port
-        cmd = ['x64sc', '-default'] + roms() + ['-sounddev', 'dummy', '-warp',
+        self.logname = log
+        cmd = [X64, '-default'] + roms() + ['-sounddev', 'dummy', '-warp',
                '-easyflashcrtwrite' if writeback else '+easyflashcrtwrite',
                '-cartcrt', crt, '-remotemonitor', '-remotemonitoraddress', 'ip4://127.0.0.1:%d' % port]
-        if not os.environ.get('DISPLAY') and shutil.which('xvfb-run'):
-            cmd = ['xvfb-run', '-a'] + cmd
-        self.p = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        for i in range(60):
+        self.log = open(log, 'wb')
+        t0 = time.time()
+        self.p = subprocess.Popen(PREFIX + cmd, stdout=self.log, stderr=subprocess.STDOUT, env=ENV)
+        # the remote monitor must come up
+        deadline = t0 + 120 * SLOW
+        while True:
+            self.check_alive('before the remote monitor came up')
             try:
-                socket.create_connection(('127.0.0.1', port)).close(); break
+                socket.create_connection(('127.0.0.1', port), 2).close(); break
             except OSError:
+                if time.time() > deadline:
+                    self.fail('the remote monitor (port %d) did not come up within %d s' % (port, 120 * SLOW))
                 time.sleep(1)
-        time.sleep(8)  # boot into the menu
+        # then the test menu must be running (it prints the file name on the screen last)
+        deadline = t0 + 300 * SLOW
+        while True:
+            try:
+                screen = bytes(self.mem(0x0400, 1000))
+            except OSError:
+                screen = b''
+            if MENU_READY in screen:
+                break
+            self.check_alive('before the test menu was running')
+            if time.time() > deadline:
+                self.fail('the test menu did not come up within %d s' % (300 * SLOW))
+            time.sleep(2)
+        self.boot = time.time() - t0
+
+    def check_alive(self, when):
+        if self.p.poll() is not None:
+            self.fail('VICE exited with code %d %s' % (self.p.returncode, when))
+
+    def fail(self, msg):
+        self.stop()
+        try:
+            tail = open(self.logname, 'rb').read().decode('latin1').strip().splitlines()[-6:]
+        except OSError:
+            tail = []
+        raise ViceError(msg + ''.join('\n    | ' + l for l in tail))
 
     def cmd(self, c, wait=0.5, cont=True):
-        s = socket.create_connection(('127.0.0.1', self.port)); s.settimeout(3)
-        s.sendall((c + '\n').encode()); time.sleep(wait)
+        self.check_alive('during the test')
+        s = socket.create_connection(('127.0.0.1', self.port), 10); s.settimeout(3 * SLOW)
+        s.sendall((c + '\n').encode()); time.sleep(wait * SLOW)
         data = b''
         try:
             while True:
@@ -191,27 +260,38 @@ class Vice:
         return data.decode('latin1')
 
     def mem(self, a, n):
+        """n bytes from address a; lines look like '>C:0400  20 20 ... 20   ....' (16 bytes, then text)"""
         out = self.cmd('m %04x %04x' % (a, a + n - 1), 1.0)
-        vals = []
+        vals = [None] * n
         for line in out.splitlines():
-            if '>C:' in line:
-                for t in line[line.index('>C:') + 3:].split()[1:]:
-                    if len(t) == 2 and all(ch in '0123456789abcdefABCDEF' for ch in t):
-                        vals.append(int(t, 16))
-                    else:
-                        break
-        return vals[:n]
+            m = re.search(r'>C:([0-9a-fA-F]{4})((?:\s+[0-9a-fA-F]{2}){1,16})', line)
+            if not m:
+                continue
+            addr = int(m.group(1), 16)
+            for i, t in enumerate(m.group(2).split()):
+                if 0 <= addr + i - a < n:
+                    vals[addr + i - a] = int(t, 16)
+        return [v if v is not None else 0 for v in vals]
+
+    def stop(self):
+        if self.p.poll() is None:
+            self.p.terminate()
+            try:
+                self.p.wait(10)
+            except subprocess.TimeoutExpired:
+                self.p.kill(); self.p.wait()
+        self.log.close()
 
     def quit(self):
         try:
             self.cmd('quit', 1)
         except Exception:
             pass
-        for i in range(20):
+        for i in range(int(40 * SLOW)):
             if self.p.poll() is not None:
-                return
+                break
             time.sleep(0.5)
-        self.p.terminate()
+        self.stop()
 
 def run_test(name, index, verbose):
     prog, expected, timeout, opt = TESTS[name]
@@ -232,23 +312,25 @@ def run_test(name, index, verbose):
         else:
             shutil.copy(CRT, crt)
         orig = crt + '.orig'; shutil.copy(crt, orig)
-        v = Vice(crt, 6510 + index, opt.get('flash', False))
+        v = Vice(crt, 6510 + index, opt.get('flash', False), os.path.join(tmp, 'vice.log'))
+        # a fast machine boots the menu in about 5 s; slower ones get proportionally longer timeouts
+        scale = max(1.0, v.boot / 5.0) * SLOW
         try:
             v.cmd('l "%s" 0' % prg, 1.0)
             v.cmd('g c000', 1.0, cont=False)
             t0 = time.time(); done = False
-            while time.time() - t0 < timeout:
+            while time.time() - t0 < timeout * scale:
                 time.sleep(3)
                 try:
                     if v.mem(0xc9f0, 1) == [0x42]:
                         done = True; break
-                except Exception:
+                except OSError:
                     pass
             got = bytes(v.mem(0xc900, len(exp))) if done else b''
         finally:
             v.quit()
         if not done:
-            return False, 'timeout (program did not finish)'
+            return False, 'timeout (program did not finish within %d s)' % (timeout * scale)
         if got != exp:
             return False, 'results differ\n    expected %s\n    got      %s' % (exp.hex(' '), got.hex(' '))
         if opt.get('flash'):
@@ -263,15 +345,23 @@ def run_test(name, index, verbose):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('-k', dest='select', default='', help='run only tests whose name contains this')
-    ap.add_argument('-j', dest='jobs', type=int, default=4, help='parallel VICE instances')
-    ap.add_argument('-v', dest='verbose', action='store_true', help='keep the temporary files')
+    jobs = min(4, max(1, (os.cpu_count() or 1) // 2))
+    ap.add_argument('-j', dest='jobs', type=int, default=jobs, help='parallel VICE instances (default %d)' % jobs)
+    ap.add_argument('-s', dest='slow', type=float, default=1.0, help='multiply all timeouts by this factor')
+    ap.add_argument('-v', dest='verbose', action='store_true', help='keep the temporary files (including vice.log)')
     args = ap.parse_args()
+    global SLOW
+    SLOW = max(0.1, args.slow)
     for f, what in ((BIN, 'cartridge image'), (CRT, 'cartridge')):
         if not os.path.exists(f):
             sys.exit('missing %s %s: run make first' % (what, f))
-    for tool in ('x64sc', 'cartconv', 'ca65', 'ld65'):
+    for tool in (X64, 'cartconv', 'ca65', 'ld65'):
         if not shutil.which(tool):
             sys.exit('missing tool: ' + tool)
+    display = setup_display()
+    r = roms()
+    print('%s via %s, %d parallel, ROMs: %s' % (X64, display, args.jobs,
+          os.path.dirname(r[1]) if r else 'not found in ~/.local/share/vice/C64 or $VICE_ROMS (VICE must find them itself)'), flush=True)
     names = [n for n in TESTS if args.select in n]
     results = {}
     with ThreadPoolExecutor(max_workers=args.jobs) as ex:
@@ -280,8 +370,10 @@ def main():
             n = futs[f]
             try:
                 results[n] = f.result()
+            except ViceError as e:
+                results[n] = (False, str(e))
             except Exception as e:
-                results[n] = (False, 'error: %s' % e)
+                results[n] = (False, 'error: %r' % e)
             ok, msg = results[n]
             print('%-28s %s%s' % (n, 'PASS' if ok else 'FAIL', ('  ' + msg) if msg else ''), flush=True)
     failed = [n for n in names if not results[n][0]]
