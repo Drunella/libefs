@@ -55,7 +55,7 @@ section; for fixed items they refer to the original code.
 | D1 | doc | – | Documentation mismatches |
 | S1 | critical | confirmed | Defragment copies size+1 bytes per file; the next save fails on the stray byte |
 | S2 | critical | confirmed | Defragment has no bounds checks: a `$ffffff` entry programs bank 0 and the whole cartridge |
-| S3 | critical | confirmed | `EFS_format` with an open file: next `chrin` erases banks 0-7 (read) / a later file gets a corrupt size (write) |
+| S3 | critical | **fixed** | `EFS_format` with an open file: next `chrin` erases banks 0-7 (read) / a later file gets a corrupt size (write) |
 | S4 | critical | confirmed | `EFS_open` while a write channel is full clears the status; the next `chrout` writes into bank 0 |
 | S5 | critical | confirmed | `EFS_save` of ≥ 64 KB passes the space check and writes past the area into bank 0 |
 | S6 | major | confirmed | A failed save leaves a live, corrupt directory entry |
@@ -879,6 +879,18 @@ file `N7` is listed with **0 blocks** (size `302 & 3 = 2`).
 additionally re-initialise `efs_io_byte` to `EAPIReadFlashInc` at the
 end of format and defragment.
 
+**Fixed**: `rom_format_body` returns `ERROR_FILE_OPEN` while a channel is
+open (like defragment), and both format and defragment reset
+`efs_io_byte` to `EAPIReadFlashInc` before returning.
+
+*VICE* (`work/s3test.s`):
+
+| case | fixed | before the fix |
+| ---- | ----- | -------------- |
+| format while `DATA1` is open for reading, then `chrin` | format `$02`; `chrin` returns the next byte | format 0; `chrin` erases banks 0-7 ROML (6,042 + 7 × ~8,160 bytes changed) |
+| format while `OP` is open for writing, then close, load | format `$02`; `OP` closes and loads back intact | format 0; a later file in slot 7 gets a corrupt size |
+| format with nothing open, then open/chrin | 0; `chrin` reads normally | – |
+
 #### S4 – `EFS_open` while a write channel is full clears the status; the next `chrout` writes into bank 0
 
 `src/lib/lib-efs.s:671-681` (`rom_open_body`) zeroes `status_byte` and
@@ -1139,6 +1151,7 @@ Fixed on `main`, each verified in VICE:
 | "Refuse write operations when MiniEAPI is installed" | M6 |
 | "Fix blocks free for read-only and full areas" | M9 |
 | "Make the EFS_validate stub return a defined result" | M10 (part) |
+| "Refuse EFS_format while a channel is open" | S3 |
 
 Most of the critical items were one-instruction branch or flag errors
 (`bne` instead of `bcc`, `beq` instead of `bne`, `plp` restoring the

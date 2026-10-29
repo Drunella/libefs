@@ -190,6 +190,9 @@
         jsr rom_flags_get_area
         jsr rom_defragment_erasearea
 
+        jsr efs_init_eapireadinc  ; leave efs_io_byte as "read" (erase was patched in)
+        lda #$00
+        clc
         rts
 
       @error:
@@ -206,12 +209,22 @@
         jsr rom_check_writable
         bcs @error
 
+        lda internal_state  ; check if file open: an open read channel would
+        beq @process        ; call the erase hook from chrin, an open write
+        lda #ERROR_FILE_OPEN  ; channel would write its size into the erased area
+        sec
+        rts
+
+      @process:
         lda #$01
         jsr rom_defragment_erasearea
         bcs @error
         lda #$02
         jsr rom_defragment_erasearea
-        rts
+        bcs @error
+        jsr efs_init_eapireadinc  ; leave efs_io_byte as "read"
+        lda #$00
+        clc
       @error:
         rts
 
