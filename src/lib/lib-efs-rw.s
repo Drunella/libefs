@@ -1014,9 +1014,10 @@
         jsr rom_filesave_blockedspace  ; free space
         jsr rom_filesave_addsize
         jsr rom_filesave_checksize
-        bcs @error
-
-        lda #$00
+        bcc :+
+        lda #ERROR_DISK_FULL  ; still no room after the defragmentation
+        bne @error
+      : lda #$00
         clc
         rts
       @error:

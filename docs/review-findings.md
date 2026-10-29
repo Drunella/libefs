@@ -68,6 +68,7 @@ section; for fixed items they refer to the original code.
 | S14 | minor | **fixed** | Command parser read past short names |
 | S15 | minor | **fixed** | `@` in save ignored a failed scratch |
 | S16 | minor | **fixed** | Directory held 254 files instead of 255 |
+| S17 | minor | **fixed** | Garbage error code after the post-defragment check |
 | S12 | minor | **fixed** | Verify end address of a file without data (with S8) |
 | S10-S22 | minor | see section | Exact-fit save, dir `chrin` X/Y, verify end address, name consumed, parser bounds, `@` handling, 254 files, geometry assumptions, commit marker, API nits |
 | S23 | doc | – | Callback and memory rules, activity indication, comment list |
@@ -1177,7 +1178,7 @@ flags `$7f`):
   defragment.
 - **S17 – garbage error code after a failed post-defragment check.**
   `rom_filesave_conditions:899-903` branches to `@error` with A = a size
-  byte (same pattern as M7); hard to reach. *By code.*
+  byte (same pattern as M7); hard to reach. *By code.* **Fixed** (by code): returns `ERROR_DISK_FULL`.
 - **S18 – `@` overwrite checks the space before scratching.**
   `rom_save_body` runs the conditions before the `@` scratch, so the
   file about to be replaced still counts as used: replacing a large file
@@ -1325,6 +1326,7 @@ Fixed on `main`, each verified in VICE:
 | "Check the name length before parsing a command prefix" | S14 |
 | "Report a failed scratch of the @ overwrite command" | S15 |
 | "Allow 255 directory entries" | S16 |
+| "Return disk full when the post-defragment check fails" | S17 |
 
 Most of the critical items were one-instruction branch or flag errors
 (`bne` instead of `bcc`, `beq` instead of `bne`, `plp` restoring the
