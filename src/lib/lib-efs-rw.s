@@ -1068,13 +1068,16 @@
         sbc io_start_address + 1
         sta zp_var_xf
 
-        clc  ; add load address
-        lda #$02
-        adc zp_var_xe
+        clc  ; add load address; keep the carry, the size can reach $10000
+        lda zp_var_xe
+        adc #$02
         sta zp_var_xe
-        lda #$00
-        adc zp_var_xf
+        lda zp_var_xf
+        adc #$00
         sta zp_var_xf
+        lda #$00
+        rol  ; a = high byte of the 24 bit size (0 or 1)
+        pha
 
         clc  ; add to used space
         lda zp_var_xe
@@ -1083,7 +1086,7 @@
         lda zp_var_xf
         adc zp_var_xc
         sta zp_var_xc
-        lda #$00
+        pla
         adc zp_var_xd
         sta zp_var_xd
 

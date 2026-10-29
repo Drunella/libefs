@@ -57,7 +57,7 @@ section; for fixed items they refer to the original code.
 | S2 | critical | confirmed | Defragment has no bounds checks: a `$ffffff` entry programs bank 0 and the whole cartridge |
 | S3 | critical | **fixed** | `EFS_format` with an open file: next `chrin` erases banks 0-7 (read) / a later file gets a corrupt size (write) |
 | S4 | critical | **fixed** | `EFS_open` while a write channel is full clears the status; the next `chrout` writes into bank 0 |
-| S5 | critical | confirmed | `EFS_save` of ≥ 64 KB passes the space check and writes past the area into bank 0 |
+| S5 | critical | **fixed** | `EFS_save` of ≥ 64 KB passes the space check and writes past the area into bank 0 |
 | S6 | major | confirmed | A failed save leaves a live, corrupt directory entry |
 | S7 | major | by code | Write/erase errors ignored in defragment, erase and close |
 | S8 | major | confirmed | `chrin` signals EOF one byte late (KERNAL difference) |
@@ -933,6 +933,14 @@ machine crashes; write-back shows **bank 0 ROML: 5,434 bytes changed**
 
 *Fix*: compute the size once in 24 bits (or reject end − start ≥ `$fffe`).
 
+**Fixed**: `rom_filesave_addsize` keeps the carry of the "+2" and adds
+it to the high byte of the 24-bit sum.
+
+*VICE* (`work/r2gtest.s`, 30,000 bytes free, save of `$0001-$fffe`):
+fixed → `$48` disk full, no flash change; before the fix → accepted,
+machine crashed, bank 0 ROML 5,456 bytes changed. The C6 save test
+still passes.
+
 ### Major
 
 #### S6 – A failed save leaves a live, corrupt directory entry
@@ -1163,6 +1171,7 @@ Fixed on `main`, each verified in VICE:
 | "Make the EFS_validate stub return a defined result" | M10 (part) |
 | "Refuse EFS_format while a channel is open" | S3 |
 | "Keep the channel status when EFS_open is rejected" | S4 |
+| "Fix space check for saves of 64 KB or more" | S5 |
 
 Most of the critical items were one-instruction branch or flag errors
 (`bne` instead of `bcc`, `beq` instead of `bne`, `plp` restoring the
