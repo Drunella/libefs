@@ -332,8 +332,8 @@
     :   cmp $dd08       ; poll TO2TEN for change
         beq :-
 
-        lda $dd05       ; TI2AHI expect (approximate) $7f4a $70a6 $3251 $20c0
-        ldx $dd04
+        lda $dd04       ; low byte in a, high byte in x (cc65 int return)
+        ldx $dd05       ; expect (approximate) $7f4a $70a6 $3251 $20c0
         cli
         rts
 

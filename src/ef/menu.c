@@ -319,10 +319,10 @@ void createpattern(char* address, uint16_t size, uint32_t number)
 
 void longtest()
 {
-    // create test data at 9000 to 9AFF (2816 bytes)
-    // load and save this filem with a recognizable pattern
-    // also save, load and delete many other files
-    // after a run, the file must still be correct
+    // create test data (2687 bytes) at $9000 with the run counter as text,
+    // save it as "myfile", load it to ADDRESS, verify it, compare it with
+    // the pattern and the counter; repeat with a new pattern until a key
+    // is pressed (the overwrites trigger defragmentations)
     uint8_t retval, status;
     char* address = (char*)(ADDRESS);
     uint16_t size = 2687; // 2816;
@@ -336,7 +336,7 @@ void longtest()
     char *filename = &cmdname[3];
 
     createpattern((char*)0x9000, size, counter);
-    EFS_setnam_wrapper(filename, strlen(filename));
+    EFS_setnam_wrapper(cmdname, strlen(cmdname));  // "@0:": a file from an earlier run may exist
     EFS_setlfs_wrapper(0);  // no secondary
     retval = EFS_save_wrapper((char*)(0x9000), (char*)(0x9000) + size + 1);
     if (retval != 0) errors++;
@@ -376,7 +376,13 @@ void longtest()
             
         verify = atol(address);
         if (verify != counter)  {
-            cprintf("error: count verify=%d\n\r", verify);
+            cprintf("error: count verify=%lu\n\r", verify);
+            errors++;
+        }
+
+        // the loaded file must match the pattern that was saved
+        if (memcmp(address, (char*)0x9000, size) != 0) {
+            cprintf("error: content mismatch\n\r");
             errors++;
         }
 
@@ -388,10 +394,10 @@ void longtest()
         EFS_close_wrapper();*/
           
         counter++;
-        sprintf(address, "%lu", counter);
+        createpattern((char*)0x9000, size, counter);  // new pattern, saved from $9000
         EFS_setnam_wrapper(cmdname, strlen(cmdname));
         EFS_setlfs_wrapper(0);
-        retval = EFS_save_wrapper(address, address + size + 1);
+        retval = EFS_save_wrapper((char*)0x9000, (char*)0x9000 + size + 1);
         if (retval != 0)  {
             cprintf("error: save retval=%d\n\r", retval);
             errors++;
@@ -560,25 +566,25 @@ void main(void)
         case '6':
             gotoxy(0, CONSOLE_START_Y);
             readdir();
-            repaint == true;
+            repaint = true;
             break;
 
         case '7':
             gotoxy(0, CONSOLE_START_Y);
             scratchfile(commandname);
-            repaint == true;
+            repaint = true;
             break;
 
         case '8':
             gotoxy(0, CONSOLE_START_Y);
             savefile(filename, (char*)(ADDRESS), global_size);
-            repaint == true;
+            repaint = true;
             break;
 
         case '9':
             gotoxy(0, CONSOLE_START_Y);
             format();
-            repaint == true;
+            repaint = true;
             break;
 
         case 'q':

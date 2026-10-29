@@ -69,10 +69,18 @@
         ldy $2c  ; TXTTAB: start of basic program
         lda #$00  ; load to x/y
         jsr EFS_load
+        bcs @error
 
-        ; relink basic
+        ; end of program = last byte + 1 -> VARTAB, then relink basic
+        txa
+        clc
+        adc #$01
+        sta $2d
+        tya
+        adc #$00
+        sta $2e
         jsr $A533
-
+      @error:
         rts
 
     direfs_memory_config:

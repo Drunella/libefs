@@ -14,10 +14,10 @@
 # limitations under the License.
 # ----------------------------------------------------------------------------
 
-# test settings
-# lh(0) or ll(1), hh(2)
+# test settings: banking mode of the read/write areas of the test cartridge
+# lh(0) or ll(1), hh(2); BANKMODE_VALUE is derived
 BANKMODE=ll
-BANKMODE_VALUE=1
+BANKMODE_VALUE=$(if $(filter lh,$(BANKMODE)),0,$(if $(filter ll,$(BANKMODE)),1,2))
 
 # Settings
 TARGET=c64
@@ -120,9 +120,9 @@ build/ef/init.bin: build/ef/init.o
 # easyflash menu.prg
 build/ef/menu.prg: $(EF_MENU_FILES)
 	$(LD65) $(LD65FLAGS) -vm -m ./build/ef/menu.map -Ln ./build/ef/menu.lst -o $@ -C src/ef/menu.cfg c64.lib $(EF_MENU_FILES)
-	echo "./build/ef/menu.prg, 1, 1" >> ./build/ef/files.list
 
-# easyflash config.bin
+# easyflash config.bin (depends on BANKMODE in this Makefile)
+build/ef/efs-config.o: Makefile
 build/ef/efs-config.bin: build/ef/efs-config.o src/ef/efs-config.cfg
 	$(LD65) $(LD65FLAGS) -vm -m ./build/ef/efs-config.map -Ln ./build/ef/efs-config.lst -o $@ -C src/ef/efs-config.cfg c64.lib build/ef/efs-config.o
 
@@ -131,8 +131,8 @@ build/ef/efs-config.bin: build/ef/efs-config.o src/ef/efs-config.cfg
 build/ef/efs.dir.prg build/ef/efs.files.prg: build/ef/files.list build/ef/menu.prg
 	tools/mkefs.py -v -m lh -u -s 507904 -l ./build/ef/files.list -f . -d ./build/ef
 
-# test files
-build/ef/files.list:
+# test files (the menu is added last, hidden)
+build/ef/files.list: build/ef/menu.prg
 	@mkdir -p ./build/files
 	rm -f ./build/ef/files.list
 	./tools/mkdata.py -f build/files/data1.prg -a 0x3000 -s 1 >> build/ef/files.list
@@ -151,10 +151,11 @@ build/ef/files.list:
 	./tools/mkdata.py -f build/files/data99k.prg -a 0x3000 -s 25342 >> build/ef/files.list
 	./tools/mkdata.py -f build/files/data100k.prg -a 0x3000 -s 25343 >> build/ef/files.list
 	./tools/mkdata.py -f build/files/data1000k.prg -a 0x3000 -s 255998 >> build/ef/files.list
+	echo "./build/ef/menu.prg, 1, 1" >> ./build/ef/files.list
 
 
-# build efs rw
-build/ef/efs-rw.dir.prg build/ef/efs-rw.files.prg: build/ef/files-rw.list
+# build efs rw (depends on BANKMODE in this Makefile)
+build/ef/efs-rw.dir.prg build/ef/efs-rw.files.prg: build/ef/files-rw.list Makefile
 	tools/mkefs.py -v -u -s 256000 -o 6144 -m $(BANKMODE) -b 32 -n efs-rw -l ./build/ef/files-rw.list -f . -d ./build/ef
 
 # test files rw

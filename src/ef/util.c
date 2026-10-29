@@ -163,8 +163,10 @@ char* gettextxy(uint8_t x, uint8_t y, uint8_t len)
 
         } else if (c == CH_DEL) {
             // del
-            if (n > 0) content[n-1] = 0;
-            n--;
+            if (n > 0) {
+                n--;
+                content[n] = 0;
+            }
 
         } else if (c == CH_HOME || c == 0x93) {
             // clear
@@ -172,7 +174,8 @@ char* gettextxy(uint8_t x, uint8_t y, uint8_t len)
             n = 0;
 
         } else if (c == 0x5f) {
-            // cancel
+            // cancel: return an empty string
+            content[0] = 0;
             break;
 
         } else if (c >= 0x20 && c <= 0x7f) {

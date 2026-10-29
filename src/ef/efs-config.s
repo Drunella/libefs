@@ -47,8 +47,8 @@ BANKMODE = -1
         .byte  32, $80,  32, $80,  32,  $b0  ; area 1: lower banks of 262144 bytes, llll
         .byte  32, $a0,  32, $a0,  32,  $d4  ; area 2: upper banks of 262144 bytes, hhhh
 .elseif BANKMODE = 2
-        .byte  32, $a0,  32, $a0,  32,  $d4  ; area 1: upper banks of 262144 bytes, llll
-        .byte  32, $80,  32, $80,  32,  $b0  ; area 2: lower banks of 262144 bytes, hhhh
+        .byte  32, $a0,  32, $a0,  32,  $d4  ; area 1: upper halves of banks 32-63, hhhh
+        .byte  32, $80,  32, $80,  32,  $b0  ; area 2: lower halves of banks 32-63, llll
 .else
     .error "bankmode must be set to 0(lh), 1(ll) or (2(hh)"
 .endif

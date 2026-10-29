@@ -233,6 +233,7 @@ LOADER_START      = $c000
         ;jsr EFS_init_minieapi
         lda #>EAPI_LOCATION  ; address to load eapi to
         jsr EFS_init_eapi
+        bcs init_error       ; no eapi or unsupported flash
 
         lda #$36
         sta $01
@@ -251,9 +252,17 @@ LOADER_START      = $c000
         ldy #>MENU_START
         lda #$00  ; load to x/y
         jsr EFS_load
+        bcs init_error       ; menu not found
         
     startup:
         jmp MENU_START
+
+    init_error:
+        ; switch the cartridge off and reset: the machine comes up as a
+        ; plain c64 instead of jumping into garbage
+        lda #$04
+        sta $de02
+        jmp ($fffc)
 
     loader_text:
         .byte $0c, $0f, $01, $04, $09, $0e, $07, $2e, $2e, $2e  ; "loading..."

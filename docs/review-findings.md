@@ -1334,23 +1334,54 @@ compiled code.
 
 | ID | Severity | Status | Location | Finding |
 | -- | -------- | ------ | -------- | ------- |
-| T1 | major (test) | confirmed | Makefile:117-118, 128-130, 145-147 | `menu.prg` is added to `files.list` only by the `menu.prg` recipe (`echo >>`). If `files.list` is rebuilt while `menu.prg` is up to date, MENU is missing from the cartridge. `init.s` ignores the load error and jumps to `$0801`. Every rebuild of `menu.prg` appends another line. `BANKMODE`/`BANKMODE_VALUE` must be changed together and do not trigger rebuilds. |
-| T2 | major (test) | confirmed | src/ef/menu.cfg | The C stack starts at `$3e00` (end of MAIN) and grows down into BSS (`$3d00-$3d55`). The reserved STACK area `$3e00-$3fff` is never used. |
-| T3 | major (test) | by code | src/ef/menu.c `longtest` | Tests less than its comment claims. It uses one file and verifies it against the data just loaded from it (always equal); only the counter is checked. The first save without `@0:` fails on a second run. `%d` is used with a `uint32_t`. |
+| T1 | major (test) | **fixed** | Makefile:117-118, 128-130, 145-147 | `menu.prg` is added to `files.list` only by the `menu.prg` recipe (`echo >>`). If `files.list` is rebuilt while `menu.prg` is up to date, MENU is missing from the cartridge. `init.s` ignores the load error and jumps to `$0801`. Every rebuild of `menu.prg` appends another line. `BANKMODE`/`BANKMODE_VALUE` must be changed together and do not trigger rebuilds. |
+| T2 | major (test) | **fixed** | src/ef/menu.cfg | The C stack starts at `$3e00` (end of MAIN) and grows down into BSS (`$3d00-$3d55`). The reserved STACK area `$3e00-$3fff` is never used. |
+| T3 | major (test) | **fixed** | src/ef/menu.c `longtest` | Tests less than its comment claims. It uses one file and verifies it against the data just loaded from it (always equal); only the counter is checked. The first save without `@0:` fails on a second run. `%d` is used with a `uint32_t`. |
 | T4 | major (test) | by code | src/ef/menu.c | Loading with secondary 1 (load address `$3000`) of files larger than `$d00` bytes overwrites the menu's BSS/stack. `data1000k` relocated runs into I/O and the library at `$df00`. `readfile` has no bound either. |
-| T5 | minor | confirmed | src/ef/menu.c:563,569,575,581 | `repaint == true;` (comparison) instead of `=`, so no redraw after Directory/Scratch/Save/Format. |
-| T6 | minor | by code | src/ef/util.c:164-167 | `gettextxy`: DEL at position 0 underflows `n` to 255. A further DEL writes outside the 17-byte buffer. Cancel returns the edited text like Enter. |
-| T7 | minor | confirmed | tools/mkefs.py:48-51,75 | Dedup never works: a `hashlib.sha256` object is used as dict key (identity comparison). If it is ever fixed, it must stay off for r/w images, because `rom_filesave_nextentry` assumes the last entry ends the used data. |
-| T8 | minor | confirmed | tools/mkefs.py:85-86 | The duplicate-name check is dead (`entries_directory` is never filled) and would raise `TypeError` (str + dict). |
-| T9 | minor | confirmed | tools/mkefs.py:54 | `>= maxsize` rejects data that exactly fits `-s`. |
-| T10 | minor | confirmed | tools/mkefs.py:94,105; mkbin.py:129-130 | The directory holds 255 files (one slot is needed for the terminator; this is fine but should be documented). The mkbin `hh` shift is applied only when the map gives an explicit address. The mkbin format comment does not match the parser. |
-| T11 | minor | by code | tools/mkefs.py, mkdata.py | No check of the 64-bank limit; default `-s` is wrong for ll/hh. Fragile list parsing (empty line, `01`). `random.randbytes` needs Python 3.9 (README says 3.6). `-s 0` crashes. |
-| T13 | minor | confirmed | tools/mkefs.py | Files in the generated images are placed with a one-byte gap after each file (`DELME15` offset `$1800` size 17, `DELME384` offset `$1812`). libefs places the next save at `offset + size` of the last entry, i.e. on the gap byte (harmless, it is blank), but the space accounting counts one byte less per file than is used. |
-| T12 | minor | by code | src/ef/init.s:229-256; src/prg/direfs.s:68-76; src/ef/efs-wrapper.s | `init.s` checks no results and never calls `EFS_validate`. `direfs` does not set VARTAB after loading `$`, and does not check that the cartridge is present. `TIMER_get_system` returns the bytes swapped (unused). `SYS_readdir` leaves a subroutine via `jmp` (unused). The `efs-config.s` comments for `BANKMODE=2` have llll/hhhh swapped. |
+| T5 | minor | **fixed** | src/ef/menu.c:563,569,575,581 | `repaint == true;` (comparison) instead of `=`, so no redraw after Directory/Scratch/Save/Format. |
+| T6 | minor | **fixed** | src/ef/util.c:164-167 | `gettextxy`: DEL at position 0 underflows `n` to 255. A further DEL writes outside the 17-byte buffer. Cancel returns the edited text like Enter. |
+| T7 | minor | **fixed** | tools/mkefs.py:48-51,75 | Dedup never works: a `hashlib.sha256` object is used as dict key (identity comparison). If it is ever fixed, it must stay off for r/w images, because `rom_filesave_nextentry` assumes the last entry ends the used data. |
+| T8 | minor | **fixed** | tools/mkefs.py:85-86 | The duplicate-name check is dead (`entries_directory` is never filled) and would raise `TypeError` (str + dict). |
+| T9 | minor | **fixed** | tools/mkefs.py:54 | `>= maxsize` rejects data that exactly fits `-s`. |
+| T10 | minor | **fixed** | tools/mkefs.py:94,105; mkbin.py:129-130 | The directory holds 255 files (one slot is needed for the terminator; this is fine but should be documented). The mkbin `hh` shift is applied only when the map gives an explicit address. The mkbin format comment does not match the parser. |
+| T11 | minor | **partly fixed** | tools/mkefs.py, mkdata.py | No check of the 64-bank limit; default `-s` is wrong for ll/hh. Fragile list parsing (empty line, `01`). `random.randbytes` needs Python 3.9 (README says 3.6). `-s 0` crashes. |
+| T13 | – | withdrawn | tools/mkefs.py | The one-byte gaps were observed on directories *after* a defragment: they were S1, not mkefs. The generated image is contiguous (`DELME384` at offset 6161 = 6144 + 17). |
+| T12 | minor | **partly fixed** | src/ef/init.s:229-256; src/prg/direfs.s:68-76; src/ef/efs-wrapper.s | `init.s` checks no results and never calls `EFS_validate`. `direfs` does not set VARTAB after loading `$`, and does not check that the cartridge is present. `TIMER_get_system` returns the bytes swapped (unused). `SYS_readdir` leaves a subroutine via `jmp` (unused). The `efs-config.s` comments for `BANKMODE=2` have llll/hhhh swapped. |
 
 The 24-byte directory entries produced by `mkefs.py` were checked
 against the library's interpretation for area 0 (lh) and the r/w area in
 ll, lh and hh mode. All files resolve to the correct data.
+
+**Fixes** (commits "Test cartridge: …" and "Tools: …"):
+
+- T1: `files.list` depends on `menu.prg` and adds the menu line itself;
+  the r/w image and `efs-config.o` depend on the Makefile (`BANKMODE`),
+  and `BANKMODE_VALUE` is derived from `BANKMODE`.
+- T2: `menu.cfg` puts BSS at `$3c00-$3fff` above MAIN, so the C stack
+  (growing down from `$3c00`) cannot reach it.
+- T3: the long test saves a fresh pattern from `$9000` each round
+  (`@0:` from the start), compares the loaded file with it (`memcmp`)
+  and prints the counter with `%lu`.
+- T5: `repaint = true`. T6: DEL at position 0 is ignored, cancel returns
+  an empty string.
+- T7/T8/T9: the (broken) dedup was removed — libefs requires every entry
+  to own its data; the duplicate-name check works; an exact fit of `-s`
+  is accepted; the directory limit is 255 entries.
+- T10/T11: mkbin applies the `hh` shift to prg load addresses too and
+  rejects banks above 63; the map format comment matches the parser;
+  mkefs skips empty list lines and parses type/hidden as decimal
+  (`01` works); mkdata uses `os.urandom`, accepts `-s 0` and paths
+  without a directory.
+- T12: `init.s` switches the cartridge off and resets when EAPI or the
+  menu cannot be loaded; `direfs` sets VARTAB after loading the listing
+  and checks the load result; `TIMER_get_system` returns low/high in
+  the cc65 order; the `BANKMODE=2` comments in `efs-config.s` are
+  corrected. Not changed: T4 (the test menu's own load addresses),
+  `SYS_readdir` (unused), the remaining T11 items (default `-s` for
+  ll/hh, README's Python version).
+
+Verified: full `make` (cartridge, d64), the cartridge boots into the
+menu in VICE, the library tests pass on it.
 
 ---
 
