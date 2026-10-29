@@ -49,7 +49,7 @@ section; for fixed items they refer to the original code.
 | m2 | minor | **fixed** | Directory bounds are not checked for deleted entries; dirlist uses a hard-coded `$b8` bound |
 | m3 | minor | **fixed** | `rom_filesave_blockedspace` uses the stale "active file" area |
 | m4 | minor | **fixed** | `rom_defragment_erasearea` with size < 8 erases 256 sectors |
-| m5 | minor | by code | Hard-coded `$80`/`$a0` file base and dir bank used as files bank |
+| m5 | minor | **partly fixed** | Hard-coded `$80`/`$a0` file base and dir bank used as files bank |
 | m6 | minor | confirmed | LOAD returns the last address, not last + 1 like the KERNAL |
 | m7 | minor | **partly fixed** | Various smaller API inconsistencies (see list) |
 | D1 | doc | – | Documentation mismatches |
@@ -758,7 +758,10 @@ defragment then verify `DELME17K` → OK (`$40`); before: mismatch
   `offset_high = pointer − $80` (or `− $a0` for hhhh) instead of
   `pointer − files_high`. `rom_filesave_begin` uses the directory bank as
   the files bank for the first file. Both only work because the test
-  config has `dir bank = files bank` and `dir high = files high`.
+  config has `dir bank = files bank` and `dir high = files high`. **Partly
+  fixed**: `rom_defragment_copy_dir` uses the destination's configured
+  files address; the first-file position in `rom_filesave_begin` still
+  assumes dir = files, which the manual now states as a limit (S21).
 - **m6 – end address** (*confirmed in VICE*). LOAD returns the address
   of the last byte (X/Y = `$3000` for the 1-byte file `DATA1` loaded to
   `$3000`). The KERNAL returns the

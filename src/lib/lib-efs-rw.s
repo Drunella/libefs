@@ -801,27 +801,15 @@
         lda zp_var_x9    ; offset low
         jsr efs_io_byte  ; write
 
-        ; depending on banking mode
-        lda zp_var_x7
-        cmp #$d4
-        beq @hh
-
-      @lh_ll:
+        ; offset high, relative to the files address of the destination
+        jsr rom_config_get_area_fileshigh_invert
+        sta efs_temp_byte
         lda zp_var_xa    ; offset high
         sec
-        sbc #$80  ; for lhlh and llll
+        sbc efs_temp_byte
         jsr efs_io_byte  ; write
-        jmp @next
-
-      @hh:
-        lda zp_var_xa    ; offset high
-        sec
-        sbc #$a0  ; for hhhh
-        jsr efs_io_byte  ; write
-        ;jmp @next
 
         ; write size
-      @next:
         lda zp_var_xb
         jsr efs_io_byte  ; write
         lda zp_var_xc
