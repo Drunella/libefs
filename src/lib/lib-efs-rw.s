@@ -193,10 +193,18 @@
 
         jsr rom_flags_get_area
         jsr rom_defragment_erasearea
+        bcs @erase_failed
 
         jsr efs_init_eapireadinc  ; leave efs_io_byte as "read" (erase was patched in)
         pla
         clc
+        rts
+
+      @erase_failed:
+        jsr efs_init_eapireadinc
+        pla
+        lda #ERROR_WRITE_ERROR
+        sec
         rts
 
       @error:
@@ -229,7 +237,12 @@
         jsr efs_init_eapireadinc  ; leave efs_io_byte as "read"
         lda #$00
         clc
+        rts
       @error:
+        pha
+        jsr efs_init_eapireadinc
+        pla
+        sec
         rts
 
 
@@ -388,6 +401,17 @@
         bcs @leave
         jsr rom_filesave_transfer_dir
         jsr rom_filesave_transfer_dir_size
+
+        clc  ; remember the entry (size field, bank) for the error path
+        lda efs_readef_low
+        adc #21
+        sta filename_address
+        lda efs_readef_high
+        adc #$00
+        sta filename_address + 1
+        jsr EAPIGetBank
+        sta filename_length
+
         jsr rom_filesave_transfer_data
         
       @leave:
@@ -448,10 +472,7 @@
     rom_filesave_chrin_close:
         jsr rom_config_prepare_config  ; first call to config
 
-        jsr rom_filesave_transfer_dir_finish
-
-        clc
-        rts
+        jmp rom_filesave_transfer_dir_finish  ; .C set and error_byte on error
 
 
 
@@ -508,6 +529,7 @@
         lda zp_var_x8        
         ldy zp_var_xa
         jsr efs_io_byte
+        bcs @erase_error
 
         ; select depending on mode
         lda zp_var_x7  ; mode
@@ -558,8 +580,11 @@
         clc
         rts
 
-      @error_pla:
-        pla
+      @erase_error:
+        lda #ERROR_WRITE_ERROR
+        sec
+        rts
+
       @error:
         lda #ERROR_DEVICE_NOT_PRESENT
         sec
@@ -957,6 +982,7 @@
         bcs @error       ; copy failed, A = error code
         jsr rom_flags_get_area
         jsr rom_defragment_erasearea
+        bcs @error       ; erase failed, A = error code
 
         jsr rom_config_prepare_config  ; set new configuration
         jsr efs_init_readef
@@ -1529,6 +1555,31 @@
         rts
 
 
+    rom_filesave_scratch_entry:
+        ; scratches the directory entry whose size field address is in
+        ; filename_address (bank in filename_length): flags = size field - 5
+        ; used when a save or the size write at close fails, so that no
+        ; live entry with wrong data remains
+        jsr efs_init_eapiwriteinc
+        lda filename_length
+        jsr efs_setstartbank_ext
+        sec
+        lda filename_address
+        sbc #$05
+        tax
+        lda filename_address + 1
+        sbc #$00
+        tay
+        jsr rom_config_get_area_mode_active_file  ; file based
+        jsr EAPISetPtr
+        lda #$60  ; flags: deleted
+        jsr efs_io_byte
+        lda #ERROR_WRITE_ERROR
+        sta error_byte
+        sec
+        rts
+
+
     rom_filesave_transfer_dir_finish:
         jsr efs_init_eapiwriteinc  ; repair dynamic code
 
@@ -1543,13 +1594,19 @@
 
         lda io_start_address
         jsr efs_io_byte
+        bcs @error
         lda io_start_address + 1
         jsr efs_io_byte
+        bcs @error
         lda io_end_address
         jsr efs_io_byte
+        bcs @error
 
         clc
         rts
+
+      @error:
+        jmp rom_filesave_scratch_entry  ; size unknown: drop the entry
 
 
     rom_filesave_transfer_data_prepare:
@@ -1668,10 +1725,7 @@
         rts
 
       @error:
-        lda #ERROR_WRITE_ERROR
-        sta error_byte
-        sec
-        rts
+        jmp rom_filesave_scratch_entry  ; drop the half written entry
         
 
     rom_filesave_decrease_size:

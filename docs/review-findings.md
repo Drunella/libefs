@@ -58,8 +58,8 @@ section; for fixed items they refer to the original code.
 | S3 | critical | **fixed** | `EFS_format` with an open file: next `chrin` erases banks 0-7 (read) / a later file gets a corrupt size (write) |
 | S4 | critical | **fixed** | `EFS_open` while a write channel is full clears the status; the next `chrout` writes into bank 0 |
 | S5 | critical | **fixed** | `EFS_save` of ≥ 64 KB passes the space check and writes past the area into bank 0 |
-| S6 | major | confirmed | A failed save leaves a live, corrupt directory entry |
-| S7 | major | by code | Write/erase errors ignored in defragment, erase and close |
+| S6 | major | **fixed** | A failed save leaves a live, corrupt directory entry |
+| S7 | major | **fixed** | Write/erase errors ignored in defragment, erase and close |
 | S8 | major | confirmed | `chrin` signals EOF one byte late (KERNAL difference) |
 | S9 | major | by code | Type `$1f` entries: terminator for search/dirlist, live file for space/save/defragment |
 | S10-S22 | minor | see section | Exact-fit save, dir `chrin` X/Y, verify end address, name consumed, parser bounds, `@` handling, 254 files, geometry assumptions, commit marker, API nits |
@@ -998,6 +998,24 @@ A = 0, end `$512b` (full size), first data byte `$ff`.
 *Fix*: scratch the entry in the error paths of `transfer_data` and of
 `rom_filesave_chrin_close` (S7).
 
+**Fixed** (with the remaining S7 parts): the new
+`rom_filesave_scratch_entry` programs the flags of the entry whose size
+field address is kept in `filename_address`/`filename_length` to `$60`
+and returns `ERROR_WRITE_ERROR`. `rom_save_body` records the entry
+before the data transfer (as the chrout path already did), and
+`rom_filesave_transfer_data` calls the helper on a write error.
+`rom_filesave_transfer_dir_finish` checks the three size writes and
+calls it too, and `rom_filesave_chrin_close` passes the result on, so
+`EFS_close` returns `$19` with C set when the size cannot be written.
+
+*VICE* (`work/s6btest.s`, flash bytes pre-programmed in the image so
+that the next write fails):
+
+| case | fixed | before the fix |
+| ---- | ----- | -------------- |
+| save `A1` whose third byte hits a pre-programmed byte | `$19`; `load "A1"` → `$04` (entry scratched) | `$19`; `load "A1"` → 0 (live entry with wrong data) |
+| open(1) `W`, 5 bytes, close, with the size byte of its slot pre-programmed | close `$19`, C set; `W` not listed, 726 blocks free | close 0; `W` listed with 65,280 blocks (size `$ffff00`), 982 blocks free |
+
 #### S7 – Write and erase errors are ignored in defragment, erase and close
 
 - `src/lib/lib-efs-rw.s:759` (`;bcs @error ignore errors :(`): the copy
@@ -1013,6 +1031,13 @@ A = 0, end `$512b` (full size), first data byte `$ff`.
 
 *By code.* The copy should stop at the first error and leave the source
 alone; close should scratch the entry when the size cannot be written.
+
+**Fixed**: the copy stops at the first write error (with S2, the
+destination is erased again), `rom_defragment_erasearea` returns
+`ERROR_WRITE_ERROR` when `EAPIEraseSector` fails and `EFS_defragment`,
+`EFS_format` and the automatic defragment report it, and a failed size
+write at close scratches the entry and returns `$19` (verified with S6).
+Erase errors cannot be produced in VICE; that part is by code.
 
 #### S8 – `chrin` signals EOF one byte late (differs from the KERNAL)
 
@@ -1179,6 +1204,7 @@ compiled code.
 | T9 | minor | confirmed | tools/mkefs.py:54 | `>= maxsize` rejects data that exactly fits `-s`. |
 | T10 | minor | confirmed | tools/mkefs.py:94,105; mkbin.py:129-130 | The directory holds 255 files (one slot is needed for the terminator; this is fine but should be documented). The mkbin `hh` shift is applied only when the map gives an explicit address. The mkbin format comment does not match the parser. |
 | T11 | minor | by code | tools/mkefs.py, mkdata.py | No check of the 64-bank limit; default `-s` is wrong for ll/hh. Fragile list parsing (empty line, `01`). `random.randbytes` needs Python 3.9 (README says 3.6). `-s 0` crashes. |
+| T13 | minor | confirmed | tools/mkefs.py | Files in the generated images are placed with a one-byte gap after each file (`DELME15` offset `$1800` size 17, `DELME384` offset `$1812`). libefs places the next save at `offset + size` of the last entry, i.e. on the gap byte (harmless, it is blank), but the space accounting counts one byte less per file than is used. |
 | T12 | minor | by code | src/ef/init.s:229-256; src/prg/direfs.s:68-76; src/ef/efs-wrapper.s | `init.s` checks no results and never calls `EFS_validate`. `direfs` does not set VARTAB after loading `$`, and does not check that the cartridge is present. `TIMER_get_system` returns the bytes swapped (unused). `SYS_readdir` leaves a subroutine via `jmp` (unused). The `efs-config.s` comments for `BANKMODE=2` have llll/hhhh swapped. |
 
 The 24-byte directory entries produced by `mkefs.py` were checked
@@ -1214,6 +1240,7 @@ Fixed on `main`, each verified in VICE:
 | "Fix space check for saves of 64 KB or more" | S5 |
 | "Guard defragment against corrupt sizes and destination overflow" | S2, S7 (copy) |
 | "Fix defragment copying one byte too many per file" | S1 |
+| "Scratch the entry when a save or the size write at close fails" | S6, S7 |
 
 Most of the critical items were one-instruction branch or flag errors
 (`bne` instead of `bcc`, `beq` instead of `bne`, `plp` restoring the
